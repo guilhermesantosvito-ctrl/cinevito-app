@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>CineVito — Administração</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .abas { display:flex; gap:8px; margin-bottom:18px; }
+  .aba { flex:1; text-align:center; padding:10px; border-radius:8px; background:var(--bg-card); cursor:pointer; font-size:14px; }
+  .aba.ativa { background:var(--accent-gold); color:#14100a; font-weight:700; }
+  .lista-item { display:flex; justify-content:space-between; align-items:center; background:var(--bg-card); padding:10px 12px; border-radius:8px; margin-bottom:8px; font-size:14px; }
+  .lista-item button { background:none; border:none; color:var(--danger); font-size:13px; cursor:pointer; }
+  label { font-size:13px; color:var(--text-muted); display:block; margin:10px 0 4px; }
+  .checkbox-linha { display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid #2b3151; font-size:14px; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <a href="catalogo.html" style="color:var(--accent-teal); font-size:14px;">&larr; Voltar ao catálogo</a>
+  <h1 class="brand-title" style="font-size:20px; margin:16px 0;">Administração</h1>
+
+  <div class="abas">
+    <div class="aba ativa" data-aba="videos" onclick="mostrarAba('videos')">Vídeos</div>
+    <div class="aba" data-aba="colecoes" onclick="mostrarAba('colecoes')">Coleções</div>
+  </div>
+
+  <div id="aba-videos">
+    <h3 style="margin-bottom:4px;">Adicionar vídeo</h3>
+    <p class="texto-muted" style="margin-top:0;">Cole o link do Internet Archive, YouTube ou de um arquivo de vídeo direto (.mp4). Só o link fica salvo — o app continua leve.</p>
+
+    <label>Link do vídeo</label>
+    <input type="text" id="v-url" class="input" placeholder="https://archive.org/details/... ou YouTube">
+
+    <label>Título</label>
+    <input type="text" id="v-titulo" class="input" placeholder="Nome do filme/vídeo">
+
+    <label>Descrição</label>
+    <input type="text" id="v-descricao" class="input" placeholder="Uma linha sobre o vídeo">
+
+    <label>Categoria</label>
+    <select id="v-categoria" class="input"></select>
+
+    <label>URL da capa (opcional — auto-preenchido se for Internet Archive)</label>
+    <input type="text" id="v-capa" class="input" placeholder="https://...">
+
+    <label>Licença</label>
+    <input type="text" id="v-licenca" class="input" placeholder="Ex: Domínio Público" value="Domínio Público">
+
+    <label>Ano</label>
+    <input type="number" id="v-ano" class="input" placeholder="Ex: 1968">
+
+    <div class="checkbox-linha">
+      <input type="checkbox" id="v-premium">
+      <label style="margin:0;">Conteúdo premium (só assinante assiste)</label>
+    </div>
+
+    <p class="msg-erro" id="v-erro" style="display:none;"></p>
+    <button class="btn btn-primary" onclick="salvarVideo()">Adicionar ao catálogo</button>
+
+    <h3 style="margin:28px 0 10px;">Vídeos cadastrados</h3>
+    <div id="lista-videos">Carregando...</div>
+  </div>
+
+  <div id="aba-colecoes" style="display:none;">
+    <h3 style="margin-bottom:4px;">Criar coleção</h3>
+    <p class="texto-muted" style="margin-top:0;">Ex: "Sessão de Sexta", "Coletânea Terror". Aparece como uma prateleira especial no catálogo.</p>
+
+    <label>Título da coleção</label>
+    <input type="text" id="c-titulo" class="input" placeholder="Ex: Sessão de Sexta">
+
+    <label>Descrição (opcional)</label>
+    <input type="text" id="c-descricao" class="input" placeholder="Uma linha sobre a coleção">
+
+    <label>URL da capa (opcional)</label>
+    <input type="text" id="c-capa" class="input" placeholder="https://...">
+
+    <p class="msg-erro" id="c-erro" style="display:none;"></p>
+    <button class="btn btn-teal" onclick="salvarColecao()">Criar coleção</button>
+
+    <h3 style="margin:28px 0 10px;">Coleções existentes</h3>
+    <div id="lista-colecoes">Carregando...</div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/video-utils.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>
