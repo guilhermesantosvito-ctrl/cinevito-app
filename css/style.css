@@ -319,6 +319,41 @@ body {
 .toast-aniversario .toast-titulo { color: var(--accent-teal); }
 .toast-aniversario a { background: var(--accent-teal); color: #071019; }
 
+/* ---------- Faixa de instalar o app (PWA) ---------- */
+.faixa-instalar {
+  position: sticky;
+  top: 0;
+  background: linear-gradient(90deg, var(--accent-gold), var(--accent-teal));
+  color: #0A0D12;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  z-index: 100;
+  text-align: center;
+}
+.faixa-instalar button {
+  background: #0A0D12;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.faixa-instalar .fechar-instalar {
+  background: transparent;
+  color: #0A0D12;
+  padding: 4px;
+  font-size: 14px;
+}
+
+/* ---------- Responsivo: notebook, tablet, TV ---------- */
 @media (min-width: 700px) {
   .container {
     max-width: 1200px;
