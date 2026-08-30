@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>CineVito — Perfil</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="container">
+  <a href="catalogo.html" style="color:var(--accent-teal); font-size:14px;">&larr; Voltar</a>
+
+  <h1 class="brand-title" style="font-size:22px; margin:16px 0 20px;">Meu perfil</h1>
+
+  <div id="cartao-perfil" style="background:var(--bg-card); border:1px solid #232a3a; border-radius:12px; padding:20px; margin-bottom:16px;">
+    <div class="avatar" id="avatar-grande" style="width:56px; height:56px; font-size:22px; margin-bottom:14px;">?</div>
+    <div style="font-size:18px; font-weight:600;" id="perfil-nome">-</div>
+    <div class="texto-muted" id="perfil-email" style="margin-top:2px;">-</div>
+  </div>
+
+  <div id="cartao-plano" style="background:var(--bg-card); border:1px solid #232a3a; border-radius:12px; padding:20px; margin-bottom:16px;">
+    <div class="texto-muted">Plano atual</div>
+    <div id="perfil-plano" style="font-size:18px; font-weight:600; margin-top:4px; color:var(--accent-gold);">Carregando...</div>
+    <div class="texto-muted" id="perfil-validade" style="margin-top:4px;"></div>
+    <a href="assinatura.html" class="btn btn-secondary" style="margin-top:14px; padding:10px;">Gerenciar assinatura</a>
+  </div>
+
+  <button class="btn btn-secondary" onclick="sairDoPerfil()">Sair da conta</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/perfil.js"></script>
+</body>
+</html>
