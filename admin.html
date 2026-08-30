@@ -68,7 +68,8 @@
     <input type="number" id="v-ano" class="input" placeholder="Ex: 1968">
 
     <p class="msg-erro" id="v-erro" style="display:none;"></p>
-    <button class="btn btn-primary" onclick="salvarVideo()">Adicionar ao catálogo</button>
+    <button class="btn btn-primary" id="botao-salvar-video" onclick="salvarVideo()">Adicionar ao catálogo</button>
+    <a href="#" id="link-cancelar-edicao" onclick="cancelarEdicaoVideo(); return false;" style="display:none; text-align:center; margin-top:10px; color:var(--accent-teal); font-size:13px;">Cancelar edição</a>
 
     <h3 style="margin:28px 0 10px;">Vídeos cadastrados</h3>
     <div id="lista-videos">Carregando...</div>
