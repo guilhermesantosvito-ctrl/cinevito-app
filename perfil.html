@@ -26,6 +26,17 @@
     <div class="texto-muted" id="perfil-email" style="margin-top:2px;">-</div>
   </div>
 
+  <div id="cartao-editar" style="background:var(--bg-card); border:1px solid #232a3a; border-radius:12px; padding:20px; margin-bottom:16px;">
+    <div class="texto-muted" style="margin-bottom:10px;">Editar minhas informações</div>
+    <label style="font-size:13px; color:var(--text-muted); display:block; margin-bottom:4px;">Nome</label>
+    <input type="text" id="editar-nome" class="input" placeholder="Seu nome">
+    <label style="font-size:13px; color:var(--text-muted); display:block; margin-bottom:4px;">E-mail</label>
+    <input type="email" id="editar-email" class="input" placeholder="Seu e-mail">
+    <p class="msg-erro" id="editar-erro" style="display:none;"></p>
+    <p class="texto-muted" id="editar-sucesso" style="display:none; color:var(--accent-teal);"></p>
+    <button class="btn btn-primary" onclick="salvarEdicaoPerfil()">Salvar alterações</button>
+  </div>
+
   <div id="cartao-plano" style="background:var(--bg-card); border:1px solid #232a3a; border-radius:12px; padding:20px; margin-bottom:16px;">
     <div class="texto-muted">Plano atual</div>
     <div id="perfil-plano" style="font-size:18px; font-weight:600; margin-top:4px; color:var(--accent-gold);">Carregando...</div>
