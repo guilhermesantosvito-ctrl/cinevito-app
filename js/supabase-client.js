@@ -23,7 +23,20 @@ async function exigirLogin() {
   return user;
 }
 
+// Administradores e equipe sempre têm acesso total, sem precisar de
+// teste grátis nem assinatura — isso é só para clientes.
+async function usuarioEhAdmin(usuarioId) {
+  const { data } = await supabaseClient
+    .from("profiles")
+    .select("is_admin")
+    .eq("id", usuarioId)
+    .maybeSingle();
+  return !!data?.is_admin;
+}
+
 async function usuarioEhAssinante(usuarioId) {
+  if (await usuarioEhAdmin(usuarioId)) return true;
+
   const { data, error } = await supabaseClient
     .from("assinaturas")
     .select("status, data_expiracao")
@@ -36,4 +49,17 @@ async function usuarioEhAssinante(usuarioId) {
   if (error || !data) return false;
   if (!data.data_expiracao) return true;
   return new Date(data.data_expiracao) > new Date();
+}
+
+// Retorna os detalhes da assinatura/teste atual, para mostrar avisos
+// de quantos dias faltam (usado no aviso fechável do catálogo)
+async function obterStatusAssinatura(usuarioId) {
+  const { data } = await supabaseClient
+    .from("assinaturas")
+    .select("status, data_expiracao")
+    .eq("usuario_id", usuarioId)
+    .order("criado_em", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data || null;
 }
