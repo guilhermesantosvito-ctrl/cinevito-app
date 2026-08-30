@@ -42,9 +42,29 @@ async function usuarioEhAssinante(usuarioId) {
     .limit(1)
     .maybeSingle();
 
-  if (error || !data) return false;
-  if (!data.data_expiracao) return true;
-  return new Date(data.data_expiracao) > new Date();
+  if (!error && data) {
+    if (!data.data_expiracao) return true;
+    if (new Date(data.data_expiracao) > new Date()) return true;
+  }
+
+  // Rede de segurança: mesmo sem registro de assinatura (ou se o
+  // teste grátis não foi concedido por algum motivo), ninguém é
+  // cobrado antes de completar 2 dias desde a criação da conta.
+  return await aindaDentroDoPrazoDeContaNova(usuarioId);
+}
+
+async function aindaDentroDoPrazoDeContaNova(usuarioId) {
+  const { data: perfil } = await supabaseClient
+    .from("profiles")
+    .select("criado_em")
+    .eq("id", usuarioId)
+    .maybeSingle();
+
+  if (!perfil?.criado_em) return false;
+
+  const doisDiasDepois = new Date(perfil.criado_em);
+  doisDiasDepois.setDate(doisDiasDepois.getDate() + 2);
+  return new Date() < doisDiasDepois;
 }
 
 async function obterStatusAssinatura(usuarioId) {
@@ -55,5 +75,19 @@ async function obterStatusAssinatura(usuarioId) {
     .order("criado_em", { ascending: false })
     .limit(1)
     .maybeSingle();
-  return data || null;
+
+  if (data) return data;
+
+  const { data: perfil } = await supabaseClient
+    .from("profiles")
+    .select("criado_em")
+    .eq("id", usuarioId)
+    .maybeSingle();
+
+  if (!perfil?.criado_em) return null;
+
+  const expiracao = new Date(perfil.criado_em);
+  expiracao.setDate(expiracao.getDate() + 2);
+
+  return { status: "trial", data_expiracao: expiracao.toISOString() };
 }
