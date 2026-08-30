@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>CineVito — Coleção</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .grade-colecao { display:grid; grid-template-columns: repeat(2, 1fr); gap:12px; margin-top:16px; }
+  .grade-colecao .card-video { width:100%; height:220px; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <a href="catalogo.html" style="color:var(--accent-teal); font-size:14px;">&larr; Voltar ao catálogo</a>
+  <h1 class="brand-title" id="colecao-titulo" style="font-size:22px; margin:16px 0 4px;"></h1>
+  <p class="texto-muted" id="colecao-descricao"></p>
+  <div class="grade-colecao" id="grade-videos"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/colecao.js"></script>
+</body>
+</html>
