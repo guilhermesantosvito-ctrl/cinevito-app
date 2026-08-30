@@ -1,6 +1,12 @@
 let usuarioCatalogo = null;
 let assinanteAtual = false;
 
+const GENEROS_PADRAO = [
+  "Ação", "Aventura", "Comédia", "Drama", "Terror", "Ficção Científica",
+  "Romance", "Documentário", "Animação", "Infantil", "Suspense",
+  "Musical", "Fantasia", "Faroeste", "Guerra", "Biografia"
+];
+
 (async function iniciarCatalogo() {
   const usuario = await exigirLogin();
   if (!usuario) return;
@@ -8,31 +14,97 @@ let assinanteAtual = false;
 
   const { data: perfil } = await supabaseClient
     .from("profiles")
-    .select("nome, is_admin")
+    .select("nome, is_admin, data_nascimento")
     .eq("id", usuario.id)
     .maybeSingle();
 
   const nome = perfil?.nome || usuario.email || "U";
   document.getElementById("avatar-inicial").textContent = nome.charAt(0).toUpperCase();
-  document.getElementById("avatar-inicial").style.cursor = "pointer";
   document.getElementById("avatar-inicial").onclick = () => window.location.href = "perfil.html";
+  document.getElementById("texto-boas-vindas").textContent = `Olá, ${nome.split(" ")[0]}!`;
 
   assinanteAtual = await usuarioEhAssinante(usuario.id);
-  if (!assinanteAtual) {
-    document.getElementById("aviso-assinatura").style.display = "block";
-  }
 
   if (perfil?.is_admin) {
     const linkAdmin = document.createElement("a");
     linkAdmin.href = "admin.html";
+    linkAdmin.className = "icone-topbar";
     linkAdmin.textContent = "⚙️";
-    linkAdmin.style.fontSize = "20px";
-    linkAdmin.style.marginRight = "8px";
-    document.querySelector(".topbar").insertBefore(linkAdmin, document.getElementById("avatar-inicial"));
+    document.getElementById("lado-direito-topbar").insertBefore(
+      linkAdmin, document.getElementById("lado-direito-topbar").firstChild
+    );
+  } else {
+    await mostrarToastStatus(usuario.id);
+    await verificarAniversario(perfil?.data_nascimento);
   }
 
   await montarPagina();
 })();
+
+async function mostrarToastStatus(usuarioId) {
+  const status = await obterStatusAssinatura(usuarioId);
+  const area = document.getElementById("area-toast");
+
+  if (!status || status.status === "inativa") {
+    area.innerHTML = `
+      <div class="toast-assinatura">
+        <button class="fechar-toast" onclick="this.parentElement.remove()">✕</button>
+        <div class="toast-titulo">Assine o CineVito</div>
+        <div class="toast-texto">Você ainda não é assinante. Assine para desbloquear o catálogo.</div>
+        <a href="assinatura.html">Ver planos</a>
+      </div>`;
+    return;
+  }
+
+  if (!status.data_expiracao) return;
+
+  const diasRestantes = Math.ceil((new Date(status.data_expiracao) - new Date()) / 86400000);
+
+  if (status.status === "trial" && diasRestantes > 0) {
+    area.innerHTML = `
+      <div class="toast-assinatura">
+        <button class="fechar-toast" onclick="this.parentElement.remove()">✕</button>
+        <div class="toast-titulo">Teste grátis</div>
+        <div class="toast-texto">Restam ${diasRestantes} dia${diasRestantes === 1 ? "" : "s"} do seu teste grátis. Assine já para não perder o acesso.</div>
+        <a href="assinatura.html">Assinar agora</a>
+      </div>`;
+  } else if (status.status === "ativa" && diasRestantes <= 7 && diasRestantes > 0) {
+    area.innerHTML = `
+      <div class="toast-assinatura">
+        <button class="fechar-toast" onclick="this.parentElement.remove()">✕</button>
+        <div class="toast-titulo">Assinatura expirando</div>
+        <div class="toast-texto">Faltam ${diasRestantes} dia${diasRestantes === 1 ? "" : "s"} para sua assinatura expirar.</div>
+        <a href="assinatura.html">Renovar agora</a>
+      </div>`;
+  } else if (diasRestantes <= 0) {
+    area.innerHTML = `
+      <div class="toast-assinatura">
+        <button class="fechar-toast" onclick="this.parentElement.remove()">✕</button>
+        <div class="toast-titulo">Acesso expirado</div>
+        <div class="toast-texto">Seu período de acesso terminou. Assine para continuar.</div>
+        <a href="assinatura.html">Ver planos</a>
+      </div>`;
+  }
+}
+
+async function verificarAniversario(dataNascimento) {
+  if (!dataNascimento) return;
+
+  const nascimento = new Date(dataNascimento + "T00:00:00");
+  const hoje = new Date();
+  if (nascimento.getMonth() !== hoje.getMonth()) return;
+
+  const area = document.getElementById("area-toast");
+  const div = document.createElement("div");
+  div.className = "toast-assinatura toast-aniversario";
+  div.innerHTML = `
+    <button class="fechar-toast" onclick="this.parentElement.remove()">✕</button>
+    <div class="toast-titulo">🎂 Mês de aniversário!</div>
+    <div class="toast-texto">Use o cupom <strong>ANIVERSARIO10</strong> e ganhe 10% de desconto na sua assinatura.</div>
+    <a href="assinatura.html">Assinar com desconto</a>
+  `;
+  area.appendChild(div);
+}
 
 async function montarPagina() {
   const container = document.getElementById("lista-categorias");
@@ -50,7 +122,7 @@ async function montarPagina() {
     .limit(10);
 
   montarAbasTopo(categorias || [], colecoes || []);
-  montarFiltro(categorias || []);
+  montarFiltroGeneros();
 
   if (continuando && continuando.length > 0) {
     montarLinha(container, "continuar", "Continuar assistindo", continuando.map(c => c.videos).filter(Boolean));
@@ -103,6 +175,7 @@ function montarLinha(container, idSecao, titulo, listaVideos) {
   listaVideos.forEach(video => {
     const card = document.createElement("div");
     card.className = "card-video";
+    card.dataset.genero = video.genero || "";
     card.onclick = () => abrirVideo(video.id);
     card.innerHTML = `
       <img src="${video.url_capa}" alt="${video.titulo}" loading="lazy">
@@ -120,7 +193,7 @@ function montarAbasTopo(categorias, colecoes) {
   nav.innerHTML = "";
 
   const abaInicio = document.createElement("a");
-  abaInicio.href = "#topo";
+  abaInicio.href = "#";
   abaInicio.className = "aba-topo ativa";
   abaInicio.textContent = "Início";
   abaInicio.onclick = (e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: "smooth" }); marcarAbaAtiva(abaInicio); };
@@ -155,35 +228,37 @@ function irParaSecao(id) {
   if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-function montarFiltro(categorias) {
-  const linha = document.getElementById("filtro-categorias");
+function montarFiltroGeneros() {
+  const linha = document.getElementById("filtro-generos");
   linha.innerHTML = "";
 
   const chipTodos = document.createElement("div");
   chipTodos.className = "chip-filtro ativo";
-  chipTodos.textContent = "Todos";
-  chipTodos.onclick = () => aplicarFiltro(null, chipTodos);
+  chipTodos.textContent = "Todos os gêneros";
+  chipTodos.onclick = () => aplicarFiltroGenero(null, chipTodos);
   linha.appendChild(chipTodos);
 
-  categorias.forEach(cat => {
+  GENEROS_PADRAO.forEach(genero => {
     const chip = document.createElement("div");
     chip.className = "chip-filtro";
-    chip.textContent = cat.nome;
-    chip.onclick = () => aplicarFiltro(cat.id, chip);
+    chip.textContent = genero;
+    chip.onclick = () => aplicarFiltroGenero(genero, chip);
     linha.appendChild(chip);
   });
 }
 
-function aplicarFiltro(categoriaId, chipClicado) {
+function aplicarFiltroGenero(genero, chipClicado) {
   document.querySelectorAll(".chip-filtro").forEach(c => c.classList.remove("ativo"));
   chipClicado.classList.add("ativo");
 
   document.querySelectorAll(".secao-categoria").forEach(secao => {
-    if (categoriaId === null) {
-      secao.style.display = "";
-    } else {
-      secao.style.display = secao.id === `categoria-${categoriaId}` ? "" : "none";
-    }
+    let algumVisivel = false;
+    secao.querySelectorAll(".card-video").forEach(card => {
+      const mostra = genero === null || card.dataset.genero === genero;
+      card.style.display = mostra ? "" : "none";
+      if (mostra) algumVisivel = true;
+    });
+    secao.style.display = algumVisivel ? "" : "none";
   });
 }
 
