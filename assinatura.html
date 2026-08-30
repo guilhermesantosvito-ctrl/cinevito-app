@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>CineVito — Assinatura</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .abas-plano { display:flex; gap:8px; margin-bottom:20px; }
+  .aba-plano {
+    flex:1; text-align:center; padding:12px 6px; border-radius:10px;
+    background:var(--bg-card); border:1px solid #232a3a; cursor:pointer;
+  }
+  .aba-plano.ativa { background:var(--accent-gold); border-color:var(--accent-gold); }
+  .aba-plano.ativa .aba-titulo, .aba-plano.ativa .aba-sub { color:#14100a; }
+  .aba-titulo { font-weight:700; font-size:14px; }
+  .aba-sub { font-size:11px; color:var(--text-muted); margin-top:2px; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <a href="catalogo.html" style="color:var(--accent-teal); font-size:14px;">&larr; Voltar</a>
+
+  <h1 class="brand-title" style="font-size:22px; margin:16px 0 4px;">Assine o CineVito</h1>
+  <p class="texto-muted" style="margin-bottom:22px;">Escolha o plano ideal pra você.</p>
+
+  <div id="status-assinatura" style="display:none; background:var(--bg-card); border:1px solid var(--accent-teal); border-radius:10px; padding:14px; margin-bottom:18px;">
+    <strong style="color:var(--accent-teal);">Assinatura ativa</strong>
+    <p class="texto-muted" style="margin:6px 0 0;">Você já tem acesso ao catálogo. Aproveite!</p>
+  </div>
+
+  <div id="planos-area">
+
+    <div class="abas-plano">
+      <div class="aba-plano" data-plano="basico" onclick="selecionarPlano('basico')">
+        <div class="aba-titulo">Básico</div>
+        <div class="aba-sub">1 dispositivo</div>
+      </div>
+      <div class="aba-plano ativa" data-plano="padrao" onclick="selecionarPlano('padrao')">
+        <div class="aba-titulo">Padrão</div>
+        <div class="aba-sub">2 dispositivos</div>
+      </div>
+      <div class="aba-plano" data-plano="premium" onclick="selecionarPlano('premium')">
+        <div class="aba-titulo">Premium</div>
+        <div class="aba-sub">4 dispositivos</div>
+      </div>
+    </div>
+
+    <div id="lista-periodos"></div>
+
+    <button class="btn btn-primary" style="margin-top:8px;" onclick="assinar()">Assinar agora</button>
+    <p class="texto-muted" style="text-align:center; margin-top:10px;">
+      Pagamento via cartão de crédito ou Pix, processado pelo Mercado Pago.
+    </p>
+    <p class="msg-erro" id="assinatura-erro" style="display:none; text-align:center;"></p>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/checkout.js"></script>
+</body>
+</html>
