@@ -27,8 +27,11 @@
   <div style="width:100%; max-width:340px;">
 
     <div id="form-login">
-      <input type="email" id="login-email" class="input" placeholder="E-mail">
-      <input type="password" id="login-senha" class="input" placeholder="Senha">
+      <input type="email" id="login-email" class="input" placeholder="E-mail" autocomplete="off">
+      <input type="password" id="login-senha" class="input" placeholder="Senha" autocomplete="new-password">
+      <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-muted); margin:-4px 0 14px;">
+        <input type="checkbox" id="lembrar-email"> Lembrar meu e-mail neste aparelho
+      </label>
       <p class="msg-erro" id="login-erro" style="display:none;"></p>
       <button class="btn btn-primary" onclick="fazerLogin()">Entrar</button>
       <p class="texto-muted" style="text-align:center; margin-top:16px;">
@@ -44,6 +47,8 @@
       <input type="text" id="cadastro-nome" class="input" placeholder="Seu nome">
       <input type="email" id="cadastro-email" class="input" placeholder="E-mail">
       <input type="password" id="cadastro-senha" class="input" placeholder="Crie uma senha">
+      <label style="display:block; font-size:12px; color:var(--text-muted); margin:-4px 0 4px;">Data de nascimento (pra gente te dar um presente no seu aniversário 🎂)</label>
+      <input type="date" id="cadastro-nascimento" class="input">
       <p class="msg-erro" id="cadastro-erro" style="display:none;"></p>
       <button class="btn btn-teal" onclick="criarConta()">Criar conta</button>
       <p class="texto-muted" style="text-align:center; margin-top:16px;">
@@ -99,6 +104,12 @@ async function fazerLogin() {
     return;
   }
 
+  if (document.getElementById("lembrar-email").checked) {
+    localStorage.setItem("cinevito_email_lembrado", email);
+  } else {
+    localStorage.removeItem("cinevito_email_lembrado");
+  }
+
   window.location.href = "catalogo.html";
 }
 
@@ -132,15 +143,13 @@ async function criarConta() {
     return;
   }
 
-  // Cria o registro na tabela profiles
   if (data.user) {
     await supabaseClient.from("profiles").insert({
       id: data.user.id,
       nome: nome,
-      email: email
+      email: email,
+      data_nascimento: document.getElementById("cadastro-nascimento").value || null
     });
-
-    // Verifica se este IP/aparelho já usou o teste grátis, e libera se for novo
     await supabaseClient.functions.invoke("registrar-acesso", {
       body: { usuario_id: data.user.id, device_id: obterDeviceId() }
     });
@@ -171,6 +180,12 @@ async function recuperarSenha() {
 (async () => {
   const user = await getUsuarioLogado();
   if (user) window.location.href = "catalogo.html";
+
+  const emailLembrado = localStorage.getItem("cinevito_email_lembrado");
+  if (emailLembrado) {
+    document.getElementById("login-email").value = emailLembrado;
+    document.getElementById("lembrar-email").checked = true;
+  }
 })();
 
 </script>
