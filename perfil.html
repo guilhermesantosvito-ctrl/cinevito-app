@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>CineVito — Perfil</title>
 <link rel="stylesheet" href="css/style.css">
+<style>
+  .item-menu {
+    display:flex; align-items:center; gap:10px; background:var(--bg-card);
+    border:1px solid #232a3a; border-radius:10px; padding:14px 16px;
+    margin-bottom:10px; text-decoration:none; color:var(--text-primary); font-size:14px;
+  }
+</style>
 </head>
 <body>
 
@@ -26,7 +33,11 @@
     <a href="assinatura.html" class="btn btn-secondary" style="margin-top:14px; padding:10px;">Gerenciar assinatura</a>
   </div>
 
-  <button class="btn btn-secondary" onclick="sairDoPerfil()">Sair da conta</button>
+  <a href="sugestao.html" class="item-menu">🎬 Sugerir um filme</a>
+  <a href="faq.html" class="item-menu">❓ Como funciona / Perguntas frequentes</a>
+  <a href="mailto:contatocinevito@gmail.com" class="item-menu">✉️ Falar com a gente</a>
+
+  <button class="btn btn-secondary" style="margin-top:16px;" onclick="sairDoPerfil()">Sair da conta</button>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
