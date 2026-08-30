@@ -1,11 +1,6 @@
 let usuarioCatalogo = null;
 let assinanteAtual = false;
-
-const GENEROS_PADRAO = [
-  "Ação", "Aventura", "Comédia", "Drama", "Terror", "Ficção Científica",
-  "Romance", "Documentário", "Animação", "Infantil", "Suspense",
-  "Musical", "Fantasia", "Faroeste", "Guerra", "Biografia"
-];
+let generosCache = [];
 
 (async function iniciarCatalogo() {
   const usuario = await exigirLogin();
@@ -106,6 +101,17 @@ async function verificarAniversario(dataNascimento) {
   area.appendChild(div);
 }
 
+function habilitarScrollHorizontal(elemento) {
+  if (!elemento || elemento.dataset.scrollHabilitado) return;
+  elemento.dataset.scrollHabilitado = "1";
+  elemento.addEventListener("wheel", (e) => {
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+      e.preventDefault();
+      elemento.scrollLeft += e.deltaY;
+    }
+  }, { passive: false });
+}
+
 async function montarPagina() {
   const container = document.getElementById("lista-categorias");
   container.innerHTML = "";
@@ -113,6 +119,8 @@ async function montarPagina() {
   const { data: categorias } = await supabaseClient.from("categorias").select("*").order("ordem");
   const { data: colecoes } = await supabaseClient.from("colecoes").select("*").order("ordem");
   const { data: videos } = await supabaseClient.from("videos").select("*");
+  const { data: generos } = await supabaseClient.from("generos").select("*").order("ordem");
+  generosCache = generos || [];
 
   const { data: continuando } = await supabaseClient
     .from("continuar_assistindo")
@@ -150,6 +158,7 @@ async function montarPagina() {
     });
     bloco.appendChild(carrossel);
     container.appendChild(bloco);
+    habilitarScrollHorizontal(carrossel);
   }
 
   (categorias || []).forEach(categoria => {
@@ -157,6 +166,9 @@ async function montarPagina() {
     if (videosDaCategoria.length === 0) return;
     montarLinha(container, `categoria-${categoria.id}`, categoria.nome, videosDaCategoria);
   });
+
+  habilitarScrollHorizontal(document.getElementById("abas-topo"));
+  habilitarScrollHorizontal(document.getElementById("filtro-generos"));
 }
 
 function montarLinha(container, idSecao, titulo, listaVideos) {
@@ -186,6 +198,7 @@ function montarLinha(container, idSecao, titulo, listaVideos) {
 
   bloco.appendChild(carrossel);
   container.appendChild(bloco);
+  habilitarScrollHorizontal(carrossel);
 }
 
 function montarAbasTopo(categorias, colecoes) {
@@ -238,11 +251,11 @@ function montarFiltroGeneros() {
   chipTodos.onclick = () => aplicarFiltroGenero(null, chipTodos);
   linha.appendChild(chipTodos);
 
-  GENEROS_PADRAO.forEach(genero => {
+  generosCache.forEach(g => {
     const chip = document.createElement("div");
     chip.className = "chip-filtro";
-    chip.textContent = genero;
-    chip.onclick = () => aplicarFiltroGenero(genero, chip);
+    chip.textContent = g.nome;
+    chip.onclick = () => aplicarFiltroGenero(g.nome, chip);
     linha.appendChild(chip);
   });
 }
