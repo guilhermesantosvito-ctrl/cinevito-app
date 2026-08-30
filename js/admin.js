@@ -2,6 +2,7 @@ let usuarioAdmin = null;
 let categoriasCache = [];
 let videosCache = [];
 let generosCacheAdmin = [];
+let videoEditandoId = null;
 
 (async function iniciarAdmin() {
   const usuario = await exigirLogin();
@@ -130,7 +131,7 @@ async function salvarVideo() {
   const capaDigitada = document.getElementById("v-capa").value.trim();
   const capaFinal = capaDigitada || sugerirCapaAutomatica(urlNormalizada);
 
-  const { error } = await supabaseClient.from("videos").insert({
+  const dadosVideo = {
     titulo,
     descricao: document.getElementById("v-descricao").value.trim(),
     categoria_id: categoriaId,
@@ -140,7 +141,14 @@ async function salvarVideo() {
     fonte: "Adicionado manualmente",
     licenca: document.getElementById("v-licenca").value.trim(),
     ano: parseInt(document.getElementById("v-ano").value) || null
-  });
+  };
+
+  let error;
+  if (videoEditandoId) {
+    ({ error } = await supabaseClient.from("videos").update(dadosVideo).eq("id", videoEditandoId));
+  } else {
+    ({ error } = await supabaseClient.from("videos").insert(dadosVideo));
+  }
 
   if (error) {
     erroEl.textContent = "Erro ao salvar: " + error.message;
@@ -148,9 +156,34 @@ async function salvarVideo() {
     return;
   }
 
-  ["v-url", "v-titulo", "v-descricao", "v-capa", "v-ano"].forEach(id => document.getElementById(id).value = "");
-
+  cancelarEdicaoVideo();
   await carregarListaVideos();
+}
+
+function editarVideo(id) {
+  const video = videosCache.find(v => v.id === id);
+  if (!video) return;
+
+  videoEditandoId = id;
+  document.getElementById("v-url").value = video.url_video || "";
+  document.getElementById("v-titulo").value = video.titulo || "";
+  document.getElementById("v-descricao").value = video.descricao || "";
+  document.getElementById("v-categoria").value = video.categoria_id || "";
+  document.getElementById("v-genero").value = video.genero || "";
+  document.getElementById("v-capa").value = video.url_capa || "";
+  document.getElementById("v-licenca").value = video.licenca || "";
+  document.getElementById("v-ano").value = video.ano || "";
+
+  document.getElementById("botao-salvar-video").textContent = "Salvar alterações";
+  document.getElementById("link-cancelar-edicao").style.display = "block";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function cancelarEdicaoVideo() {
+  videoEditandoId = null;
+  ["v-url", "v-titulo", "v-descricao", "v-capa", "v-ano"].forEach(id => document.getElementById(id).value = "");
+  document.getElementById("botao-salvar-video").textContent = "Adicionar ao catálogo";
+  document.getElementById("link-cancelar-edicao").style.display = "none";
 }
 
 async function carregarListaVideos() {
@@ -165,8 +198,11 @@ async function carregarListaVideos() {
 
   container.innerHTML = videosCache.map(v => `
     <div class="lista-item">
-      <span>${v.titulo}${v.genero ? ' <span class="texto-muted">· ' + v.genero + '</span>' : ''}</span>
-      <button onclick="apagarVideo('${v.id}')">Apagar</button>
+      <span>${v.titulo}${v.genero ? ' <span class="texto-muted">· ' + v.genero + '</span>' : ' <span class="texto-muted">· sem gênero</span>'}</span>
+      <span>
+        <button onclick="editarVideo('${v.id}')" style="color:var(--accent-teal); margin-right:10px;">Editar</button>
+        <button onclick="apagarVideo('${v.id}')">Apagar</button>
+      </span>
     </div>
   `).join("");
 }
