@@ -28,7 +28,7 @@ async function usuarioEhAssinante(usuarioId) {
     .from("assinaturas")
     .select("status, data_expiracao")
     .eq("usuario_id", usuarioId)
-    .eq("status", "ativa")
+    .in("status", ["ativa", "trial"])
     .order("criado_em", { ascending: false })
     .limit(1)
     .maybeSingle();
