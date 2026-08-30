@@ -6,20 +6,37 @@
 <title>CineVito — Assistindo</title>
 <link rel="stylesheet" href="css/style.css">
 <style>
-  .player-wrapper iframe { width: 100%; height: 100%; border: 0; }
+  .player-wrapper { position: relative; }
+  .player-wrapper iframe, .player-wrapper video { width: 100%; height: 100%; border: 0; display:block; }
+  .botao-voltar-player {
+    position: absolute; top: 12px; left: 12px; z-index: 5;
+    width: 36px; height: 36px; border-radius: 50%;
+    background: rgba(8,11,16,0.65); color: #fff;
+    display:flex; align-items:center; justify-content:center;
+    text-decoration:none; font-size: 18px; backdrop-filter: blur(2px);
+  }
+  .botao-favorito {
+    background: var(--bg-card); border: 1px solid #232a3a; border-radius: 8px;
+    padding: 8px 14px; color: var(--text-primary); font-size: 14px;
+    display:inline-flex; align-items:center; gap:6px; cursor:pointer; margin-top:14px;
+  }
+  .botao-favorito.ativo { border-color: var(--accent-gold); color: var(--accent-gold); }
 </style>
 </head>
 <body>
 
 <div class="player-wrapper" id="player-wrapper">
+  <a href="catalogo.html" class="botao-voltar-player">←</a>
   <p style="color:#999; text-align:center; padding-top:40%;">Carregando...</p>
 </div>
 
 <div class="container" style="padding-top:16px;">
-  <a href="catalogo.html" style="color:var(--accent-teal); font-size:14px;">&larr; Voltar ao catálogo</a>
-  <h2 id="video-titulo" style="margin:12px 0 6px;"></h2>
+  <h2 id="video-titulo" style="margin:0 0 6px;"></h2>
   <p class="texto-muted" id="video-descricao"></p>
   <p class="texto-muted" id="video-info" style="margin-top:14px;"></p>
+  <button class="botao-favorito" id="botao-favorito" onclick="alternarFavorito()">
+    <span id="icone-favorito">☆</span> <span id="texto-favorito">Adicionar aos favoritos</span>
+  </button>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
