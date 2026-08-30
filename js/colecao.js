@@ -38,17 +38,16 @@
   grade.innerHTML = itens.map(item => {
     const v = item.videos;
     return `
-      <div class="card-video" onclick="abrirDaColecao('${v.id}', ${v.premium}, ${assinante})">
+      <div class="card-video" onclick="abrirDaColecao('${v.id}', ${assinante})">
         <img src="${v.url_capa}" alt="${v.titulo}" loading="lazy">
-        ${v.premium ? '<span class="badge-premium">Premium</span>' : ''}
         <div class="titulo-card">${v.titulo}</div>
       </div>
     `;
   }).join("");
 })();
 
-function abrirDaColecao(videoId, premium, assinante) {
-  if (premium && !assinante) {
+function abrirDaColecao(videoId, assinante) {
+  if (!assinante) {
     window.location.href = "assinatura.html";
     return;
   }
