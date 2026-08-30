@@ -1,9 +1,11 @@
 let usuarioAtual = null;
 let planoSelecionado = "padrao";
+let periodoSelecionado = "mensal";
+let paymentBrickController = null;
 
-// Preços exibidos aqui são só para mostrar na tela.
-// O valor cobrado de verdade é sempre conferido no servidor (Edge Function),
-// então mesmo que alguém tente mexer no navegador, não muda o preço real.
+// Chave pública do Mercado Pago (segura pra ficar no navegador)
+const mp = new MercadoPago("APP_USR-471c3a9b-ff0f-4743-a417-e54b9f13e902", { locale: "pt-BR" });
+
 const PLANOS = {
   basico: {
     nome: "Básico",
@@ -33,8 +35,6 @@ const PLANOS = {
     }
   }
 };
-
-let periodoSelecionado = "mensal";
 
 (async function iniciarAssinatura() {
   usuarioAtual = await exigirLogin();
@@ -82,29 +82,104 @@ function renderizarPeriodos() {
   });
 }
 
-async function assinar() {
-  const erroEl = document.getElementById("assinatura-erro");
-  erroEl.style.display = "none";
+async function continuarParaPagamento() {
+  document.getElementById("planos-area").style.display = "none";
+  document.getElementById("area-pagamento").style.display = "block";
 
-  const chavePlano = `${planoSelecionado}-${periodoSelecionado}`;
+  const dados = PLANOS[planoSelecionado];
+  const preco = dados.periodos[periodoSelecionado].preco;
 
-  try {
-    const { data, error } = await supabaseClient.functions.invoke("criar-assinatura", {
-      body: {
-        usuario_id: usuarioAtual.id,
-        email: usuarioAtual.email,
-        plano: chavePlano
-      }
-    });
-
-    if (error || !data?.checkout_url) {
-      throw new Error(error?.message || "Resposta inválida do servidor");
-    }
-
-    window.location.href = data.checkout_url;
-
-  } catch (e) {
-    erroEl.textContent = "Não foi possível iniciar o checkout: " + e.message;
-    erroEl.style.display = "block";
+  if (paymentBrickController) {
+    paymentBrickController.unmount();
   }
+
+  const settings = {
+    initialization: {
+      amount: preco,
+      payer: { email: usuarioAtual.email }
+    },
+    customization: {
+      paymentMethods: {
+        creditCard: "all",
+        bankTransfer: "all"
+      }
+    },
+    callbacks: {
+      onReady: () => {},
+      onSubmit: (formData) => {
+        return new Promise(async (resolve, reject) => {
+          const chavePlano = `${planoSelecionado}-${periodoSelecionado}`;
+          const mensagemEl = document.getElementById("mensagem-pagamento");
+          mensagemEl.textContent = "";
+
+          try {
+            const { data, error } = await supabaseClient.functions.invoke("processar-pagamento", {
+              body: {
+                usuario_id: usuarioAtual.id,
+                plano: chavePlano,
+                formData: formData
+              }
+            });
+
+            if (error) throw new Error(error.message);
+
+            if (data.status === "approved") {
+              mensagemEl.style.color = "var(--accent-teal)";
+              mensagemEl.textContent = "Pagamento aprovado! Redirecionando...";
+              setTimeout(() => window.location.href = "catalogo.html", 1500);
+              resolve();
+
+            } else if (data.status === "pending" && data.pix_copia_cola) {
+              document.getElementById("brick-pagamento").style.display = "none";
+              const areaPix = document.getElementById("area-pix");
+              areaPix.style.display = "block";
+              areaPix.innerHTML = `
+                <div class="pix-caixa">
+                  <strong style="color:var(--accent-gold);">Escaneie ou copie o código Pix</strong>
+                  <img src="data:image/png;base64,${data.pix_qr_base64}" alt="QR Code Pix">
+                  <div class="pix-codigo" id="pix-codigo-texto">${data.pix_copia_cola}</div>
+                  <button class="btn btn-secondary" style="margin-top:10px;" onclick="copiarCodigoPix()">Copiar código</button>
+                  <p class="texto-muted" style="margin-top:10px;">Assim que o pagamento for confirmado, seu acesso libera automaticamente.</p>
+                </div>
+              `;
+              resolve();
+
+            } else {
+              mensagemEl.style.color = "var(--danger)";
+              mensagemEl.textContent = "Pagamento recusado: " + (data.motivo || "tente outro cartão.");
+              reject();
+            }
+
+          } catch (e) {
+            mensagemEl.style.color = "var(--danger)";
+            mensagemEl.textContent = "Erro ao processar: " + e.message;
+            reject();
+          }
+        });
+      },
+      onError: (error) => {
+        console.error(error);
+      }
+    }
+  };
+
+  paymentBrickController = await mp.bricks().create("payment", "brick-pagamento", settings);
+}
+
+function voltarParaPlanos() {
+  document.getElementById("area-pagamento").style.display = "none";
+  document.getElementById("planos-area").style.display = "block";
+  document.getElementById("area-pix").style.display = "none";
+  document.getElementById("brick-pagamento").style.display = "block";
+  document.getElementById("mensagem-pagamento").textContent = "";
+  if (paymentBrickController) {
+    paymentBrickController.unmount();
+    paymentBrickController = null;
+  }
+}
+
+function copiarCodigoPix() {
+  const texto = document.getElementById("pix-codigo-texto").textContent;
+  navigator.clipboard.writeText(texto);
+  alert("Código Pix copiado!");
 }
