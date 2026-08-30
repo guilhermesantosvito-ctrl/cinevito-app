@@ -6,10 +6,6 @@ const SUPABASE_ANON_KEY = "sb_publishable_AorMLpxhH9CHLdgKLigQoA_eVDgvJEv";
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// ---------------------------------------------------------
-// Funções auxiliares reutilizadas em várias telas
-// ---------------------------------------------------------
-
 async function getUsuarioLogado() {
   const { data: { user } } = await supabaseClient.auth.getUser();
   return user;
@@ -51,8 +47,6 @@ async function usuarioEhAssinante(usuarioId) {
   return new Date(data.data_expiracao) > new Date();
 }
 
-// Retorna os detalhes da assinatura/teste atual, para mostrar avisos
-// de quantos dias faltam (usado no aviso fechável do catálogo)
 async function obterStatusAssinatura(usuarioId) {
   const { data } = await supabaseClient
     .from("assinaturas")
