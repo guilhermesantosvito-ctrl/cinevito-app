@@ -101,11 +101,14 @@ async function verificarAniversario(dataNascimento) {
   area.appendChild(div);
 }
 
+// Permite rolar carrosséis/abas com a roda do mouse no computador
+// (no celular, arrastar com o dedo já funciona sozinho)
 function habilitarScrollHorizontal(elemento) {
   if (!elemento || elemento.dataset.scrollHabilitado) return;
   elemento.dataset.scrollHabilitado = "1";
   elemento.addEventListener("wheel", (e) => {
-    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+    const temOverflow = elemento.scrollWidth > elemento.clientWidth;
+    if (temOverflow && Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
       e.preventDefault();
       elemento.scrollLeft += e.deltaY;
     }
