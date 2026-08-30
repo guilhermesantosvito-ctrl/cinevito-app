@@ -5,6 +5,28 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>CineVito — Catálogo</title>
 <link rel="stylesheet" href="css/style.css">
+<style>
+  .abas-topo {
+    display:flex; gap:18px; overflow-x:auto; scrollbar-width:none;
+    padding:2px 0 12px; position:sticky; top:0; background:var(--bg-primary);
+    z-index:10; margin-bottom:10px;
+  }
+  .abas-topo::-webkit-scrollbar { display:none; }
+  .aba-topo {
+    white-space:nowrap; font-size:13px; color:var(--text-muted);
+    text-decoration:none; padding-bottom:4px; border-bottom:2px solid transparent;
+    flex-shrink:0;
+  }
+  .aba-topo.ativa { color:var(--text-primary); border-bottom-color:var(--accent-gold); font-weight:600; }
+
+  .filtro-linha { display:flex; gap:8px; margin-bottom:6px; overflow-x:auto; scrollbar-width:none; }
+  .filtro-linha::-webkit-scrollbar { display:none; }
+  .chip-filtro {
+    flex-shrink:0; padding:6px 14px; border-radius:20px; font-size:12px;
+    background:var(--bg-card); border:1px solid #232a3a; color:var(--text-muted); cursor:pointer;
+  }
+  .chip-filtro.ativo { background:var(--accent-gold); border-color:var(--accent-gold); color:#0A0D12; font-weight:600; }
+</style>
 </head>
 <body>
 
@@ -15,18 +37,22 @@
   </div>
 
   <div id="aviso-assinatura" style="display:none; background:var(--bg-card); border:1px solid var(--accent-gold); border-radius:10px; padding:14px; margin-bottom:18px;">
-    <strong style="color:var(--accent-gold);">Você ainda não é assinante</strong>
-    <p class="texto-muted" style="margin:6px 0 12px;">Assine para desbloquear todo o catálogo premium.</p>
+    <strong style="color:var(--accent-gold);">Seu acesso gratuito acabou</strong>
+    <p class="texto-muted" style="margin:6px 0 12px;">Assine para continuar aproveitando o catálogo.</p>
     <a href="assinatura.html" class="btn btn-primary" style="padding:10px;">Ver planos</a>
   </div>
+
+  <nav class="abas-topo" id="abas-topo"></nav>
+
+  <div class="filtro-linha" id="filtro-categorias"></div>
 
   <div id="lista-categorias">Carregando catálogo...</div>
 </div>
 
 <div class="bottom-nav">
-  <a href="catalogo.html" class="ativo"><span class="icone">🎬</span>Início</a>
-  <a href="assinatura.html"><span class="icone">💳</span>Assinatura</a>
-  <a href="#" onclick="sair()"><span class="icone">🚪</span>Sair</a>
+  <a href="catalogo.html" class="ativo"><span class="icone">🎬</span><span class="nav-label">Início</span></a>
+  <a href="assinatura.html"><span class="icone">💳</span><span class="nav-label">Assinatura</span></a>
+  <a href="#" onclick="sair()"><span class="icone">🚪</span><span class="nav-label">Sair</span></a>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
