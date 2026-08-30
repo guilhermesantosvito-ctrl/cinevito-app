@@ -1,0 +1,260 @@
+/* =========================================================
+   CINEVITO — Design tokens (paleta Vito Systems)
+   Laranja + ciano sobre fundo quase-preto, visual tech/futurista.
+   ========================================================= */
+
+:root {
+  --bg-primary: #080B10;
+  --bg-elevated: #161B25;
+  --bg-card: #161B25;
+  --accent-gold: #FF8228;      /* laranja Vito Systems */
+  --accent-gold-dim: #b35a1c;
+  --accent-teal: #00C8FF;      /* ciano Vito Systems */
+  --text-primary: #F5F7FA;
+  --text-muted: #96A0AF;
+  --danger: #E85D4D;
+  --radius: 10px;
+  --font-display: 'Arial Narrow', 'Oswald', sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: linear-gradient(180deg, #080B10 0%, #10151E 100%);
+  background-attachment: fixed;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- Linha de circuito (assinatura visual) ---------- */
+.sprocket-strip {
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent-gold), var(--accent-teal));
+  border-radius: 3px;
+  box-shadow: 0 0 14px rgba(255,130,40,0.45), 0 0 14px rgba(0,200,255,0.45);
+  opacity: 0.9;
+}
+
+.brand-title {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 4px;
+  font-weight: 700;
+  background: linear-gradient(90deg, var(--accent-gold), var(--accent-teal));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ---------- Layout helpers ---------- */
+.container {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 20px 16px 90px;
+  min-height: 100vh;
+}
+
+.screen-center {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 24px;
+}
+
+/* ---------- Buttons ---------- */
+.btn {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  border-radius: var(--radius);
+  border: none;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+  transition: transform 0.15s ease;
+}
+.btn:active { transform: scale(0.98); }
+
+.btn-primary {
+  background: var(--accent-gold);
+  color: #0A0D12;
+  box-shadow: 0 0 20px rgba(255,130,40,0.35);
+}
+
+.btn-secondary {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid #232a3a;
+}
+
+.btn-teal {
+  background: var(--accent-teal);
+  color: #071019;
+  box-shadow: 0 0 20px rgba(0,200,255,0.35);
+}
+
+/* ---------- Inputs ---------- */
+.input {
+  width: 100%;
+  padding: 14px;
+  border-radius: var(--radius);
+  border: 1px solid #232a3a;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: 15px;
+  margin-bottom: 12px;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--accent-teal);
+  box-shadow: 0 0 0 1px var(--accent-teal);
+}
+
+.input::placeholder { color: var(--text-muted); }
+
+/* ---------- Catalog grid ---------- */
+.categoria-titulo {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 14px;
+  color: var(--text-muted);
+  margin: 22px 0 10px;
+}
+
+.carrossel {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scrollbar-width: none;
+}
+.carrossel::-webkit-scrollbar { display: none; }
+
+.card-video {
+  position: relative;
+  flex: 0 0 130px;
+  height: 190px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg-card);
+  cursor: pointer;
+  border: 1px solid #1f2534;
+  transition: border-color 0.2s ease;
+}
+.card-video:active { border-color: var(--accent-teal); }
+
+.card-video img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.badge-premium {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: linear-gradient(90deg, var(--accent-gold), var(--accent-teal));
+  color: #0A0D12;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.card-video .titulo-card {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 6px 8px;
+  font-size: 12px;
+  background: linear-gradient(transparent, rgba(0,0,0,0.9));
+}
+
+/* ---------- Top bar ---------- */
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0 12px;
+}
+
+.avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-gold), var(--accent-teal));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #0A0D12;
+}
+
+/* ---------- Player ---------- */
+.player-wrapper {
+  width: 100%;
+  aspect-ratio: 16/9;
+  background: #000;
+}
+.player-wrapper video { width: 100%; height: 100%; }
+
+/* ---------- Plans / subscription ---------- */
+.plano-card {
+  background: var(--bg-card);
+  border: 1px solid #232a3a;
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-bottom: 14px;
+}
+.plano-card.selecionado {
+  border-color: var(--accent-gold);
+  box-shadow: 0 0 0 1px var(--accent-gold), 0 0 20px rgba(255,130,40,0.2);
+}
+.plano-preco {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--accent-gold);
+}
+
+/* ---------- Bottom nav ---------- */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  max-width: 480px;
+  margin: 0 auto;
+  background: var(--bg-elevated);
+  display: flex;
+  border-top: 1px solid #232a3a;
+}
+.bottom-nav a {
+  flex: 1;
+  text-align: center;
+  padding: 10px 0 8px;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 11px;
+}
+.bottom-nav a.ativo { color: var(--accent-gold); }
+.bottom-nav .icone { font-size: 20px; display: block; margin-bottom: 2px; }
+
+.msg-erro {
+  color: var(--danger);
+  font-size: 13px;
+  margin: -6px 0 12px;
+}
+
+.texto-muted { color: var(--text-muted); font-size: 13px; }
