@@ -70,6 +70,15 @@ function mostrarLogin() {
   document.getElementById("form-login").style.display = "block";
 }
 
+function obterDeviceId() {
+  let id = localStorage.getItem("cinevito_device_id");
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem("cinevito_device_id", id);
+  }
+  return id;
+}
+
 async function fazerLogin() {
   const email = document.getElementById("login-email").value.trim();
   const senha = document.getElementById("login-senha").value;
@@ -130,10 +139,10 @@ async function criarConta() {
       nome: nome,
       email: email
     });
-    // Cria uma assinatura inativa por padrão
-    await supabaseClient.from("assinaturas").insert({
-      usuario_id: data.user.id,
-      status: "inativa"
+
+    // Verifica se este IP/aparelho já usou o teste grátis, e libera se for novo
+    await supabaseClient.functions.invoke("registrar-acesso", {
+      body: { usuario_id: data.user.id, device_id: obterDeviceId() }
     });
   }
 
