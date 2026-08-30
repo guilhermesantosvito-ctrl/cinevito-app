@@ -2,6 +2,12 @@ let usuarioAdmin = null;
 let categoriasCache = [];
 let videosCache = [];
 
+const GENEROS_PADRAO = [
+  "Ação", "Aventura", "Comédia", "Drama", "Terror", "Ficção Científica",
+  "Romance", "Documentário", "Animação", "Infantil", "Suspense",
+  "Musical", "Fantasia", "Faroeste", "Guerra", "Biografia"
+];
+
 (async function iniciarAdmin() {
   const usuario = await exigirLogin();
   if (!usuario) return;
@@ -20,6 +26,7 @@ let videosCache = [];
   }
 
   await carregarCategoriasNoSelect();
+  carregarGenerosNoSelect();
   await carregarListaVideos();
   await carregarListaColecoes();
 
@@ -42,6 +49,11 @@ function mostrarAba(nome) {
   document.getElementById("aba-colecoes").style.display = nome === "colecoes" ? "block" : "none";
 }
 
+function carregarGenerosNoSelect() {
+  const select = document.getElementById("v-genero");
+  select.innerHTML = GENEROS_PADRAO.map(g => `<option value="${g}">${g}</option>`).join("");
+}
+
 async function carregarCategoriasNoSelect() {
   const { data } = await supabaseClient.from("categorias").select("*").order("ordem");
   categoriasCache = data || [];
@@ -56,6 +68,7 @@ async function salvarVideo() {
   const urlBruta = document.getElementById("v-url").value.trim();
   const titulo = document.getElementById("v-titulo").value.trim();
   const categoriaId = document.getElementById("v-categoria").value;
+  const genero = document.getElementById("v-genero").value;
 
   if (!urlBruta || !titulo || !categoriaId) {
     erroEl.textContent = "Preencha ao menos o link, o título e a categoria.";
@@ -71,6 +84,7 @@ async function salvarVideo() {
     titulo,
     descricao: document.getElementById("v-descricao").value.trim(),
     categoria_id: categoriaId,
+    genero: genero,
     url_video: urlNormalizada,
     url_capa: capaFinal,
     fonte: "Adicionado manualmente",
@@ -101,7 +115,7 @@ async function carregarListaVideos() {
 
   container.innerHTML = videosCache.map(v => `
     <div class="lista-item">
-      <span>${v.titulo}</span>
+      <span>${v.titulo}${v.genero ? ' <span class="texto-muted">· ' + v.genero + '</span>' : ''}</span>
       <button onclick="apagarVideo('${v.id}')">Apagar</button>
     </div>
   `).join("");
