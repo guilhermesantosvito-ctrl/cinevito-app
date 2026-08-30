@@ -1,12 +1,7 @@
 let usuarioAdmin = null;
 let categoriasCache = [];
 let videosCache = [];
-
-const GENEROS_PADRAO = [
-  "Ação", "Aventura", "Comédia", "Drama", "Terror", "Ficção Científica",
-  "Romance", "Documentário", "Animação", "Infantil", "Suspense",
-  "Musical", "Fantasia", "Faroeste", "Guerra", "Biografia"
-];
+let generosCacheAdmin = [];
 
 (async function iniciarAdmin() {
   const usuario = await exigirLogin();
@@ -26,9 +21,10 @@ const GENEROS_PADRAO = [
   }
 
   await carregarCategoriasNoSelect();
-  carregarGenerosNoSelect();
+  await carregarGenerosNoSelect();
   await carregarListaVideos();
   await carregarListaColecoes();
+  await carregarListaGeneros();
 
   document.getElementById("v-url").addEventListener("blur", () => {
     const bruto = document.getElementById("v-url").value;
@@ -47,11 +43,65 @@ function mostrarAba(nome) {
   document.querySelector(`.aba[data-aba="${nome}"]`).classList.add("ativa");
   document.getElementById("aba-videos").style.display = nome === "videos" ? "block" : "none";
   document.getElementById("aba-colecoes").style.display = nome === "colecoes" ? "block" : "none";
+  document.getElementById("aba-clientes").style.display = nome === "clientes" ? "block" : "none";
+
+  if (nome === "clientes") carregarClientes();
 }
 
-function carregarGenerosNoSelect() {
+async function carregarGenerosNoSelect() {
+  const { data } = await supabaseClient.from("generos").select("*").order("ordem");
+  generosCacheAdmin = data || [];
   const select = document.getElementById("v-genero");
-  select.innerHTML = GENEROS_PADRAO.map(g => `<option value="${g}">${g}</option>`).join("");
+  select.innerHTML = generosCacheAdmin.map(g => `<option value="${g.nome}">${g.nome}</option>`).join("");
+}
+
+async function adicionarGenero() {
+  const erroEl = document.getElementById("g-erro");
+  erroEl.style.display = "none";
+  const nome = document.getElementById("g-nome").value.trim();
+
+  if (!nome) {
+    erroEl.textContent = "Digite o nome do gênero.";
+    erroEl.style.display = "block";
+    return;
+  }
+
+  const proximaOrdem = generosCacheAdmin.length > 0
+    ? Math.max(...generosCacheAdmin.map(g => g.ordem || 0)) + 1
+    : 1;
+
+  const { error } = await supabaseClient.from("generos").insert({ nome, ordem: proximaOrdem });
+
+  if (error) {
+    erroEl.textContent = "Erro ao adicionar: " + error.message;
+    erroEl.style.display = "block";
+    return;
+  }
+
+  document.getElementById("g-nome").value = "";
+  await carregarGenerosNoSelect();
+  await carregarListaGeneros();
+}
+
+async function carregarListaGeneros() {
+  const container = document.getElementById("lista-generos");
+  if (generosCacheAdmin.length === 0) {
+    container.innerHTML = '<p class="texto-muted">Nenhum gênero cadastrado ainda.</p>';
+    return;
+  }
+  container.innerHTML = generosCacheAdmin.map(g => `
+    <div class="lista-item">
+      <span>${g.nome}</span>
+      <button onclick="apagarGenero('${g.id}')">Apagar</button>
+    </div>
+  `).join("");
+}
+
+async function apagarGenero(id) {
+  if (!confirm("Apagar este gênero? (vídeos que já usam ele mantêm o texto, mas o filtro some)")) return;
+  await supabaseClient.from("generos").delete().eq("id", id);
+  await carregarGenerosNoSelect();
+  await carregarListaGeneros();
 }
 
 async function carregarCategoriasNoSelect() {
@@ -218,4 +268,69 @@ async function alternarVideoNaColecao(colecaoId, videoId, incluir) {
   } else {
     await supabaseClient.from("colecao_videos").delete().eq("colecao_id", colecaoId).eq("video_id", videoId);
   }
+}
+
+async function carregarClientes() {
+  const corpo = document.getElementById("corpo-tabela-clientes");
+  corpo.innerHTML = '<tr><td colspan="7" class="texto-muted">Carregando...</td></tr>';
+
+  const { data: perfis, error: erroPerfis } = await supabaseClient
+    .from("profiles")
+    .select("id, nome, email, data_nascimento, is_admin")
+    .order("criado_em", { ascending: false });
+
+  if (erroPerfis) {
+    corpo.innerHTML = `<tr><td colspan="7" class="texto-muted">Erro ao carregar: ${erroPerfis.message}</td></tr>`;
+    return;
+  }
+
+  const clientes = (perfis || []).filter(p => !p.is_admin);
+
+  const { data: assinaturas } = await supabaseClient
+    .from("assinaturas")
+    .select("usuario_id, status, plano, data_expiracao, criado_em")
+    .order("criado_em", { ascending: false });
+
+  const assinaturaPorUsuario = {};
+  (assinaturas || []).forEach(a => {
+    if (!assinaturaPorUsuario[a.usuario_id]) assinaturaPorUsuario[a.usuario_id] = a;
+  });
+
+  if (clientes.length === 0) {
+    corpo.innerHTML = '<tr><td colspan="7" class="texto-muted">Nenhum cliente ainda.</td></tr>';
+    return;
+  }
+
+  corpo.innerHTML = clientes.map(c => {
+    const assinatura = assinaturaPorUsuario[c.id];
+    let selo = '<span class="selo-status selo-inativa">Sem plano</span>';
+    let plano = "-";
+    let validade = "-";
+
+    if (assinatura) {
+      plano = assinatura.plano || "-";
+      if (assinatura.data_expiracao) {
+        validade = new Date(assinatura.data_expiracao).toLocaleDateString("pt-BR");
+      }
+      if (assinatura.status === "ativa") selo = '<span class="selo-status selo-ativa">Assinante</span>';
+      else if (assinatura.status === "trial") selo = '<span class="selo-status selo-trial">Teste grátis</span>';
+      else selo = '<span class="selo-status selo-inativa">Inativo</span>';
+    }
+
+    const aniversario = c.data_nascimento
+      ? new Date(c.data_nascimento + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+      : "-";
+
+    return `
+      <tr>
+        <td>${c.nome || "Sem nome"}</td>
+        <td>${c.email || "-"}</td>
+        <td>${selo}</td>
+        <td>${plano}</td>
+        <td>${validade}</td>
+        <td>${aniversario}</td>
+        <td><a href="mailto:${c.email}">✉️ E-mail</a></td>
+      </tr>
+    `;
+  }).join("");
 }
