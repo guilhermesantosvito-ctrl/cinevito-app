@@ -11,8 +11,18 @@
 <div class="screen-center">
   <div class="sprocket-strip" style="width:100%; margin-bottom:26px;"></div>
 
+  <svg width="56" height="56" viewBox="0 0 56 56" style="margin-bottom:12px;">
+    <circle cx="28" cy="28" r="26" fill="none" stroke="url(#gradIcone)" stroke-width="3"/>
+    <path d="M22 18 L40 28 L22 38 Z" fill="url(#gradIcone)"/>
+    <defs>
+      <linearGradient id="gradIcone" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#FF8228"/>
+        <stop offset="100%" stop-color="#00C8FF"/>
+      </linearGradient>
+    </defs>
+  </svg>
   <h1 class="brand-title" style="font-size:28px; margin-bottom:4px;">CineVito</h1>
-  <p class="texto-muted" style="margin-bottom:28px;">Filmes e vídeos de conteúdo livre</p>
+  <p class="texto-muted" style="margin-bottom:28px;">Cinema sem limites.</p>
 
   <div style="width:100%; max-width:340px;">
 
@@ -22,6 +32,9 @@
       <p class="msg-erro" id="login-erro" style="display:none;"></p>
       <button class="btn btn-primary" onclick="fazerLogin()">Entrar</button>
       <p class="texto-muted" style="text-align:center; margin-top:16px;">
+        <a href="#" onclick="recuperarSenha()" style="color:var(--accent-teal);">Esqueci minha senha</a>
+      </p>
+      <p class="texto-muted" style="text-align:center; margin-top:6px;">
         Não tem conta?
         <a href="#" onclick="mostrarCadastro()" style="color:var(--accent-teal);">Criar conta</a>
       </p>
@@ -110,12 +123,14 @@ async function criarConta() {
     return;
   }
 
+  // Cria o registro na tabela profiles
   if (data.user) {
     await supabaseClient.from("profiles").insert({
       id: data.user.id,
       nome: nome,
       email: email
     });
+    // Cria uma assinatura inativa por padrão
     await supabaseClient.from("assinaturas").insert({
       usuario_id: data.user.id,
       status: "inativa"
@@ -123,6 +138,25 @@ async function criarConta() {
   }
 
   window.location.href = "catalogo.html";
+}
+
+async function recuperarSenha() {
+  const email = document.getElementById("login-email").value.trim();
+  if (!email) {
+    alert("Digite seu e-mail no campo de e-mail primeiro, depois clique em 'Esqueci minha senha'.");
+    return;
+  }
+
+  const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + "/redefinir-senha.html"
+  });
+
+  if (error) {
+    alert("Não foi possível enviar o e-mail de recuperação: " + error.message);
+    return;
+  }
+
+  alert("Enviamos um link para redefinir sua senha no e-mail: " + email);
 }
 
 (async () => {
