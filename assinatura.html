@@ -15,6 +15,15 @@
   .aba-plano.ativa .aba-titulo, .aba-plano.ativa .aba-sub { color:#14100a; }
   .aba-titulo { font-weight:700; font-size:14px; }
   .aba-sub { font-size:11px; color:var(--text-muted); margin-top:2px; }
+  .pix-caixa {
+    background:var(--bg-card); border:1px solid var(--accent-gold); border-radius:10px;
+    padding:16px; text-align:center; margin-top:14px;
+  }
+  .pix-caixa img { width:180px; height:180px; margin:10px auto; display:block; }
+  .pix-codigo {
+    background:var(--bg-elevated); border:1px solid #232a3a; border-radius:8px;
+    padding:10px; font-size:11px; word-break:break-all; color:var(--text-muted); margin-top:10px;
+  }
 </style>
 </head>
 <body>
@@ -49,14 +58,22 @@
 
     <div id="lista-periodos"></div>
 
-    <button class="btn btn-primary" style="margin-top:8px;" onclick="assinar()">Assinar agora</button>
+    <button class="btn btn-primary" id="botao-continuar" style="margin-top:8px;" onclick="continuarParaPagamento()">Continuar</button>
     <p class="texto-muted" style="text-align:center; margin-top:10px;">
       Pagamento seguro via cartão de crédito ou Pix.
     </p>
     <p class="msg-erro" id="assinatura-erro" style="display:none; text-align:center;"></p>
   </div>
+
+  <div id="area-pagamento" style="display:none;">
+    <a href="#" onclick="voltarParaPlanos(); return false;" class="texto-muted" style="color:var(--accent-teal); font-size:13px;">&larr; Trocar plano</a>
+    <div id="brick-pagamento" style="margin-top:14px;"></div>
+    <div id="area-pix" style="display:none;"></div>
+    <p id="mensagem-pagamento" style="text-align:center; margin-top:14px;"></p>
+  </div>
 </div>
 
+<script src="https://sdk.mercadopago.com/js/v2"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/checkout.js"></script>
