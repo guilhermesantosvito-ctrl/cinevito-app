@@ -6,13 +6,25 @@
 <title>CineVito — Administração</title>
 <link rel="stylesheet" href="css/style.css">
 <style>
-  .abas { display:flex; gap:8px; margin-bottom:18px; }
-  .aba { flex:1; text-align:center; padding:10px; border-radius:8px; background:var(--bg-card); cursor:pointer; font-size:14px; }
+  .abas { display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap; }
+  .aba { flex:1; min-width:100px; text-align:center; padding:10px; border-radius:8px; background:var(--bg-card); cursor:pointer; font-size:13px; }
   .aba.ativa { background:var(--accent-gold); color:#14100a; font-weight:700; }
   .lista-item { display:flex; justify-content:space-between; align-items:center; background:var(--bg-card); padding:10px 12px; border-radius:8px; margin-bottom:8px; font-size:14px; }
   .lista-item button { background:none; border:none; color:var(--danger); font-size:13px; cursor:pointer; }
   label { font-size:13px; color:var(--text-muted); display:block; margin:10px 0 4px; }
   .checkbox-linha { display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid #2b3151; font-size:14px; }
+  .linha-genero-add { display:flex; gap:8px; margin-bottom:14px; }
+  .linha-genero-add input { flex:1; margin-bottom:0; }
+  .linha-genero-add button { width:auto; padding:0 16px; }
+  .form-estreito { max-width: 480px; }
+  table.tabela-crm { width:100%; border-collapse:collapse; font-size:13px; }
+  table.tabela-crm th { text-align:left; color:var(--text-muted); font-weight:600; padding:8px 6px; border-bottom:1px solid #232a3a; }
+  table.tabela-crm td { padding:8px 6px; border-bottom:1px solid #1a1f2c; vertical-align:top; }
+  table.tabela-crm a { color:var(--accent-teal); text-decoration:none; }
+  .selo-status { padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; }
+  .selo-ativa { background:rgba(46,196,182,0.15); color:var(--accent-teal); }
+  .selo-trial { background:rgba(255,130,40,0.15); color:var(--accent-gold); }
+  .selo-inativa { background:rgba(232,93,77,0.15); color:var(--danger); }
 </style>
 </head>
 <body>
@@ -24,9 +36,10 @@
   <div class="abas">
     <div class="aba ativa" data-aba="videos" onclick="mostrarAba('videos')">Vídeos</div>
     <div class="aba" data-aba="colecoes" onclick="mostrarAba('colecoes')">Coleções</div>
+    <div class="aba" data-aba="clientes" onclick="mostrarAba('clientes')">Clientes (CRM)</div>
   </div>
 
-  <div id="aba-videos">
+  <div id="aba-videos" class="form-estreito">
     <h3 style="margin-bottom:4px;">Adicionar vídeo</h3>
     <p class="texto-muted" style="margin-top:0;">Cole o link do Internet Archive, YouTube ou de um arquivo de vídeo direto (.mp4). Só o link fica salvo — o app continua leve.</p>
 
@@ -61,7 +74,7 @@
     <div id="lista-videos">Carregando...</div>
   </div>
 
-  <div id="aba-colecoes" style="display:none;">
+  <div id="aba-colecoes" class="form-estreito" style="display:none;">
     <h3 style="margin-bottom:4px;">Criar coleção</h3>
     <p class="texto-muted" style="margin-top:0;">Ex: "Sessão de Sexta", "Coletânea Terror". Aparece como uma prateleira especial no catálogo.</p>
 
@@ -79,6 +92,38 @@
 
     <h3 style="margin:28px 0 10px;">Coleções existentes</h3>
     <div id="lista-colecoes">Carregando...</div>
+
+    <h3 style="margin:28px 0 10px;">Gêneros do catálogo</h3>
+    <p class="texto-muted" style="margin-top:0;">Esses são os gêneros que aparecem no filtro e na hora de cadastrar um vídeo.</p>
+    <div class="linha-genero-add">
+      <input type="text" id="g-nome" class="input" placeholder="Ex: Suspense Policial">
+      <button class="btn btn-primary" onclick="adicionarGenero()">Adicionar</button>
+    </div>
+    <p class="msg-erro" id="g-erro" style="display:none;"></p>
+    <div id="lista-generos">Carregando...</div>
+  </div>
+
+  <div id="aba-clientes" style="display:none;">
+    <h3 style="margin-bottom:4px;">Clientes</h3>
+    <p class="texto-muted" style="margin-top:0;">Lista de todos os clientes cadastrados. Use o e-mail pra manter contato — nunca WhatsApp.</p>
+    <div style="overflow-x:auto;">
+      <table class="tabela-crm" id="tabela-clientes">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>E-mail</th>
+            <th>Status</th>
+            <th>Plano</th>
+            <th>Validade</th>
+            <th>Aniversário</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="corpo-tabela-clientes">
+          <tr><td colspan="7" class="texto-muted">Carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
 </div>
