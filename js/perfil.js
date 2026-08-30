@@ -76,11 +76,13 @@ async function salvarEdicaoPerfil() {
       valor_novo: novoNome
     });
   }
-  if (perfilAtual?.email !== novoEmail) {
+  const emailAtualDeVerdade = (usuarioPerfil.email || "").toLowerCase();
+  const emailMudou = novoEmail.toLowerCase() !== emailAtualDeVerdade;
+  if (emailMudou) {
     registrosMudanca.push({
       usuario_id: usuarioPerfil.id,
       campo: "email",
-      valor_antigo: perfilAtual?.email || null,
+      valor_antigo: usuarioPerfil.email || null,
       valor_novo: novoEmail
     });
   }
@@ -96,7 +98,6 @@ async function salvarEdicaoPerfil() {
     return;
   }
 
-  const emailMudou = registrosMudanca.some(r => r.campo === "email");
   if (emailMudou) {
     const { error: erroAuth } = await supabaseClient.auth.updateUser({ email: novoEmail });
     if (erroAuth) {
