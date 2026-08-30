@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>CineVito — Sugerir filme</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="container">
+  <a href="perfil.html" class="botao-voltar-topo">←</a>
+  <h1 class="brand-title" style="font-size:20px; margin:0 0 6px;">Sugerir um filme</h1>
+  <p class="texto-muted" style="margin-bottom:20px;">Não achou o que procurava? Conta pra gente!</p>
+
+  <label style="font-size:13px; color:var(--text-muted); display:block; margin-bottom:4px;">Nome do filme</label>
+  <input type="text" id="s-titulo" class="input" placeholder="Ex: De Volta Para o Futuro">
+
+  <label style="font-size:13px; color:var(--text-muted); display:block; margin-bottom:4px;">Ano de lançamento (opcional)</label>
+  <input type="number" id="s-ano" class="input" placeholder="Ex: 1985">
+
+  <label style="font-size:13px; color:var(--text-muted); display:block; margin-bottom:4px;">Gênero (opcional)</label>
+  <input type="text" id="s-genero" class="input" placeholder="Ex: Ficção Científica">
+
+  <p class="msg-erro" id="s-erro" style="display:none;"></p>
+  <p class="texto-muted" id="s-sucesso" style="display:none; color:var(--accent-teal);">Sugestão enviada, obrigado!</p>
+  <button class="btn btn-primary" onclick="enviarSugestao()">Enviar sugestão</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/sugestao.js"></script>
+</body>
+</html>
