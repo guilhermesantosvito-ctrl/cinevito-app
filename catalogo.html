@@ -31,6 +31,18 @@
     background:var(--bg-card); border:1px solid #232a3a; color:var(--text-muted); cursor:pointer;
   }
   .chip-filtro.ativo { background:var(--accent-gold); border-color:var(--accent-gold); color:#0A0D12; font-weight:600; }
+
+  .botao-scroll-lado {
+    position:absolute; top:0; bottom:6px; width:26px; z-index:5;
+    background:linear-gradient(90deg, var(--bg-primary) 40%, transparent);
+    border:none; color:var(--text-primary); font-size:20px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .botao-scroll-lado.esquerda { left:-4px; }
+  .botao-scroll-lado.direita {
+    right:-4px;
+    background:linear-gradient(270deg, var(--bg-primary) 40%, transparent);
+  }
 </style>
 </head>
 <body>
@@ -48,7 +60,11 @@
 
   <nav class="abas-topo" id="abas-topo"></nav>
 
-  <div class="filtro-linha" id="filtro-generos"></div>
+  <div style="position:relative;">
+    <button class="botao-scroll-lado esquerda" onclick="rolarFiltroGeneros(-1)">‹</button>
+    <div class="filtro-linha" id="filtro-generos"></div>
+    <button class="botao-scroll-lado direita" onclick="rolarFiltroGeneros(1)">›</button>
+  </div>
 
   <div id="lista-categorias">Carregando catálogo...</div>
 </div>
