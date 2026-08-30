@@ -1,4 +1,4 @@
-let usuarioCatalogo = null;
+  let usuarioCatalogo = null;
 let assinanteAtual = false;
 let generosCache = [];
 
@@ -101,8 +101,6 @@ async function verificarAniversario(dataNascimento) {
   area.appendChild(div);
 }
 
-// Permite rolar carrosséis/abas com a roda do mouse no computador
-// (no celular, arrastar com o dedo já funciona sozinho)
 function habilitarScrollHorizontal(elemento) {
   if (!elemento || elemento.dataset.scrollHabilitado) return;
   elemento.dataset.scrollHabilitado = "1";
@@ -242,6 +240,11 @@ function marcarAbaAtiva(abaClicada) {
 function irParaSecao(id) {
   const el = document.getElementById(id);
   if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function rolarFiltroGeneros(direcao) {
+  const linha = document.getElementById("filtro-generos");
+  linha.scrollBy({ left: direcao * 220, behavior: "smooth" });
 }
 
 function montarFiltroGeneros() {
