@@ -3,7 +3,6 @@ let planoSelecionado = "padrao";
 let periodoSelecionado = "mensal";
 let paymentBrickController = null;
 
-// Chave pública do Mercado Pago (segura pra ficar no navegador)
 const mp = new MercadoPago("APP_USR-471c3a9b-ff0f-4743-a417-e54b9f13e902", { locale: "pt-BR" });
 
 const PLANOS = {
@@ -87,7 +86,24 @@ async function continuarParaPagamento() {
   document.getElementById("area-pagamento").style.display = "block";
 
   const dados = PLANOS[planoSelecionado];
-  const preco = dados.periodos[periodoSelecionado].preco;
+  let preco = dados.periodos[periodoSelecionado].preco;
+
+  const codigoCupom = document.getElementById("campo-cupom").value.trim().toUpperCase();
+  let cupomValido = null;
+
+  if (codigoCupom) {
+    const { data: cupom } = await supabaseClient
+      .from("cupons")
+      .select("*")
+      .eq("codigo", codigoCupom)
+      .eq("ativo", true)
+      .maybeSingle();
+
+    if (cupom && (!cupom.valido_ate || new Date(cupom.valido_ate) >= new Date())) {
+      cupomValido = codigoCupom;
+      preco = Math.round((preco * (1 - cupom.percentual_desconto / 100)) * 100) / 100;
+    }
+  }
 
   if (paymentBrickController) {
     paymentBrickController.unmount();
@@ -117,7 +133,8 @@ async function continuarParaPagamento() {
               body: {
                 usuario_id: usuarioAtual.id,
                 plano: chavePlano,
-                formData: formData
+                formData: formData,
+                cupom: cupomValido
               }
             });
 
