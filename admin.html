@@ -18,8 +18,8 @@
 <body>
 
 <div class="container">
-  <a href="catalogo.html" style="color:var(--accent-teal); font-size:14px;">&larr; Voltar ao catálogo</a>
-  <h1 class="brand-title" style="font-size:20px; margin:16px 0;">Administração</h1>
+  <a href="catalogo.html" class="botao-voltar-topo">←</a>
+  <h1 class="brand-title" style="font-size:20px; margin:0 0 16px;">Administração</h1>
 
   <div class="abas">
     <div class="aba ativa" data-aba="videos" onclick="mostrarAba('videos')">Vídeos</div>
@@ -36,11 +36,14 @@
     <label>Título</label>
     <input type="text" id="v-titulo" class="input" placeholder="Nome do filme/vídeo">
 
-    <label>Descrição</label>
+    <label>Sinopse</label>
     <input type="text" id="v-descricao" class="input" placeholder="Uma linha sobre o vídeo">
 
-    <label>Categoria</label>
+    <label>Categoria (prateleira onde aparece)</label>
     <select id="v-categoria" class="input"></select>
+
+    <label>Gênero (usado no filtro do catálogo)</label>
+    <select id="v-genero" class="input"></select>
 
     <label>URL da capa (opcional — auto-preenchido se for Internet Archive)</label>
     <input type="text" id="v-capa" class="input" placeholder="https://...">
