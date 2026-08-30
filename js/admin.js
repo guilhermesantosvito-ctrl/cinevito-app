@@ -75,8 +75,7 @@ async function salvarVideo() {
     url_capa: capaFinal,
     fonte: "Adicionado manualmente",
     licenca: document.getElementById("v-licenca").value.trim(),
-    ano: parseInt(document.getElementById("v-ano").value) || null,
-    premium: document.getElementById("v-premium").checked
+    ano: parseInt(document.getElementById("v-ano").value) || null
   });
 
   if (error) {
@@ -86,7 +85,6 @@ async function salvarVideo() {
   }
 
   ["v-url", "v-titulo", "v-descricao", "v-capa", "v-ano"].forEach(id => document.getElementById(id).value = "");
-  document.getElementById("v-premium").checked = false;
 
   await carregarListaVideos();
 }
@@ -103,7 +101,7 @@ async function carregarListaVideos() {
 
   container.innerHTML = videosCache.map(v => `
     <div class="lista-item">
-      <span>${v.titulo} ${v.premium ? "⭐" : ""}</span>
+      <span>${v.titulo}</span>
       <button onclick="apagarVideo('${v.id}')">Apagar</button>
     </div>
   `).join("");
