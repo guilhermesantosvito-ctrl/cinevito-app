@@ -6,6 +6,10 @@ const SUPABASE_ANON_KEY = "sb_publishable_AorMLpxhH9CHLdgKLigQoA_eVDgvJEv";
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// ---------------------------------------------------------
+// Funções auxiliares reutilizadas em várias telas
+// ---------------------------------------------------------
+
 async function getUsuarioLogado() {
   const { data: { user } } = await supabaseClient.auth.getUser();
   return user;
@@ -53,6 +57,28 @@ async function usuarioEhAssinante(usuarioId) {
   return await aindaDentroDoPrazoDeContaNova(usuarioId);
 }
 
+// Diferente de usuarioEhAssinante(): essa função só retorna true se
+// a pessoa tem uma assinatura PAGA de verdade (status "ativa").
+// Teste grátis não conta aqui — usada na tela de planos, pra sempre
+// deixar quem está em teste grátis assinar antes do prazo acabar.
+async function usuarioTemAssinaturaPaga(usuarioId) {
+  const { data, error } = await supabaseClient
+    .from("assinaturas")
+    .select("status, data_expiracao")
+    .eq("usuario_id", usuarioId)
+    .eq("status", "ativa")
+    .order("criado_em", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!error && data) {
+    if (!data.data_expiracao) return true;
+    if (new Date(data.data_expiracao) > new Date()) return true;
+  }
+
+  return false;
+}
+
 async function aindaDentroDoPrazoDeContaNova(usuarioId) {
   const { data: perfil } = await supabaseClient
     .from("profiles")
@@ -67,6 +93,8 @@ async function aindaDentroDoPrazoDeContaNova(usuarioId) {
   return new Date() < doisDiasDepois;
 }
 
+// Retorna os detalhes da assinatura/teste atual, para mostrar avisos
+// de quantos dias faltam (usado no aviso fechável do catálogo)
 async function obterStatusAssinatura(usuarioId) {
   const { data } = await supabaseClient
     .from("assinaturas")
@@ -78,6 +106,8 @@ async function obterStatusAssinatura(usuarioId) {
 
   if (data) return data;
 
+  // Sem nenhum registro de assinatura — mostra o teste grátis baseado
+  // na data de criação da conta, como rede de segurança.
   const { data: perfil } = await supabaseClient
     .from("profiles")
     .select("criado_em")
