@@ -121,3 +121,39 @@ async function obterStatusAssinatura(usuarioId) {
 
   return { status: "trial", data_expiracao: expiracao.toISOString() };
 }
+
+// ---------------------------------------------------------
+// Logout automático após ficar muito tempo em segundo plano
+// (evita que o cliente fique "preso" numa versão antiga do app
+// quando ele nunca fecha, só minimiza ou troca de tela)
+// ---------------------------------------------------------
+const CHAVE_ULTIMO_SEGUNDO_PLANO = "cinevito_em_segundo_plano_desde";
+const LIMITE_SEGUNDO_PLANO_MS = 3 * 60 * 1000; // 3 minutos
+
+async function verificarLogoutPorInatividade() {
+  const desde = localStorage.getItem(CHAVE_ULTIMO_SEGUNDO_PLANO);
+  if (!desde) return;
+
+  const passou = Date.now() - Number(desde);
+  localStorage.removeItem(CHAVE_ULTIMO_SEGUNDO_PLANO);
+
+  if (passou >= LIMITE_SEGUNDO_PLANO_MS) {
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    if (user) {
+      await supabaseClient.auth.signOut();
+      window.location.href = "index.html";
+    }
+  }
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    localStorage.setItem(CHAVE_ULTIMO_SEGUNDO_PLANO, String(Date.now()));
+  } else {
+    verificarLogoutPorInatividade();
+  }
+});
+
+// Confere também assim que a página carrega, pra pegar o caso em que
+// o navegador "matou" a aba enquanto ela estava em segundo plano
+verificarLogoutPorInatividade();
