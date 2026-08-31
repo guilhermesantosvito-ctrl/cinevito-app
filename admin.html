@@ -37,6 +37,7 @@
     <div class="aba ativa" data-aba="videos" onclick="mostrarAba('videos')">Vídeos</div>
     <div class="aba" data-aba="colecoes" onclick="mostrarAba('colecoes')">Coleções</div>
     <div class="aba" data-aba="clientes" onclick="mostrarAba('clientes')">Clientes (CRM)</div>
+    <div class="aba" data-aba="equipe" onclick="mostrarAba('equipe')" id="aba-btn-equipe" style="display:none;">Equipe</div>
   </div>
 
   <div id="aba-videos" class="form-estreito">
@@ -125,6 +126,21 @@
         </tbody>
       </table>
     </div>
+  </div>
+
+  <div id="aba-equipe" class="form-estreito" style="display:none;">
+    <h3 style="margin-bottom:4px;">Equipe</h3>
+    <p class="texto-muted" style="margin-top:0;">Dê acesso ao painel para outra pessoa. Ela vai poder gerenciar vídeos, coleções e clientes, mas não vai poder adicionar ou remover outros administradores — só você, como admin master, pode fazer isso.</p>
+
+    <label>E-mail da pessoa (ela precisa já ter uma conta criada no CineVito)</label>
+    <div class="linha-genero-add">
+      <input type="text" id="eq-email" class="input" placeholder="email@exemplo.com">
+      <button class="btn btn-primary" onclick="adicionarNaEquipe()">Adicionar à equipe</button>
+    </div>
+    <p class="msg-erro" id="eq-erro" style="display:none;"></p>
+
+    <h3 style="margin:28px 0 10px;">Quem tem acesso ao painel</h3>
+    <div id="lista-equipe">Carregando...</div>
   </div>
 
 </div>
