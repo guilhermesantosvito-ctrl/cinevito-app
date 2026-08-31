@@ -3,6 +3,7 @@ let planoSelecionado = "padrao";
 let periodoSelecionado = "mensal";
 let paymentBrickController = null;
 
+// Chave pública do Mercado Pago (segura pra ficar no navegador)
 const mp = new MercadoPago("APP_USR-471c3a9b-ff0f-4743-a417-e54b9f13e902", { locale: "pt-BR" });
 
 const PLANOS = {
@@ -39,8 +40,8 @@ const PLANOS = {
   usuarioAtual = await exigirLogin();
   if (!usuarioAtual) return;
 
-  const assinante = await usuarioEhAssinante(usuarioAtual.id);
-  if (assinante) {
+  const jaAssina = await usuarioTemAssinaturaPaga(usuarioAtual.id);
+  if (jaAssina) {
     document.getElementById("status-assinatura").style.display = "block";
     document.getElementById("planos-area").style.display = "none";
     return;
@@ -117,12 +118,12 @@ async function continuarParaPagamento() {
     customization: {
       paymentMethods: {
         creditCard: "all",
-        bankTransfer: "all"
+        bankTransfer: "all" // habilita Pix
       }
     },
     callbacks: {
       onReady: () => {},
-      onSubmit: (formData) => {
+      onSubmit: ({ formData }) => {
         return new Promise(async (resolve, reject) => {
           const chavePlano = `${planoSelecionado}-${periodoSelecionado}`;
           const mensagemEl = document.getElementById("mensagem-pagamento");
