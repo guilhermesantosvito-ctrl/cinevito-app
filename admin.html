@@ -37,6 +37,7 @@
     <div class="aba ativa" data-aba="videos" onclick="mostrarAba('videos')">Vídeos</div>
     <div class="aba" data-aba="colecoes" onclick="mostrarAba('colecoes')">Coleções</div>
     <div class="aba" data-aba="clientes" onclick="mostrarAba('clientes')">Clientes (CRM)</div>
+    <div class="aba" data-aba="planos" onclick="mostrarAba('planos')" id="aba-btn-planos" style="display:none;">Planos</div>
     <div class="aba" data-aba="equipe" onclick="mostrarAba('equipe')" id="aba-btn-equipe" style="display:none;">Equipe</div>
   </div>
 
@@ -128,9 +129,36 @@
     </div>
   </div>
 
+  <div id="aba-planos" class="form-estreito" style="display:none;">
+    <h3 style="margin-bottom:4px;">Criar tipo de assinatura</h3>
+    <p class="texto-muted" style="margin-top:0;">Só admin master vê e mexe nessa aba. Crie quantos planos quiser — nome, preço, dispositivos e duração são totalmente livres.</p>
+
+    <label>Nome do plano</label>
+    <input type="text" id="p-nome" class="input" placeholder="Ex: Padrão Mensal">
+
+    <label>Descrição (opcional)</label>
+    <input type="text" id="p-descricao" class="input" placeholder="Ex: 2 dispositivos, sem anúncios">
+
+    <label>Preço (R$)</label>
+    <input type="number" step="0.01" id="p-preco" class="input" placeholder="Ex: 19.90">
+
+    <label>Dispositivos simultâneos</label>
+    <input type="number" id="p-dispositivos" class="input" value="1">
+
+    <label>Duração (em meses)</label>
+    <input type="number" id="p-duracao" class="input" placeholder="Ex: 1 = mensal, 3 = trimestral, 12 = anual" value="1">
+
+    <p class="msg-erro" id="p-erro" style="display:none;"></p>
+    <button class="btn btn-primary" id="botao-salvar-plano" onclick="salvarPlano()">Criar plano</button>
+    <a href="#" id="link-cancelar-edicao-plano" onclick="cancelarEdicaoPlano(); return false;" style="display:none; text-align:center; margin-top:10px; color:var(--accent-teal); font-size:13px;">Cancelar edição</a>
+
+    <h3 style="margin:28px 0 10px;">Planos cadastrados</h3>
+    <div id="lista-planos-admin">Carregando...</div>
+  </div>
+
   <div id="aba-equipe" class="form-estreito" style="display:none;">
     <h3 style="margin-bottom:4px;">Equipe</h3>
-    <p class="texto-muted" style="margin-top:0;">Dê acesso ao painel para outra pessoa. Ela vai poder gerenciar vídeos, coleções e clientes, mas não vai poder adicionar ou remover outros administradores — só você, como admin master, pode fazer isso.</p>
+    <p class="texto-muted" style="margin-top:0;">Dê acesso ao painel para outra pessoa. Ela vai poder gerenciar vídeos, coleções e clientes, mas não vai poder adicionar/remover administradores nem mexer nos planos de assinatura — só você, como admin master, pode fazer isso.</p>
 
     <label>E-mail da pessoa (ela precisa já ter uma conta criada no CineVito)</label>
     <div class="linha-genero-add">
