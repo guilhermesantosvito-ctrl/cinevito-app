@@ -22,6 +22,12 @@ const mp = new MercadoPago("APP_USR-471c3a9b-ff0f-4743-a417-e54b9f13e902", { loc
   await carregarPlanos();
 })();
 
+async function mostrarTrocaDePlano() {
+  document.getElementById("status-assinatura").style.display = "none";
+  document.getElementById("planos-area").style.display = "block";
+  await carregarPlanos();
+}
+
 async function carregarPlanos() {
   const containerLista = document.getElementById("lista-planos");
 
