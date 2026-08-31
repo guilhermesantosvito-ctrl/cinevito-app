@@ -31,20 +31,58 @@ let usuarioPerfil = null;
 
   const planoEl = document.getElementById("perfil-plano");
   const validadeEl = document.getElementById("perfil-validade");
+  const botaoCancelar = document.getElementById("botao-cancelar-assinatura");
 
-  if (!assinatura || assinatura.status === "inativa") {
-    planoEl.textContent = "Sem plano ativo";
-    validadeEl.textContent = "";
-  } else {
+  // Só considera "plano ativo" quando o pagamento foi realmente confirmado
+  // (status "ativa") ou é um teste grátis em andamento (status "trial").
+  // "pendente" (tentativa em andamento) e "inativa"/"substituida" não contam.
+  if (assinatura && (assinatura.status === "ativa" || assinatura.status === "trial")) {
     const nomesPlano = { "teste-gratis": "Teste grátis" };
     planoEl.textContent = nomesPlano[assinatura.plano] || assinatura.plano || "Ativo";
 
     if (assinatura.data_expiracao) {
       const data = new Date(assinatura.data_expiracao);
       validadeEl.textContent = "Válido até " + data.toLocaleDateString("pt-BR");
+    } else {
+      validadeEl.textContent = "";
     }
+
+    botaoCancelar.style.display = assinatura.status === "ativa" ? "block" : "none";
+  } else {
+    planoEl.textContent = "Sem plano ativo";
+    validadeEl.textContent = "";
+    botaoCancelar.style.display = "none";
   }
 })();
+
+async function cancelarAssinatura() {
+  if (!confirm("Cancelar sua assinatura agora? Você perde o acesso ao catálogo imediatamente.")) return;
+
+  const { data: atual } = await supabaseClient
+    .from("assinaturas")
+    .select("id")
+    .eq("usuario_id", usuarioPerfil.id)
+    .eq("status", "ativa")
+    .order("criado_em", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!atual) return;
+
+  const { error } = await supabaseClient
+    .from("assinaturas")
+    .update({ status: "inativa" })
+    .eq("id", atual.id);
+
+  if (error) {
+    alert("Não foi possível cancelar: " + error.message);
+    return;
+  }
+
+  document.getElementById("perfil-plano").textContent = "Sem plano ativo";
+  document.getElementById("perfil-validade").textContent = "";
+  document.getElementById("botao-cancelar-assinatura").style.display = "none";
+}
 
 async function salvarEdicaoPerfil() {
   const erroEl = document.getElementById("editar-erro");
@@ -107,6 +145,7 @@ async function salvarEdicaoPerfil() {
     }
   }
 
+  // Registra a mudança pra fins de CRM/recorrência
   if (registrosMudanca.length > 0) {
     await supabaseClient.from("alteracoes_perfil").insert(registrosMudanca);
   }
