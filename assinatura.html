@@ -6,6 +6,15 @@
 <title>CineVito — Assinatura</title>
 <link rel="stylesheet" href="css/style.css">
 <style>
+  .abas-plano { display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap; }
+  .aba-plano {
+    flex:1; min-width:90px; text-align:center; padding:12px 6px; border-radius:10px;
+    background:var(--bg-card); border:1px solid #232a3a; cursor:pointer;
+  }
+  .aba-plano.ativa { background:var(--accent-gold); border-color:var(--accent-gold); }
+  .aba-plano.ativa .aba-titulo, .aba-plano.ativa .aba-sub { color:#14100a; }
+  .aba-titulo { font-weight:700; font-size:14px; }
+  .aba-sub { font-size:11px; color:var(--text-muted); margin-top:2px; }
   .pix-caixa {
     background:var(--bg-card); border:1px solid var(--accent-gold); border-radius:10px;
     padding:16px; text-align:center; margin-top:14px;
@@ -31,6 +40,8 @@
   </div>
 
   <div id="planos-area">
+
+    <div id="abas-planos" class="abas-plano"></div>
 
     <div id="lista-planos">Carregando planos...</div>
 
