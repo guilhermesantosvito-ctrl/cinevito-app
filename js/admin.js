@@ -1,4 +1,5 @@
 let usuarioAdmin = null;
+let souAdminMaster = false;
 let categoriasCache = [];
 let videosCache = [];
 let generosCacheAdmin = [];
@@ -11,7 +12,7 @@ let videoEditandoId = null;
 
   const { data: perfil } = await supabaseClient
     .from("profiles")
-    .select("is_admin")
+    .select("is_admin, admin_master")
     .eq("id", usuario.id)
     .maybeSingle();
 
@@ -19,6 +20,11 @@ let videoEditandoId = null;
     alert("Esta área é só para administradores.");
     window.location.href = "catalogo.html";
     return;
+  }
+
+  souAdminMaster = !!perfil.admin_master;
+  if (souAdminMaster) {
+    document.getElementById("aba-btn-equipe").style.display = "block";
   }
 
   await carregarCategoriasNoSelect();
@@ -45,9 +51,13 @@ function mostrarAba(nome) {
   document.getElementById("aba-videos").style.display = nome === "videos" ? "block" : "none";
   document.getElementById("aba-colecoes").style.display = nome === "colecoes" ? "block" : "none";
   document.getElementById("aba-clientes").style.display = nome === "clientes" ? "block" : "none";
+  document.getElementById("aba-equipe").style.display = nome === "equipe" ? "block" : "none";
 
   if (nome === "clientes") carregarClientes();
+  if (nome === "equipe") carregarEquipe();
 }
+
+// ================= GÊNEROS =================
 
 async function carregarGenerosNoSelect() {
   const { data } = await supabaseClient.from("generos").select("*").order("ordem");
@@ -104,6 +114,8 @@ async function apagarGenero(id) {
   await carregarGenerosNoSelect();
   await carregarListaGeneros();
 }
+
+// ================= VÍDEOS =================
 
 async function carregarCategoriasNoSelect() {
   const { data } = await supabaseClient.from("categorias").select("*").order("ordem");
@@ -213,6 +225,8 @@ async function apagarVideo(id) {
   await carregarListaVideos();
 }
 
+// ================= COLEÇÕES =================
+
 async function salvarColecao() {
   const erroEl = document.getElementById("c-erro");
   erroEl.style.display = "none";
@@ -306,6 +320,8 @@ async function alternarVideoNaColecao(colecaoId, videoId, incluir) {
   }
 }
 
+// ================= CLIENTES (CRM) =================
+
 async function carregarClientes() {
   const corpo = document.getElementById("corpo-tabela-clientes");
   corpo.innerHTML = '<tr><td colspan="7" class="texto-muted">Carregando...</td></tr>';
@@ -369,4 +385,111 @@ async function carregarClientes() {
       </tr>
     `;
   }).join("");
+}
+
+// ================= EQUIPE (só admin master) =================
+
+async function carregarEquipe() {
+  const container = document.getElementById("lista-equipe");
+  container.innerHTML = "Carregando...";
+
+  const { data: perfis, error } = await supabaseClient
+    .from("profiles")
+    .select("id, nome, email, admin_master")
+    .eq("is_admin", true)
+    .order("criado_em", { ascending: true });
+
+  if (error) {
+    container.innerHTML = `<p class="texto-muted">Erro ao carregar: ${error.message}</p>`;
+    return;
+  }
+
+  if (!perfis || perfis.length === 0) {
+    container.innerHTML = '<p class="texto-muted">Ninguém além de você tem acesso ainda.</p>';
+    return;
+  }
+
+  container.innerHTML = perfis.map(p => {
+    const ehVoce = p.id === usuarioAdmin.id;
+    const selo = p.admin_master
+      ? '<span class="selo-status selo-trial">Admin master</span>'
+      : '<span class="selo-status selo-ativa">Equipe</span>';
+
+    let acoes = '<span class="texto-muted">Você</span>';
+    if (!ehVoce) {
+      acoes = p.admin_master
+        ? `<button onclick="rebaixarParaEquipe('${p.id}')">Tornar equipe</button>`
+        : `<button onclick="promoverParaMaster('${p.id}')" style="color:var(--accent-teal); margin-right:10px;">Tornar master</button>
+           <button onclick="removerDaEquipe('${p.id}')">Remover acesso</button>`;
+    }
+
+    return `
+      <div class="lista-item">
+        <span>${p.nome || "Sem nome"} <span class="texto-muted">· ${p.email}</span> ${selo}</span>
+        <span>${acoes}</span>
+      </div>
+    `;
+  }).join("");
+}
+
+async function adicionarNaEquipe() {
+  const erroEl = document.getElementById("eq-erro");
+  erroEl.style.display = "none";
+  const email = document.getElementById("eq-email").value.trim().toLowerCase();
+
+  if (!email) {
+    erroEl.textContent = "Digite o e-mail da pessoa.";
+    erroEl.style.display = "block";
+    return;
+  }
+
+  const { data: perfil, error: erroBusca } = await supabaseClient
+    .from("profiles")
+    .select("id, is_admin")
+    .eq("email", email)
+    .maybeSingle();
+
+  if (erroBusca || !perfil) {
+    erroEl.textContent = "Não encontrei ninguém com esse e-mail. A pessoa precisa criar uma conta no CineVito primeiro.";
+    erroEl.style.display = "block";
+    return;
+  }
+
+  if (perfil.is_admin) {
+    erroEl.textContent = "Essa pessoa já tem acesso ao painel.";
+    erroEl.style.display = "block";
+    return;
+  }
+
+  const { error: erroUpdate } = await supabaseClient
+    .from("profiles")
+    .update({ is_admin: true, admin_master: false })
+    .eq("id", perfil.id);
+
+  if (erroUpdate) {
+    erroEl.textContent = "Erro ao dar acesso: " + erroUpdate.message;
+    erroEl.style.display = "block";
+    return;
+  }
+
+  document.getElementById("eq-email").value = "";
+  await carregarEquipe();
+}
+
+async function promoverParaMaster(id) {
+  if (!confirm("Tornar essa pessoa admin master? Ela vai poder adicionar e remover outros administradores, igual você.")) return;
+  await supabaseClient.from("profiles").update({ admin_master: true }).eq("id", id);
+  await carregarEquipe();
+}
+
+async function rebaixarParaEquipe(id) {
+  if (!confirm("Tirar o acesso de admin master dessa pessoa? Ela continua com acesso ao painel, mas não vai poder mais gerenciar outros administradores.")) return;
+  await supabaseClient.from("profiles").update({ admin_master: false }).eq("id", id);
+  await carregarEquipe();
+}
+
+async function removerDaEquipe(id) {
+  if (!confirm("Remover o acesso dessa pessoa ao painel administrativo?")) return;
+  await supabaseClient.from("profiles").update({ is_admin: false, admin_master: false }).eq("id", id);
+  await carregarEquipe();
 }
