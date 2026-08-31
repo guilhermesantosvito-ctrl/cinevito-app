@@ -131,10 +131,13 @@
 
   <div id="aba-planos" class="form-estreito" style="display:none;">
     <h3 style="margin-bottom:4px;">Criar tipo de assinatura</h3>
-    <p class="texto-muted" style="margin-top:0;">Só admin master vê e mexe nessa aba. Crie quantos planos quiser — nome, preço, dispositivos e duração são totalmente livres.</p>
+    <p class="texto-muted" style="margin-top:0;">Só admin master vê e mexe nessa aba. A "Categoria" define em qual aba o plano aparece pro cliente (ex: todos os planos com categoria "Básico" ficam juntos numa aba "Básico").</p>
 
     <label>Nome do plano</label>
     <input type="text" id="p-nome" class="input" placeholder="Ex: Padrão Mensal">
+
+    <label>Categoria (agrupamento mostrado como aba pro cliente)</label>
+    <input type="text" id="p-categoria" class="input" placeholder="Ex: Básico, Padrão, Premium...">
 
     <label>Descrição (opcional)</label>
     <input type="text" id="p-descricao" class="input" placeholder="Ex: 2 dispositivos, sem anúncios">
