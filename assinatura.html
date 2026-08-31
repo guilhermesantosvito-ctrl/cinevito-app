@@ -6,15 +6,6 @@
 <title>CineVito — Assinatura</title>
 <link rel="stylesheet" href="css/style.css">
 <style>
-  .abas-plano { display:flex; gap:8px; margin-bottom:20px; }
-  .aba-plano {
-    flex:1; text-align:center; padding:12px 6px; border-radius:10px;
-    background:var(--bg-card); border:1px solid #232a3a; cursor:pointer;
-  }
-  .aba-plano.ativa { background:var(--accent-gold); border-color:var(--accent-gold); }
-  .aba-plano.ativa .aba-titulo, .aba-plano.ativa .aba-sub { color:#14100a; }
-  .aba-titulo { font-weight:700; font-size:14px; }
-  .aba-sub { font-size:11px; color:var(--text-muted); margin-top:2px; }
   .pix-caixa {
     background:var(--bg-card); border:1px solid var(--accent-gold); border-radius:10px;
     padding:16px; text-align:center; margin-top:14px;
@@ -41,22 +32,7 @@
 
   <div id="planos-area">
 
-    <div class="abas-plano">
-      <div class="aba-plano" data-plano="basico" onclick="selecionarPlano('basico')">
-        <div class="aba-titulo">Básico</div>
-        <div class="aba-sub">1 dispositivo</div>
-      </div>
-      <div class="aba-plano ativa" data-plano="padrao" onclick="selecionarPlano('padrao')">
-        <div class="aba-titulo">Padrão</div>
-        <div class="aba-sub">2 dispositivos</div>
-      </div>
-      <div class="aba-plano" data-plano="premium" onclick="selecionarPlano('premium')">
-        <div class="aba-titulo">Premium</div>
-        <div class="aba-sub">4 dispositivos</div>
-      </div>
-    </div>
-
-    <div id="lista-periodos"></div>
+    <div id="lista-planos">Carregando planos...</div>
 
     <label style="font-size:13px; color:var(--text-muted); display:block; margin:10px 0 4px;">Cupom de desconto (opcional)</label>
     <input type="text" id="campo-cupom" class="input" placeholder="Ex: ANIVERSARIO10" style="text-transform:uppercase;">
