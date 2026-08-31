@@ -416,7 +416,7 @@ async function carregarListaPlanosAdmin() {
   container.innerHTML = planosCacheAdmin.map(p => `
     <div class="lista-item">
       <span>
-        ${p.nome} <span class="texto-muted">· R$ ${Number(p.preco).toFixed(2).replace(".", ",")} · ${p.duracao_meses} ${p.duracao_meses === 1 ? "mês" : "meses"} · ${p.dispositivos} disp.</span>
+        ${p.nome} <span class="texto-muted">· ${p.categoria || "sem categoria"} · R$ ${Number(p.preco).toFixed(2).replace(".", ",")} · ${p.duracao_meses} ${p.duracao_meses === 1 ? "mês" : "meses"} · ${p.dispositivos} disp.</span>
         ${p.ativo ? '<span class="selo-status selo-ativa">Ativo</span>' : '<span class="selo-status selo-inativa">Desativado</span>'}
       </span>
       <span>
@@ -433,6 +433,7 @@ async function salvarPlano() {
   erroEl.style.display = "none";
 
   const nome = document.getElementById("p-nome").value.trim();
+  const categoria = document.getElementById("p-categoria").value.trim();
   const descricao = document.getElementById("p-descricao").value.trim();
   const preco = parseFloat(document.getElementById("p-preco").value);
   const dispositivos = parseInt(document.getElementById("p-dispositivos").value) || 1;
@@ -444,7 +445,7 @@ async function salvarPlano() {
     return;
   }
 
-  const dadosPlano = { nome, descricao, preco, dispositivos, duracao_meses: duracaoMeses };
+  const dadosPlano = { nome, categoria: categoria || nome, descricao, preco, dispositivos, duracao_meses: duracaoMeses };
 
   let error;
   if (planoEditandoId) {
@@ -472,6 +473,7 @@ function editarPlano(id) {
 
   planoEditandoId = id;
   document.getElementById("p-nome").value = plano.nome || "";
+  document.getElementById("p-categoria").value = plano.categoria || "";
   document.getElementById("p-descricao").value = plano.descricao || "";
   document.getElementById("p-preco").value = plano.preco || "";
   document.getElementById("p-dispositivos").value = plano.dispositivos || 1;
@@ -484,7 +486,7 @@ function editarPlano(id) {
 
 function cancelarEdicaoPlano() {
   planoEditandoId = null;
-  ["p-nome", "p-descricao", "p-preco"].forEach(id => document.getElementById(id).value = "");
+  ["p-nome", "p-categoria", "p-descricao", "p-preco"].forEach(id => document.getElementById(id).value = "");
   document.getElementById("p-dispositivos").value = 1;
   document.getElementById("p-duracao").value = 1;
   document.getElementById("botao-salvar-plano").textContent = "Criar plano";
