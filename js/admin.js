@@ -4,6 +4,8 @@ let categoriasCache = [];
 let videosCache = [];
 let generosCacheAdmin = [];
 let videoEditandoId = null;
+let planosCacheAdmin = [];
+let planoEditandoId = null;
 
 (async function iniciarAdmin() {
   const usuario = await exigirLogin();
@@ -25,6 +27,7 @@ let videoEditandoId = null;
   souAdminMaster = !!perfil.admin_master;
   if (souAdminMaster) {
     document.getElementById("aba-btn-equipe").style.display = "block";
+    document.getElementById("aba-btn-planos").style.display = "block";
   }
 
   await carregarCategoriasNoSelect();
@@ -51,9 +54,11 @@ function mostrarAba(nome) {
   document.getElementById("aba-videos").style.display = nome === "videos" ? "block" : "none";
   document.getElementById("aba-colecoes").style.display = nome === "colecoes" ? "block" : "none";
   document.getElementById("aba-clientes").style.display = nome === "clientes" ? "block" : "none";
+  document.getElementById("aba-planos").style.display = nome === "planos" ? "block" : "none";
   document.getElementById("aba-equipe").style.display = nome === "equipe" ? "block" : "none";
 
   if (nome === "clientes") carregarClientes();
+  if (nome === "planos") carregarListaPlanosAdmin();
   if (nome === "equipe") carregarEquipe();
 }
 
@@ -387,6 +392,116 @@ async function carregarClientes() {
   }).join("");
 }
 
+// ================= PLANOS (só admin master) =================
+
+async function carregarListaPlanosAdmin() {
+  const container = document.getElementById("lista-planos-admin");
+  const { data, error } = await supabaseClient
+    .from("planos")
+    .select("*")
+    .order("ordem", { ascending: true });
+
+  if (error) {
+    container.innerHTML = `<p class="texto-muted">Erro ao carregar: ${error.message}</p>`;
+    return;
+  }
+
+  planosCacheAdmin = data || [];
+
+  if (planosCacheAdmin.length === 0) {
+    container.innerHTML = '<p class="texto-muted">Nenhum plano cadastrado ainda.</p>';
+    return;
+  }
+
+  container.innerHTML = planosCacheAdmin.map(p => `
+    <div class="lista-item">
+      <span>
+        ${p.nome} <span class="texto-muted">· R$ ${Number(p.preco).toFixed(2).replace(".", ",")} · ${p.duracao_meses} ${p.duracao_meses === 1 ? "mês" : "meses"} · ${p.dispositivos} disp.</span>
+        ${p.ativo ? '<span class="selo-status selo-ativa">Ativo</span>' : '<span class="selo-status selo-inativa">Desativado</span>'}
+      </span>
+      <span>
+        <button onclick="editarPlano('${p.id}')" style="color:var(--accent-teal); margin-right:10px;">Editar</button>
+        <button onclick="alternarAtivoPlano('${p.id}', ${!p.ativo})" style="color:var(--accent-teal); margin-right:10px;">${p.ativo ? "Desativar" : "Ativar"}</button>
+        <button onclick="apagarPlano('${p.id}')">Apagar</button>
+      </span>
+    </div>
+  `).join("");
+}
+
+async function salvarPlano() {
+  const erroEl = document.getElementById("p-erro");
+  erroEl.style.display = "none";
+
+  const nome = document.getElementById("p-nome").value.trim();
+  const descricao = document.getElementById("p-descricao").value.trim();
+  const preco = parseFloat(document.getElementById("p-preco").value);
+  const dispositivos = parseInt(document.getElementById("p-dispositivos").value) || 1;
+  const duracaoMeses = parseInt(document.getElementById("p-duracao").value) || 1;
+
+  if (!nome || isNaN(preco) || preco <= 0) {
+    erroEl.textContent = "Preencha ao menos o nome e um preço válido.";
+    erroEl.style.display = "block";
+    return;
+  }
+
+  const dadosPlano = { nome, descricao, preco, dispositivos, duracao_meses: duracaoMeses };
+
+  let error;
+  if (planoEditandoId) {
+    ({ error } = await supabaseClient.from("planos").update(dadosPlano).eq("id", planoEditandoId));
+  } else {
+    const proximaOrdem = planosCacheAdmin.length > 0
+      ? Math.max(...planosCacheAdmin.map(p => p.ordem || 0)) + 1
+      : 1;
+    ({ error } = await supabaseClient.from("planos").insert({ ...dadosPlano, ordem: proximaOrdem }));
+  }
+
+  if (error) {
+    erroEl.textContent = "Erro ao salvar: " + error.message;
+    erroEl.style.display = "block";
+    return;
+  }
+
+  cancelarEdicaoPlano();
+  await carregarListaPlanosAdmin();
+}
+
+function editarPlano(id) {
+  const plano = planosCacheAdmin.find(p => p.id === id);
+  if (!plano) return;
+
+  planoEditandoId = id;
+  document.getElementById("p-nome").value = plano.nome || "";
+  document.getElementById("p-descricao").value = plano.descricao || "";
+  document.getElementById("p-preco").value = plano.preco || "";
+  document.getElementById("p-dispositivos").value = plano.dispositivos || 1;
+  document.getElementById("p-duracao").value = plano.duracao_meses || 1;
+
+  document.getElementById("botao-salvar-plano").textContent = "Salvar alterações";
+  document.getElementById("link-cancelar-edicao-plano").style.display = "block";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function cancelarEdicaoPlano() {
+  planoEditandoId = null;
+  ["p-nome", "p-descricao", "p-preco"].forEach(id => document.getElementById(id).value = "");
+  document.getElementById("p-dispositivos").value = 1;
+  document.getElementById("p-duracao").value = 1;
+  document.getElementById("botao-salvar-plano").textContent = "Criar plano";
+  document.getElementById("link-cancelar-edicao-plano").style.display = "none";
+}
+
+async function alternarAtivoPlano(id, novoValor) {
+  await supabaseClient.from("planos").update({ ativo: novoValor }).eq("id", id);
+  await carregarListaPlanosAdmin();
+}
+
+async function apagarPlano(id) {
+  if (!confirm("Apagar este plano? Assinaturas antigas que já usaram ele continuam registradas normalmente, só some da lista de opções pra novos clientes.")) return;
+  await supabaseClient.from("planos").delete().eq("id", id);
+  await carregarListaPlanosAdmin();
+}
+
 // ================= EQUIPE (só admin master) =================
 
 async function carregarEquipe() {
@@ -477,13 +592,13 @@ async function adicionarNaEquipe() {
 }
 
 async function promoverParaMaster(id) {
-  if (!confirm("Tornar essa pessoa admin master? Ela vai poder adicionar e remover outros administradores, igual você.")) return;
+  if (!confirm("Tornar essa pessoa admin master? Ela vai poder adicionar e remover outros administradores, e criar/editar planos, igual você.")) return;
   await supabaseClient.from("profiles").update({ admin_master: true }).eq("id", id);
   await carregarEquipe();
 }
 
 async function rebaixarParaEquipe(id) {
-  if (!confirm("Tirar o acesso de admin master dessa pessoa? Ela continua com acesso ao painel, mas não vai poder mais gerenciar outros administradores.")) return;
+  if (!confirm("Tirar o acesso de admin master dessa pessoa? Ela continua com acesso ao painel, mas não vai poder mais gerenciar outros administradores nem os planos.")) return;
   await supabaseClient.from("profiles").update({ admin_master: false }).eq("id", id);
   await carregarEquipe();
 }
