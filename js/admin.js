@@ -60,6 +60,7 @@ function mostrarAba(nome) {
   document.getElementById("aba-planos").style.display = nome === "planos" ? "block" : "none";
   document.getElementById("aba-equipe").style.display = nome === "equipe" ? "block" : "none";
   document.getElementById("aba-indicacoes").style.display = nome === "indicacoes" ? "block" : "none";
+  document.getElementById("aba-verificar").style.display = nome === "verificar" ? "block" : "none";
 
   if (nome === "clientes") carregarClientes();
   if (nome === "planos") carregarListaPlanosAdmin();
@@ -445,8 +446,6 @@ async function confirmarConcederAcesso() {
     return;
   }
 
-  // Busca a assinatura ativa atual do cliente, se houver, pra somar o
-  // tempo concedido (mesma regra de "nunca perde tempo pago" da renovação).
   const { data: ativaAtual } = await supabaseClient
     .from("assinaturas")
     .select("id, data_expiracao, limite_dispositivos")
@@ -563,9 +562,6 @@ async function salvarPlano() {
     descricao,
     preco,
     dispositivos,
-    // "duracao_meses" não pode ficar vazio no banco, então quando a
-    // unidade escolhida é "dias" guardamos 0 nele (sinal de "veja
-    // duracao_dias") e o valor de verdade vai em duracao_dias.
     duracao_meses: unidadeDuracao === "meses" ? quantidadeDuracao : 0,
     duracao_dias: unidadeDuracao === "dias" ? quantidadeDuracao : null
   };
@@ -737,7 +733,7 @@ async function rebaixarParaEquipe(id) {
 }
 
 async function removerDaEquipe(id) {
-  if (!confirm("Remover o acesso dessa pessoa ao painel administrativo?")) return;
+  if (!confirm("Remover o acesso dessa pessoa do painel administrativo?")) return;
   await supabaseClient.from("profiles").update({ is_admin: false, admin_master: false }).eq("id", id);
   await carregarEquipe();
 }
@@ -865,7 +861,6 @@ async function salvarCampanhaIndicacao() {
 
 async function ativarCampanhaIndicacao(id) {
   if (!confirm("Ativar essa campanha? A campanha ativa atual (se houver) será desativada automaticamente.")) return;
-  // Só uma campanha ativa por vez: desativa todas antes de ativar a escolhida
   await supabaseClient.from("campanhas_indicacao").update({ ativa: false }).eq("ativa", true);
   await supabaseClient.from("campanhas_indicacao").update({ ativa: true }).eq("id", id);
   await carregarListaCampanhasIndicacao();
@@ -881,4 +876,81 @@ async function apagarCampanhaIndicacao(id) {
   if (!confirm("Apagar esta campanha? Indicações já confirmadas nela continuam registradas, só não aparece mais na lista.")) return;
   await supabaseClient.from("campanhas_indicacao").delete().eq("id", id);
   await carregarListaCampanhasIndicacao();
+}
+
+// ================= VERIFICADOR PYTHON =================
+
+function escaparHtml(valor) {
+  return String(valor ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function classeStatusVerificacao(status) {
+  if (status === "ativo") return "status-ok";
+  if (status === "erro") return "status-erro";
+  return "status-aviso";
+}
+
+async function verificarLinksVideos() {
+  const erroEl = document.getElementById("verificar-erro");
+  const resultadoEl = document.getElementById("resultado-verificacao");
+  const botao = document.getElementById("botao-verificar");
+  const url = document.getElementById("verificar-url").value.trim();
+
+  erroEl.style.display = "none";
+  resultadoEl.innerHTML = "";
+
+  if (!url) {
+    erroEl.textContent = "Informe a URL da página para analisar.";
+    erroEl.style.display = "block";
+    return;
+  }
+
+  botao.disabled = true;
+  botao.textContent = "Verificando...";
+  resultadoEl.innerHTML = '<p class="texto-muted">Lendo a página e testando os links encontrados...</p>';
+
+  const { data, error } = await supabaseClient.functions.invoke("verificar-videos", {
+    body: { url }
+  });
+
+  botao.disabled = false;
+  botao.textContent = "Verificar links";
+
+  if (error || data?.error) {
+    resultadoEl.innerHTML = "";
+    erroEl.textContent = data?.error || "Não foi possível executar o verificador.";
+    erroEl.style.display = "block";
+    return;
+  }
+
+  const resultados = data.resultados || [];
+  const resumo = `
+    <p><strong>${data.linksEncontrados}</strong> link(s) de vídeo encontrado(s) em
+      <span class="texto-muted">${escaparHtml(data.sourceUrl)}</span>.</p>
+  `;
+
+  if (resultados.length === 0) {
+    resultadoEl.innerHTML = resumo + '<p class="texto-muted">Nenhum link .mp4 ou .m3u8 foi encontrado.</p>';
+    return;
+  }
+
+  resultadoEl.innerHTML = resumo + `
+    <div>
+      ${resultados.map(item => `
+        <div class="lista-item">
+          <div class="url-video">
+            <div><a href="${escaparHtml(item.url)}" target="_blank" rel="noopener noreferrer">${escaparHtml(item.url)}</a></div>
+            <small class="${classeStatusVerificacao(item.status)}">
+              ${escaparHtml(item.mensagem)}${item.statusCode ? ` · HTTP ${escaparHtml(item.statusCode)}` : ""}
+            </small>
+          </div>
+        </div>
+      `).join("")}
+    </div>
+  `;
 }
