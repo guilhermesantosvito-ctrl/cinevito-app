@@ -1,4 +1,4 @@
-  let usuarioCatalogo = null;
+let usuarioCatalogo = null;
 let assinanteAtual = false;
 let generosCache = [];
 
@@ -101,6 +101,8 @@ async function verificarAniversario(dataNascimento) {
   area.appendChild(div);
 }
 
+// Permite rolar carrosséis/abas com a roda do mouse no computador
+// (no celular, arrastar com o dedo já funciona sozinho)
 function habilitarScrollHorizontal(elemento) {
   if (!elemento || elemento.dataset.scrollHabilitado) return;
   elemento.dataset.scrollHabilitado = "1";
