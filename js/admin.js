@@ -6,7 +6,6 @@ let generosCacheAdmin = [];
 let videoEditandoId = null;
 let planosCacheAdmin = [];
 let planoEditandoId = null;
-let resultadosIACache = [];
 
 (async function iniciarAdmin() {
   const usuario = await exigirLogin();
@@ -61,66 +60,6 @@ function mostrarAba(nome) {
   if (nome === "clientes") carregarClientes();
   if (nome === "planos") carregarListaPlanosAdmin();
   if (nome === "equipe") carregarEquipe();
-}
-
-// ================= BUSCA NO INTERNET ARCHIVE =================
-
-async function buscarInternetArchive() {
-  const termo = document.getElementById("ia-busca").value.trim();
-  const resultadosEl = document.getElementById("ia-resultados");
-  if (!termo) return;
-
-  resultadosEl.innerHTML = '<p class="texto-muted">Buscando...</p>';
-
-  const params = new URLSearchParams();
-  params.set("q", `(${termo}) AND mediatype:(movies)`);
-  params.append("fl[]", "identifier");
-  params.append("fl[]", "title");
-  params.append("fl[]", "year");
-  params.append("fl[]", "description");
-  params.set("rows", "12");
-  params.set("output", "json");
-
-  try {
-    const resposta = await fetch("https://archive.org/advancedsearch.php?" + params.toString());
-    const dados = await resposta.json();
-    resultadosIACache = dados?.response?.docs || [];
-
-    if (resultadosIACache.length === 0) {
-      resultadosEl.innerHTML = '<p class="texto-muted">Nada encontrado. Tente outro termo.</p>';
-      return;
-    }
-
-    resultadosEl.innerHTML = resultadosIACache.map((d, i) => `
-      <div class="lista-item" style="cursor:pointer;" onclick="preencherComResultadoIA(${i})">
-        <span>${(d.title || d.identifier).toString().slice(0, 70)}${d.year ? " (" + d.year + ")" : ""}</span>
-        <span class="texto-muted">Usar este ›</span>
-      </div>
-    `).join("");
-  } catch (e) {
-    resultadosEl.innerHTML = '<p class="texto-muted">Erro ao buscar: ' + e.message + '</p>';
-  }
-}
-
-function preencherComResultadoIA(indice) {
-  const item = resultadosIACache[indice];
-  if (!item) return;
-
-  const urlDetalhes = `https://archive.org/details/${item.identifier}`;
-  const urlNormalizada = normalizarUrlVideo(urlDetalhes);
-  const descricaoLimpa = (Array.isArray(item.description) ? item.description[0] : item.description || "")
-    .toString().replace(/<[^>]+>/g, "").slice(0, 200);
-
-  document.getElementById("v-url").value = urlDetalhes;
-  document.getElementById("v-titulo").value = item.title || "";
-  document.getElementById("v-descricao").value = descricaoLimpa;
-  document.getElementById("v-capa").value = sugerirCapaAutomatica(urlNormalizada);
-  document.getElementById("v-ano").value = item.year || "";
-  document.getElementById("v-licenca").value = "Domínio Público";
-
-  document.getElementById("ia-resultados").innerHTML = "";
-  document.getElementById("ia-busca").value = "";
-  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 // ================= GÊNEROS =================
