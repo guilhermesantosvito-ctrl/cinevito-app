@@ -6,6 +6,8 @@ let generosCacheAdmin = [];
 let videoEditandoId = null;
 let planosCacheAdmin = [];
 let planoEditandoId = null;
+let clientesCacheAdmin = [];
+let clienteSelecionadoId = null;
 
 (async function iniciarAdmin() {
   const usuario = await exigirLogin();
@@ -329,7 +331,7 @@ async function alternarVideoNaColecao(colecaoId, videoId, incluir) {
 
 async function carregarClientes() {
   const corpo = document.getElementById("corpo-tabela-clientes");
-  corpo.innerHTML = '<tr><td colspan="7" class="texto-muted">Carregando...</td></tr>';
+  corpo.innerHTML = '<tr><td colspan="8" class="texto-muted">Carregando...</td></tr>';
 
   const { data: perfis, error: erroPerfis } = await supabaseClient
     .from("profiles")
@@ -337,11 +339,12 @@ async function carregarClientes() {
     .order("criado_em", { ascending: false });
 
   if (erroPerfis) {
-    corpo.innerHTML = `<tr><td colspan="7" class="texto-muted">Erro ao carregar: ${erroPerfis.message}</td></tr>`;
+    corpo.innerHTML = `<tr><td colspan="8" class="texto-muted">Erro ao carregar: ${erroPerfis.message}</td></tr>`;
     return;
   }
 
   const clientes = (perfis || []).filter(p => !p.is_admin);
+  clientesCacheAdmin = clientes;
 
   const { data: assinaturas } = await supabaseClient
     .from("assinaturas")
@@ -354,7 +357,7 @@ async function carregarClientes() {
   });
 
   if (clientes.length === 0) {
-    corpo.innerHTML = '<tr><td colspan="7" class="texto-muted">Nenhum cliente ainda.</td></tr>';
+    corpo.innerHTML = '<tr><td colspan="8" class="texto-muted">Nenhum cliente ainda.</td></tr>';
     return;
   }
 
@@ -378,6 +381,8 @@ async function carregarClientes() {
       ? new Date(c.data_nascimento + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
       : "-";
 
+    const nomeSeguro = (c.nome || "Sem nome").replace(/'/g, "\\'");
+
     return `
       <tr>
         <td>${c.nome || "Sem nome"}</td>
@@ -387,9 +392,106 @@ async function carregarClientes() {
         <td>${validade}</td>
         <td>${aniversario}</td>
         <td><a href="mailto:${c.email}">✉️ E-mail</a></td>
+        <td><button onclick="abrirConcederAcesso('${c.id}', '${nomeSeguro}')" style="color:var(--accent-teal);">Conceder acesso</button></td>
       </tr>
     `;
   }).join("");
+}
+
+// ---- Conceder acesso manual (Fase 1 do CRM) ----
+
+function abrirConcederAcesso(id, nome) {
+  clienteSelecionadoId = id;
+  document.getElementById("ca-cliente-nome").textContent = nome || "Sem nome";
+  document.getElementById("ca-quantidade").value = 30;
+  document.getElementById("ca-unidade").value = "dias";
+  document.getElementById("ca-motivo").value = "";
+  document.getElementById("ca-erro").style.display = "none";
+  const painel = document.getElementById("painel-conceder-acesso");
+  painel.style.display = "block";
+  painel.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function fecharPainelConceder() {
+  clienteSelecionadoId = null;
+  document.getElementById("painel-conceder-acesso").style.display = "none";
+}
+
+function sortearCliente() {
+  if (!clientesCacheAdmin || clientesCacheAdmin.length === 0) {
+    alert("Nenhum cliente carregado ainda. Abra a aba Clientes primeiro pra carregar a lista.");
+    return;
+  }
+  const escolhido = clientesCacheAdmin[Math.floor(Math.random() * clientesCacheAdmin.length)];
+  abrirConcederAcesso(escolhido.id, escolhido.nome || escolhido.email || "Sem nome");
+}
+
+async function confirmarConcederAcesso() {
+  const erroEl = document.getElementById("ca-erro");
+  erroEl.style.display = "none";
+
+  if (!clienteSelecionadoId) return;
+
+  const quantidade = parseInt(document.getElementById("ca-quantidade").value);
+  const unidade = document.getElementById("ca-unidade").value;
+  const motivo = document.getElementById("ca-motivo").value.trim();
+
+  if (!quantidade || quantidade <= 0) {
+    erroEl.textContent = "Digite uma quantidade válida.";
+    erroEl.style.display = "block";
+    return;
+  }
+
+  // Busca a assinatura ativa atual do cliente, se houver, pra somar o
+  // tempo concedido (mesma regra de "nunca perde tempo pago" da renovação).
+  const { data: ativaAtual } = await supabaseClient
+    .from("assinaturas")
+    .select("id, data_expiracao, limite_dispositivos")
+    .eq("usuario_id", clienteSelecionadoId)
+    .eq("status", "ativa")
+    .order("criado_em", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const agora = new Date();
+  let base = agora;
+  let dispositivosHerdados = 1;
+
+  if (ativaAtual) {
+    dispositivosHerdados = ativaAtual.limite_dispositivos || 1;
+    if (ativaAtual.data_expiracao && new Date(ativaAtual.data_expiracao) > agora) {
+      base = new Date(ativaAtual.data_expiracao);
+    }
+    await supabaseClient.from("assinaturas").update({ status: "substituida" }).eq("id", ativaAtual.id);
+  }
+
+  const expiracao = new Date(base);
+  if (unidade === "dias") {
+    expiracao.setDate(expiracao.getDate() + quantidade);
+  } else {
+    expiracao.setMonth(expiracao.getMonth() + quantidade);
+  }
+
+  const { error } = await supabaseClient.from("assinaturas").insert({
+    usuario_id: clienteSelecionadoId,
+    status: "ativa",
+    plano: "Cortesia (concedido pelo admin)",
+    plano_id: null,
+    limite_dispositivos: dispositivosHerdados,
+    data_inicio: agora.toISOString(),
+    data_expiracao: expiracao.toISOString(),
+    concedido_por_admin: true,
+    motivo_concessao: motivo || null
+  });
+
+  if (error) {
+    erroEl.textContent = "Erro ao conceder acesso: " + error.message;
+    erroEl.style.display = "block";
+    return;
+  }
+
+  fecharPainelConceder();
+  await carregarClientes();
 }
 
 // ================= PLANOS (só admin master) =================
@@ -413,10 +515,15 @@ async function carregarListaPlanosAdmin() {
     return;
   }
 
-  container.innerHTML = planosCacheAdmin.map(p => `
+  container.innerHTML = planosCacheAdmin.map(p => {
+    const duracaoTexto = p.duracao_dias
+      ? `${p.duracao_dias} ${p.duracao_dias === 1 ? "dia" : "dias"}`
+      : `${p.duracao_meses} ${p.duracao_meses === 1 ? "mês" : "meses"}`;
+
+    return `
     <div class="lista-item">
       <span>
-        ${p.nome} <span class="texto-muted">· ${p.categoria || "sem categoria"} · R$ ${Number(p.preco).toFixed(2).replace(".", ",")} · ${p.duracao_meses} ${p.duracao_meses === 1 ? "mês" : "meses"} · ${p.dispositivos} disp.</span>
+        ${p.nome} <span class="texto-muted">· ${p.categoria || "sem categoria"} · R$ ${Number(p.preco).toFixed(2).replace(".", ",")} · ${duracaoTexto} · ${p.dispositivos} disp.</span>
         ${p.ativo ? '<span class="selo-status selo-ativa">Ativo</span>' : '<span class="selo-status selo-inativa">Desativado</span>'}
       </span>
       <span>
@@ -425,7 +532,8 @@ async function carregarListaPlanosAdmin() {
         <button onclick="apagarPlano('${p.id}')">Apagar</button>
       </span>
     </div>
-  `).join("");
+  `;
+  }).join("");
 }
 
 async function salvarPlano() {
@@ -437,15 +545,27 @@ async function salvarPlano() {
   const descricao = document.getElementById("p-descricao").value.trim();
   const preco = parseFloat(document.getElementById("p-preco").value);
   const dispositivos = parseInt(document.getElementById("p-dispositivos").value) || 1;
-  const duracaoMeses = parseInt(document.getElementById("p-duracao").value) || 1;
+  const quantidadeDuracao = parseInt(document.getElementById("p-duracao").value) || 1;
+  const unidadeDuracao = document.getElementById("p-duracao-unidade").value;
 
   if (!nome || isNaN(preco) || preco <= 0) {
-    erroEl.textContent = "Preencha ao menos o nome e um preço válido.";
+    erroEl.textContent = "Preencha ao menos o nome e um preço válido (maior que zero — o Mercado Pago não aceita cobrança de R$ 0,00; pra dar acesso grátis a um cliente específico, use \"Conceder acesso\" na aba Clientes).";
     erroEl.style.display = "block";
     return;
   }
 
-  const dadosPlano = { nome, categoria: categoria || nome, descricao, preco, dispositivos, duracao_meses: duracaoMeses };
+  const dadosPlano = {
+    nome,
+    categoria: categoria || nome,
+    descricao,
+    preco,
+    dispositivos,
+    // "duracao_meses" não pode ficar vazio no banco, então quando a
+    // unidade escolhida é "dias" guardamos 0 nele (sinal de "veja
+    // duracao_dias") e o valor de verdade vai em duracao_dias.
+    duracao_meses: unidadeDuracao === "meses" ? quantidadeDuracao : 0,
+    duracao_dias: unidadeDuracao === "dias" ? quantidadeDuracao : null
+  };
 
   let error;
   if (planoEditandoId) {
@@ -477,7 +597,14 @@ function editarPlano(id) {
   document.getElementById("p-descricao").value = plano.descricao || "";
   document.getElementById("p-preco").value = plano.preco || "";
   document.getElementById("p-dispositivos").value = plano.dispositivos || 1;
-  document.getElementById("p-duracao").value = plano.duracao_meses || 1;
+
+  if (plano.duracao_dias) {
+    document.getElementById("p-duracao").value = plano.duracao_dias;
+    document.getElementById("p-duracao-unidade").value = "dias";
+  } else {
+    document.getElementById("p-duracao").value = plano.duracao_meses || 1;
+    document.getElementById("p-duracao-unidade").value = "meses";
+  }
 
   document.getElementById("botao-salvar-plano").textContent = "Salvar alterações";
   document.getElementById("link-cancelar-edicao-plano").style.display = "block";
@@ -489,6 +616,7 @@ function cancelarEdicaoPlano() {
   ["p-nome", "p-categoria", "p-descricao", "p-preco"].forEach(id => document.getElementById(id).value = "");
   document.getElementById("p-dispositivos").value = 1;
   document.getElementById("p-duracao").value = 1;
+  document.getElementById("p-duracao-unidade").value = "meses";
   document.getElementById("botao-salvar-plano").textContent = "Criar plano";
   document.getElementById("link-cancelar-edicao-plano").style.display = "none";
 }
