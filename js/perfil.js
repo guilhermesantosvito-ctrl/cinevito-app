@@ -53,7 +53,38 @@ let usuarioPerfil = null;
     validadeEl.textContent = "";
     botaoCancelar.style.display = "none";
   }
+
+  await carregarIndicacao();
 })();
+
+async function carregarIndicacao() {
+  const { data, error } = await supabaseClient.rpc("minhas_indicacoes_stats");
+  if (error || !data || data.length === 0) return;
+
+  const stats = data[0];
+  if (!stats.codigo) return; // ainda não fez nenhuma assinatura paga, não tem código ainda
+
+  document.getElementById("cartao-indicacao").style.display = "block";
+  document.getElementById("ind-codigo-texto").textContent = stats.codigo;
+
+  const areaStatus = document.getElementById("ind-status-campanha");
+  if (stats.tem_campanha_ativa) {
+    areaStatus.innerHTML = `
+      <strong style="color:var(--accent-gold);">${stats.campanha_titulo}</strong>
+      <p class="texto-muted" style="margin:4px 0 0;">Você já tem ${stats.confirmadas} de ${stats.meta_indicacoes} indicações confirmadas. Complete a meta e ganhe ${stats.recompensa_quantidade} ${stats.recompensa_unidade} grátis!</p>
+    `;
+  } else {
+    areaStatus.innerHTML = '<p class="texto-muted">Nenhuma campanha de indicação ativa no momento. Guarde seu código — avisamos quando tiver uma nova!</p>';
+  }
+}
+
+function copiarCodigoIndicacao() {
+  const texto = document.getElementById("ind-codigo-texto").textContent;
+  if (!texto || texto === "-") return;
+  const link = window.location.origin + "/index.html?ref=" + texto;
+  navigator.clipboard.writeText(link);
+  alert("Link de indicação copiado! Cole onde quiser compartilhar.");
+}
 
 async function cancelarAssinatura() {
   if (!confirm("Cancelar sua assinatura agora? Você perde o acesso ao catálogo imediatamente.")) return;
@@ -120,3 +151,47 @@ async function salvarEdicaoPerfil() {
     registrosMudanca.push({
       usuario_id: usuarioPerfil.id,
       campo: "email",
+      valor_antigo: usuarioPerfil.email || null,
+      valor_novo: novoEmail
+    });
+  }
+
+  const { error: erroPerfil } = await supabaseClient
+    .from("profiles")
+    .update({ nome: novoNome, email: novoEmail })
+    .eq("id", usuarioPerfil.id);
+
+  if (erroPerfil) {
+    erroEl.textContent = "Erro ao salvar: " + erroPerfil.message;
+    erroEl.style.display = "block";
+    return;
+  }
+
+  if (emailMudou) {
+    const { error: erroAuth } = await supabaseClient.auth.updateUser({ email: novoEmail });
+    if (erroAuth) {
+      erroEl.textContent = "Nome salvo, mas não foi possível atualizar o e-mail de login: " + erroAuth.message;
+      erroEl.style.display = "block";
+      return;
+    }
+  }
+
+  // Registra a mudança pra fins de CRM/recorrência
+  if (registrosMudanca.length > 0) {
+    await supabaseClient.from("alteracoes_perfil").insert(registrosMudanca);
+  }
+
+  sucessoEl.textContent = emailMudou
+    ? "Salvo! Verifique seu e-mail antigo ou novo para confirmar a troca de e-mail."
+    : "Informações atualizadas!";
+  sucessoEl.style.display = "block";
+
+  document.getElementById("perfil-nome").textContent = novoNome;
+  document.getElementById("perfil-email").textContent = novoEmail;
+  document.getElementById("avatar-grande").textContent = novoNome.charAt(0).toUpperCase();
+}
+
+async function sairDoPerfil() {
+  await supabaseClient.auth.signOut();
+  window.location.href = "index.html";
+}
