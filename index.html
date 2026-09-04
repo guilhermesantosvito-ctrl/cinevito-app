@@ -33,7 +33,10 @@
 
     <div id="form-login">
       <input type="email" id="login-email" class="input" placeholder="E-mail" autocomplete="off">
-      <input type="password" id="login-senha" class="input" placeholder="Senha" autocomplete="new-password">
+      <div class="campo-senha">
+        <input type="password" id="login-senha" class="input" placeholder="Senha" autocomplete="new-password">
+        <button type="button" class="botao-ver-senha" onclick="alternarVerSenha('login-senha', this)">👁</button>
+      </div>
       <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-muted); margin:-4px 0 14px;">
         <input type="checkbox" id="lembrar-email"> Lembrar meu e-mail neste aparelho
       </label>
@@ -51,7 +54,10 @@
     <div id="form-cadastro" style="display:none;">
       <input type="text" id="cadastro-nome" class="input" placeholder="Seu nome">
       <input type="email" id="cadastro-email" class="input" placeholder="E-mail">
-      <input type="password" id="cadastro-senha" class="input" placeholder="Crie uma senha">
+      <div class="campo-senha">
+        <input type="password" id="cadastro-senha" class="input" placeholder="Crie uma senha">
+        <button type="button" class="botao-ver-senha" onclick="alternarVerSenha('cadastro-senha', this)">👁</button>
+      </div>
       <label style="display:block; font-size:12px; color:var(--text-muted); margin:-4px 0 4px;">Data de nascimento (pra gente te dar um presente no seu aniversário 🎂)</label>
       <input type="date" id="cadastro-nascimento" class="input">
       <label style="display:block; font-size:12px; color:var(--text-muted); margin:-4px 0 4px;">Código de indicação (opcional)</label>
@@ -81,6 +87,13 @@ function mostrarCadastro() {
 function mostrarLogin() {
   document.getElementById("form-cadastro").style.display = "none";
   document.getElementById("form-login").style.display = "block";
+}
+
+function alternarVerSenha(idCampo, botao) {
+  const campo = document.getElementById(idCampo);
+  const mostrando = campo.type === "text";
+  campo.type = mostrando ? "password" : "text";
+  botao.textContent = mostrando ? "👁" : "🙈";
 }
 
 function obterDeviceId() {
