@@ -433,6 +433,21 @@ body {
   }
 }
 
+/* ---------- Botão de mostrar/ocultar senha ---------- */
+.campo-senha { position: relative; }
+.botao-ver-senha {
+  position: absolute;
+  right: 12px;
+  top: 14px;
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 4px;
+  line-height: 1;
+}
+
 /* ---------- Navegação por controle de TV / teclado ---------- */
 .focavel-tv { outline: none; }
 .focavel-tv:focus {
