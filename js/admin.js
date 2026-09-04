@@ -30,6 +30,7 @@ let clienteSelecionadoId = null;
   if (souAdminMaster) {
     document.getElementById("aba-btn-equipe").style.display = "block";
     document.getElementById("aba-btn-planos").style.display = "block";
+    document.getElementById("aba-btn-indicacoes").style.display = "block";
   }
 
   await carregarCategoriasNoSelect();
@@ -58,10 +59,12 @@ function mostrarAba(nome) {
   document.getElementById("aba-clientes").style.display = nome === "clientes" ? "block" : "none";
   document.getElementById("aba-planos").style.display = nome === "planos" ? "block" : "none";
   document.getElementById("aba-equipe").style.display = nome === "equipe" ? "block" : "none";
+  document.getElementById("aba-indicacoes").style.display = nome === "indicacoes" ? "block" : "none";
 
   if (nome === "clientes") carregarClientes();
   if (nome === "planos") carregarListaPlanosAdmin();
   if (nome === "equipe") carregarEquipe();
+  if (nome === "indicacoes") carregarListaCampanhasIndicacao();
 }
 
 // ================= GÊNEROS =================
@@ -592,149 +595,4 @@ function editarPlano(id) {
   if (!plano) return;
 
   planoEditandoId = id;
-  document.getElementById("p-nome").value = plano.nome || "";
-  document.getElementById("p-categoria").value = plano.categoria || "";
-  document.getElementById("p-descricao").value = plano.descricao || "";
-  document.getElementById("p-preco").value = plano.preco || "";
-  document.getElementById("p-dispositivos").value = plano.dispositivos || 1;
-
-  if (plano.duracao_dias) {
-    document.getElementById("p-duracao").value = plano.duracao_dias;
-    document.getElementById("p-duracao-unidade").value = "dias";
-  } else {
-    document.getElementById("p-duracao").value = plano.duracao_meses || 1;
-    document.getElementById("p-duracao-unidade").value = "meses";
-  }
-
-  document.getElementById("botao-salvar-plano").textContent = "Salvar alterações";
-  document.getElementById("link-cancelar-edicao-plano").style.display = "block";
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-
-function cancelarEdicaoPlano() {
-  planoEditandoId = null;
-  ["p-nome", "p-categoria", "p-descricao", "p-preco"].forEach(id => document.getElementById(id).value = "");
-  document.getElementById("p-dispositivos").value = 1;
-  document.getElementById("p-duracao").value = 1;
-  document.getElementById("p-duracao-unidade").value = "meses";
-  document.getElementById("botao-salvar-plano").textContent = "Criar plano";
-  document.getElementById("link-cancelar-edicao-plano").style.display = "none";
-}
-
-async function alternarAtivoPlano(id, novoValor) {
-  await supabaseClient.from("planos").update({ ativo: novoValor }).eq("id", id);
-  await carregarListaPlanosAdmin();
-}
-
-async function apagarPlano(id) {
-  if (!confirm("Apagar este plano? Assinaturas antigas que já usaram ele continuam registradas normalmente, só some da lista de opções pra novos clientes.")) return;
-  await supabaseClient.from("planos").delete().eq("id", id);
-  await carregarListaPlanosAdmin();
-}
-
-// ================= EQUIPE (só admin master) =================
-
-async function carregarEquipe() {
-  const container = document.getElementById("lista-equipe");
-  container.innerHTML = "Carregando...";
-
-  const { data: perfis, error } = await supabaseClient
-    .from("profiles")
-    .select("id, nome, email, admin_master")
-    .eq("is_admin", true)
-    .order("criado_em", { ascending: true });
-
-  if (error) {
-    container.innerHTML = `<p class="texto-muted">Erro ao carregar: ${error.message}</p>`;
-    return;
-  }
-
-  if (!perfis || perfis.length === 0) {
-    container.innerHTML = '<p class="texto-muted">Ninguém além de você tem acesso ainda.</p>';
-    return;
-  }
-
-  container.innerHTML = perfis.map(p => {
-    const ehVoce = p.id === usuarioAdmin.id;
-    const selo = p.admin_master
-      ? '<span class="selo-status selo-trial">Admin master</span>'
-      : '<span class="selo-status selo-ativa">Equipe</span>';
-
-    let acoes = '<span class="texto-muted">Você</span>';
-    if (!ehVoce) {
-      acoes = p.admin_master
-        ? `<button onclick="rebaixarParaEquipe('${p.id}')">Tornar equipe</button>`
-        : `<button onclick="promoverParaMaster('${p.id}')" style="color:var(--accent-teal); margin-right:10px;">Tornar master</button>
-           <button onclick="removerDaEquipe('${p.id}')">Remover acesso</button>`;
-    }
-
-    return `
-      <div class="lista-item">
-        <span>${p.nome || "Sem nome"} <span class="texto-muted">· ${p.email}</span> ${selo}</span>
-        <span>${acoes}</span>
-      </div>
-    `;
-  }).join("");
-}
-
-async function adicionarNaEquipe() {
-  const erroEl = document.getElementById("eq-erro");
-  erroEl.style.display = "none";
-  const email = document.getElementById("eq-email").value.trim().toLowerCase();
-
-  if (!email) {
-    erroEl.textContent = "Digite o e-mail da pessoa.";
-    erroEl.style.display = "block";
-    return;
-  }
-
-  const { data: perfil, error: erroBusca } = await supabaseClient
-    .from("profiles")
-    .select("id, is_admin")
-    .eq("email", email)
-    .maybeSingle();
-
-  if (erroBusca || !perfil) {
-    erroEl.textContent = "Não encontrei ninguém com esse e-mail. A pessoa precisa criar uma conta no CineVito primeiro.";
-    erroEl.style.display = "block";
-    return;
-  }
-
-  if (perfil.is_admin) {
-    erroEl.textContent = "Essa pessoa já tem acesso ao painel.";
-    erroEl.style.display = "block";
-    return;
-  }
-
-  const { error: erroUpdate } = await supabaseClient
-    .from("profiles")
-    .update({ is_admin: true, admin_master: false })
-    .eq("id", perfil.id);
-
-  if (erroUpdate) {
-    erroEl.textContent = "Erro ao dar acesso: " + erroUpdate.message;
-    erroEl.style.display = "block";
-    return;
-  }
-
-  document.getElementById("eq-email").value = "";
-  await carregarEquipe();
-}
-
-async function promoverParaMaster(id) {
-  if (!confirm("Tornar essa pessoa admin master? Ela vai poder adicionar e remover outros administradores, e criar/editar planos, igual você.")) return;
-  await supabaseClient.from("profiles").update({ admin_master: true }).eq("id", id);
-  await carregarEquipe();
-}
-
-async function rebaixarParaEquipe(id) {
-  if (!confirm("Tirar o acesso de admin master dessa pessoa? Ela continua com acesso ao painel, mas não vai poder mais gerenciar outros administradores nem os planos.")) return;
-  await supabaseClient.from("profiles").update({ admin_master: false }).eq("id", id);
-  await carregarEquipe();
-}
-
-async function removerDaEquipe(id) {
-  if (!confirm("Remover o acesso dessa pessoa ao painel administrativo?")) return;
-  await supabaseClient.from("profiles").update({ is_admin: false, admin_master: false }).eq("id", id);
-  await carregarEquipe();
-}
+  document.getElementById("p-nome").value =
