@@ -9,5 +9,6 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
+  // Deixa tudo passar direto pra rede normalmente
   event.respondWith(fetch(event.request));
 });
