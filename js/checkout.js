@@ -91,14 +91,20 @@ function renderizarListaPlanos() {
   const container = document.getElementById("lista-planos");
   const planosDaCategoria = planosDisponiveis.filter(p => (p.categoria || p.nome) === categoriaSelecionada);
 
-  container.innerHTML = planosDaCategoria.map(p => `
+  container.innerHTML = planosDaCategoria.map(p => {
+    const duracaoTexto = p.duracao_dias
+      ? (p.duracao_dias === 1 ? "1 dia" : p.duracao_dias + " dias")
+      : (p.duracao_meses === 1 ? "mês" : p.duracao_meses + " meses");
+
+    return `
     <div class="plano-card${p.id === planoSelecionadoId ? " selecionado" : ""}" style="cursor:pointer; margin-bottom:8px;" onclick="selecionarPlano('${p.id}')">
       <div class="texto-muted">${p.nome}${p.descricao ? " — " + p.descricao : ""}</div>
       <div class="plano-preco">R$ ${Number(p.preco).toFixed(2).replace(".", ",")}
-        <span style="font-size:13px; color:var(--text-muted);">/ ${p.duracao_meses === 1 ? "mês" : p.duracao_meses + " meses"}</span>
+        <span style="font-size:13px; color:var(--text-muted);">/ ${duracaoTexto}</span>
       </div>
     </div>
-  `).join("");
+  `;
+  }).join("");
 }
 
 function selecionarPlano(id) {
