@@ -38,6 +38,7 @@
     <div class="aba" data-aba="colecoes" onclick="mostrarAba('colecoes')">Coleções</div>
     <div class="aba" data-aba="clientes" onclick="mostrarAba('clientes')">Clientes (CRM)</div>
     <div class="aba" data-aba="planos" onclick="mostrarAba('planos')" id="aba-btn-planos" style="display:none;">Planos</div>
+    <div class="aba" data-aba="indicacoes" onclick="mostrarAba('indicacoes')" id="aba-btn-indicacoes" style="display:none;">Indicações</div>
     <div class="aba" data-aba="equipe" onclick="mostrarAba('equipe')" id="aba-btn-equipe" style="display:none;">Equipe</div>
   </div>
 
@@ -203,6 +204,32 @@
 
     <h3 style="margin:28px 0 10px;">Quem tem acesso ao painel</h3>
     <div id="lista-equipe">Carregando...</div>
+  </div>
+
+  <div id="aba-indicacoes" class="form-estreito" style="display:none;">
+    <h3 style="margin-bottom:4px;">Campanhas de indicação</h3>
+    <p class="texto-muted" style="margin-top:0;">Só admin master vê essa aba. Só uma campanha fica ativa por vez — ativar uma nova desativa a anterior automaticamente. Os clientes só veem números (quantos indicaram/confirmaram), nunca a lista de quem foi indicado.</p>
+
+    <label>Título (aparece pro cliente)</label>
+    <input type="text" id="ind-titulo" class="input" placeholder="Ex: Indique 5 amigos e ganhe 1 mês grátis">
+
+    <label>Meta de indicações confirmadas</label>
+    <input type="number" id="ind-meta" class="input" value="5" min="1">
+
+    <label>Recompensa — quantidade</label>
+    <input type="number" id="ind-recompensa-qtd" class="input" value="1" min="1">
+
+    <label>Recompensa — unidade</label>
+    <select id="ind-recompensa-unidade" class="input">
+      <option value="meses">Meses</option>
+      <option value="dias">Dias</option>
+    </select>
+
+    <p class="msg-erro" id="ind-erro" style="display:none;"></p>
+    <button class="btn btn-primary" onclick="salvarCampanhaIndicacao()">Criar campanha</button>
+
+    <h3 style="margin:28px 0 10px;">Campanhas cadastradas</h3>
+    <div id="lista-campanhas-indicacao">Carregando...</div>
   </div>
 
 </div>
