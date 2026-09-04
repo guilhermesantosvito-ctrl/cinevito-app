@@ -109,6 +109,30 @@
   <div id="aba-clientes" style="display:none;">
     <h3 style="margin-bottom:4px;">Clientes</h3>
     <p class="texto-muted" style="margin-top:0;">Lista de todos os clientes cadastrados. Use o e-mail pra manter contato — nunca WhatsApp.</p>
+
+    <button class="btn btn-secondary" style="margin-bottom:14px;" onclick="sortearCliente()">🎲 Sortear cliente aleatório</button>
+
+    <div id="painel-conceder-acesso" style="display:none; background:var(--bg-card); border:1px solid var(--accent-gold); border-radius:10px; padding:16px; margin-bottom:16px;">
+      <strong style="color:var(--accent-gold);">Conceder acesso pra: <span id="ca-cliente-nome"></span></strong>
+      <p class="texto-muted" style="margin:6px 0 12px;">O tempo é somado ao que a pessoa já tem (se ela já for assinante, não perde nada). Isso não passa pelo Mercado Pago.</p>
+
+      <label>Quantidade</label>
+      <input type="number" id="ca-quantidade" class="input" value="30" min="1">
+
+      <label>Unidade</label>
+      <select id="ca-unidade" class="input">
+        <option value="dias">Dias</option>
+        <option value="meses">Meses</option>
+      </select>
+
+      <label>Motivo (fica registrado no histórico do cliente)</label>
+      <input type="text" id="ca-motivo" class="input" placeholder="Ex: Sorteio de aniversário, indicou 5 amigos...">
+
+      <p class="msg-erro" id="ca-erro" style="display:none;"></p>
+      <button class="btn btn-primary" onclick="confirmarConcederAcesso()">Conceder acesso</button>
+      <a href="#" onclick="fecharPainelConceder(); return false;" style="display:block; text-align:center; margin-top:10px; color:var(--accent-teal); font-size:13px;">Cancelar</a>
+    </div>
+
     <div style="overflow-x:auto;">
       <table class="tabela-crm" id="tabela-clientes">
         <thead>
@@ -120,10 +144,11 @@
             <th>Validade</th>
             <th>Aniversário</th>
             <th></th>
+            <th></th>
           </tr>
         </thead>
         <tbody id="corpo-tabela-clientes">
-          <tr><td colspan="7" class="texto-muted">Carregando...</td></tr>
+          <tr><td colspan="8" class="texto-muted">Carregando...</td></tr>
         </tbody>
       </table>
     </div>
@@ -142,14 +167,20 @@
     <label>Descrição (opcional)</label>
     <input type="text" id="p-descricao" class="input" placeholder="Ex: 2 dispositivos, sem anúncios">
 
-    <label>Preço (R$)</label>
+    <label>Preço (R$) — use ponto para os centavos, não vírgula</label>
     <input type="number" step="0.01" id="p-preco" class="input" placeholder="Ex: 19.90">
 
     <label>Dispositivos simultâneos</label>
     <input type="number" id="p-dispositivos" class="input" value="1">
 
-    <label>Duração (em meses)</label>
-    <input type="number" id="p-duracao" class="input" placeholder="Ex: 1 = mensal, 3 = trimestral, 12 = anual" value="1">
+    <label>Duração</label>
+    <input type="number" id="p-duracao" class="input" placeholder="Ex: 1" value="1" min="1">
+
+    <label>Unidade da duração</label>
+    <select id="p-duracao-unidade" class="input">
+      <option value="meses">Meses</option>
+      <option value="dias">Dias</option>
+    </select>
 
     <p class="msg-erro" id="p-erro" style="display:none;"></p>
     <button class="btn btn-primary" id="botao-salvar-plano" onclick="salvarPlano()">Criar plano</button>
