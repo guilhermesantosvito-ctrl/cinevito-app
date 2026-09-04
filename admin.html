@@ -42,7 +42,15 @@
   </div>
 
   <div id="aba-videos" class="form-estreito">
-    <h3 style="margin-bottom:4px;">Adicionar vídeo</h3>
+    <h3 style="margin-bottom:4px;">Buscar no Internet Archive</h3>
+    <p class="texto-muted" style="margin-top:0;">Digite um nome, ator, tema, etc (ex: "Charlie Chaplin", "cartoon 1935"). Clique num resultado pra preencher o formulário sozinho — é só domínio público, 100% legal.</p>
+    <div class="linha-genero-add">
+      <input type="text" id="ia-busca" class="input" placeholder="Ex: Charlie Chaplin">
+      <button class="btn btn-secondary" onclick="buscarInternetArchive()">Buscar</button>
+    </div>
+    <div id="ia-resultados" style="margin-bottom:22px;"></div>
+
+    <h3 style="margin-bottom:4px;">Adicionar vídeo manualmente</h3>
     <p class="texto-muted" style="margin-top:0;">Cole o link do Internet Archive, YouTube ou de um arquivo de vídeo direto (.mp4). Só o link fica salvo — o app continua leve.</p>
 
     <label>Link do vídeo</label>
