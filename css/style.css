@@ -432,3 +432,17 @@ body {
     margin: 0 auto;
   }
 }
+
+/* ---------- Navegação por controle de TV / teclado ---------- */
+.focavel-tv { outline: none; }
+.focavel-tv:focus {
+  outline: 3px solid var(--accent-gold);
+  outline-offset: 3px;
+  border-radius: 8px;
+  box-shadow: 0 0 16px rgba(255,130,40,0.55);
+}
+.card-video.focavel-tv:focus {
+  transform: scale(1.05);
+  transition: transform 0.15s ease;
+  z-index: 2;
+}
