@@ -54,6 +54,8 @@
       <input type="password" id="cadastro-senha" class="input" placeholder="Crie uma senha">
       <label style="display:block; font-size:12px; color:var(--text-muted); margin:-4px 0 4px;">Data de nascimento (pra gente te dar um presente no seu aniversário 🎂)</label>
       <input type="date" id="cadastro-nascimento" class="input">
+      <label style="display:block; font-size:12px; color:var(--text-muted); margin:-4px 0 4px;">Código de indicação (opcional)</label>
+      <input type="text" id="cadastro-codigo-indicacao" class="input" placeholder="Ex: VITO4X9K" style="text-transform:uppercase;">
       <p class="msg-erro" id="cadastro-erro" style="display:none;"></p>
       <button class="btn btn-teal" onclick="criarConta()">Criar conta</button>
       <p class="texto-muted" style="text-align:center; margin-top:16px;">
@@ -162,6 +164,16 @@ async function criarConta() {
       console.error("Erro ao criar perfil:", erroPerfil.message);
     }
 
+    // Registra a indicação (se um código válido foi digitado). A função
+    // no banco valida o código e ignora silenciosamente se for inválido.
+    const codigoIndicacao = document.getElementById("cadastro-codigo-indicacao").value.trim();
+    if (codigoIndicacao) {
+      await supabaseClient.rpc("registrar_indicacao", {
+        p_codigo: codigoIndicacao,
+        p_indicado_id: data.user.id
+      });
+    }
+
     // Verifica se este IP/aparelho já usou o teste grátis, e libera se for novo
     await supabaseClient.functions.invoke("registrar-acesso", {
       body: { usuario_id: data.user.id, device_id: obterDeviceId() }
@@ -199,6 +211,14 @@ async function recuperarSenha() {
   if (emailLembrado) {
     document.getElementById("login-email").value = emailLembrado;
     document.getElementById("lembrar-email").checked = true;
+  }
+
+  // Se a pessoa chegou por um link de indicação (?ref=CODIGO), já abre
+  // direto na tela de cadastro com o código preenchido.
+  const codigoDaUrl = new URLSearchParams(window.location.search).get("ref");
+  if (codigoDaUrl) {
+    document.getElementById("cadastro-codigo-indicacao").value = codigoDaUrl.toUpperCase();
+    mostrarCadastro();
   }
 })();
 
