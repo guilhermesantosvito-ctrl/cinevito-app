@@ -25,6 +25,12 @@
   .selo-ativa { background:rgba(46,196,182,0.15); color:var(--accent-teal); }
   .selo-trial { background:rgba(255,130,40,0.15); color:var(--accent-gold); }
   .selo-inativa { background:rgba(232,93,77,0.15); color:var(--danger); }
+  .resultado-verificacao { margin-top:16px; }
+  .resultado-verificacao .lista-item { gap:12px; align-items:flex-start; }
+  .resultado-verificacao .url-video { min-width:0; overflow-wrap:anywhere; }
+  .resultado-verificacao .status-ok { color:var(--accent-teal); }
+  .resultado-verificacao .status-erro { color:var(--danger); }
+  .resultado-verificacao .status-aviso { color:var(--accent-gold); }
 </style>
 </head>
 <body>
@@ -40,6 +46,7 @@
     <div class="aba" data-aba="planos" onclick="mostrarAba('planos')" id="aba-btn-planos" style="display:none;">Planos</div>
     <div class="aba" data-aba="indicacoes" onclick="mostrarAba('indicacoes')" id="aba-btn-indicacoes" style="display:none;">Indicações</div>
     <div class="aba" data-aba="equipe" onclick="mostrarAba('equipe')" id="aba-btn-equipe" style="display:none;">Equipe</div>
+    <div class="aba" data-aba="verificar" onclick="mostrarAba('verificar')">Verificador</div>
   </div>
 
   <div id="aba-videos" class="form-estreito">
@@ -230,6 +237,22 @@
 
     <h3 style="margin:28px 0 10px;">Campanhas cadastradas</h3>
     <div id="lista-campanhas-indicacao">Carregando...</div>
+  </div>
+
+  <div id="aba-verificar" class="form-estreito" style="display:none;">
+    <h3 style="margin-bottom:4px;">Verificador de links de vídeo</h3>
+    <p class="texto-muted" style="margin-top:0;">
+      Esta ferramenta usa a mesma lógica do Python enviado: lê uma página, encontra links
+      <code>.mp4</code> e <code>.m3u8</code> e testa se cada um responde. Nada é salvo no banco.
+      Por segurança, a análise fica limitada ao domínio zencdn.net.
+    </p>
+
+    <label>URL da página para analisar</label>
+    <input type="url" id="verificar-url" class="input" value="https://zencdn.net" placeholder="https://zencdn.net">
+
+    <p class="msg-erro" id="verificar-erro" style="display:none;"></p>
+    <button class="btn btn-primary" id="botao-verificar" onclick="verificarLinksVideos()">Verificar links</button>
+    <div id="resultado-verificacao" class="resultado-verificacao" aria-live="polite"></div>
   </div>
 
 </div>
