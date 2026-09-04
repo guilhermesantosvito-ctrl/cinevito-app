@@ -45,6 +45,15 @@
     <button class="btn btn-secondary" id="botao-cancelar-assinatura" style="display:none; margin-top:8px; padding:10px; color:var(--danger); border-color:var(--danger);" onclick="cancelarAssinatura()">Cancelar assinatura</button>
   </div>
 
+  <div id="cartao-indicacao" style="background:var(--bg-card); border:1px solid #232a3a; border-radius:12px; padding:20px; margin-bottom:16px; display:none;">
+    <div class="texto-muted">Seu código de indicação</div>
+    <div style="display:flex; align-items:center; gap:10px; margin-top:6px;">
+      <div id="ind-codigo-texto" style="font-size:22px; font-weight:700; color:var(--accent-teal); letter-spacing:1px;">-</div>
+      <button class="btn btn-secondary" style="width:auto; padding:6px 12px; font-size:12px;" onclick="copiarCodigoIndicacao()">Copiar</button>
+    </div>
+    <div id="ind-status-campanha" style="margin-top:10px;"></div>
+  </div>
+
   <a href="sugestao.html" class="item-menu">🎬 Sugerir um filme</a>
   <a href="faq.html" class="item-menu">❓ Como funciona / Perguntas frequentes</a>
   <a href="mailto:contatocinevito@gmail.com" class="item-menu">✉️ Falar com a gente</a>
