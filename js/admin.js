@@ -595,4 +595,245 @@ function editarPlano(id) {
   if (!plano) return;
 
   planoEditandoId = id;
-  document.getElementById("p-nome").value =
+  document.getElementById("p-nome").value = plano.nome || "";
+  document.getElementById("p-categoria").value = plano.categoria || "";
+  document.getElementById("p-descricao").value = plano.descricao || "";
+  document.getElementById("p-preco").value = plano.preco || "";
+  document.getElementById("p-dispositivos").value = plano.dispositivos || 1;
+
+  if (plano.duracao_dias) {
+    document.getElementById("p-duracao").value = plano.duracao_dias;
+    document.getElementById("p-duracao-unidade").value = "dias";
+  } else {
+    document.getElementById("p-duracao").value = plano.duracao_meses || 1;
+    document.getElementById("p-duracao-unidade").value = "meses";
+  }
+
+  document.getElementById("botao-salvar-plano").textContent = "Salvar alterações";
+  document.getElementById("link-cancelar-edicao-plano").style.display = "block";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function cancelarEdicaoPlano() {
+  planoEditandoId = null;
+  ["p-nome", "p-categoria", "p-descricao", "p-preco"].forEach(id => document.getElementById(id).value = "");
+  document.getElementById("p-dispositivos").value = 1;
+  document.getElementById("p-duracao").value = 1;
+  document.getElementById("p-duracao-unidade").value = "meses";
+  document.getElementById("botao-salvar-plano").textContent = "Criar plano";
+  document.getElementById("link-cancelar-edicao-plano").style.display = "none";
+}
+
+async function alternarAtivoPlano(id, novoValor) {
+  await supabaseClient.from("planos").update({ ativo: novoValor }).eq("id", id);
+  await carregarListaPlanosAdmin();
+}
+
+async function apagarPlano(id) {
+  if (!confirm("Apagar este plano? Assinaturas antigas que já usaram ele continuam registradas normalmente, só some da lista de opções pra novos clientes.")) return;
+  await supabaseClient.from("planos").delete().eq("id", id);
+  await carregarListaPlanosAdmin();
+}
+
+// ================= EQUIPE (só admin master) =================
+
+async function carregarEquipe() {
+  const container = document.getElementById("lista-equipe");
+  container.innerHTML = "Carregando...";
+
+  const { data: perfis, error } = await supabaseClient
+    .from("profiles")
+    .select("id, nome, email, admin_master")
+    .eq("is_admin", true)
+    .order("criado_em", { ascending: true });
+
+  if (error) {
+    container.innerHTML = `<p class="texto-muted">Erro ao carregar: ${error.message}</p>`;
+    return;
+  }
+
+  if (!perfis || perfis.length === 0) {
+    container.innerHTML = '<p class="texto-muted">Ninguém além de você tem acesso ainda.</p>';
+    return;
+  }
+
+  container.innerHTML = perfis.map(p => {
+    const ehVoce = p.id === usuarioAdmin.id;
+    const selo = p.admin_master
+      ? '<span class="selo-status selo-trial">Admin master</span>'
+      : '<span class="selo-status selo-ativa">Equipe</span>';
+
+    let acoes = '<span class="texto-muted">Você</span>';
+    if (!ehVoce) {
+      acoes = p.admin_master
+        ? `<button onclick="rebaixarParaEquipe('${p.id}')">Tornar equipe</button>`
+        : `<button onclick="promoverParaMaster('${p.id}')" style="color:var(--accent-teal); margin-right:10px;">Tornar master</button>
+           <button onclick="removerDaEquipe('${p.id}')">Remover acesso</button>`;
+    }
+
+    return `
+      <div class="lista-item">
+        <span>${p.nome || "Sem nome"} <span class="texto-muted">· ${p.email}</span> ${selo}</span>
+        <span>${acoes}</span>
+      </div>
+    `;
+  }).join("");
+}
+
+async function adicionarNaEquipe() {
+  const erroEl = document.getElementById("eq-erro");
+  erroEl.style.display = "none";
+  const email = document.getElementById("eq-email").value.trim().toLowerCase();
+
+  if (!email) {
+    erroEl.textContent = "Digite o e-mail da pessoa.";
+    erroEl.style.display = "block";
+    return;
+  }
+
+  const { data: perfil, error: erroBusca } = await supabaseClient
+    .from("profiles")
+    .select("id, is_admin")
+    .eq("email", email)
+    .maybeSingle();
+
+  if (erroBusca || !perfil) {
+    erroEl.textContent = "Não encontrei ninguém com esse e-mail. A pessoa precisa criar uma conta no CineVito primeiro.";
+    erroEl.style.display = "block";
+    return;
+  }
+
+  if (perfil.is_admin) {
+    erroEl.textContent = "Essa pessoa já tem acesso ao painel.";
+    erroEl.style.display = "block";
+    return;
+  }
+
+  const { error: erroUpdate } = await supabaseClient
+    .from("profiles")
+    .update({ is_admin: true, admin_master: false })
+    .eq("id", perfil.id);
+
+  if (erroUpdate) {
+    erroEl.textContent = "Erro ao dar acesso: " + erroUpdate.message;
+    erroEl.style.display = "block";
+    return;
+  }
+
+  document.getElementById("eq-email").value = "";
+  await carregarEquipe();
+}
+
+async function promoverParaMaster(id) {
+  if (!confirm("Tornar essa pessoa admin master? Ela vai poder adicionar e remover outros administradores, e criar/editar planos, igual você.")) return;
+  await supabaseClient.from("profiles").update({ admin_master: true }).eq("id", id);
+  await carregarEquipe();
+}
+
+async function rebaixarParaEquipe(id) {
+  if (!confirm("Tirar o acesso de admin master dessa pessoa? Ela continua com acesso ao painel, mas não vai poder mais gerenciar outros administradores nem os planos.")) return;
+  await supabaseClient.from("profiles").update({ admin_master: false }).eq("id", id);
+  await carregarEquipe();
+}
+
+async function removerDaEquipe(id) {
+  if (!confirm("Remover o acesso dessa pessoa ao painel administrativo?")) return;
+  await supabaseClient.from("profiles").update({ is_admin: false, admin_master: false }).eq("id", id);
+  await carregarEquipe();
+}
+
+// ================= INDICAÇÕES (só admin master) =================
+
+let campanhasIndicacaoCache = [];
+
+async function carregarListaCampanhasIndicacao() {
+  const container = document.getElementById("lista-campanhas-indicacao");
+  const { data, error } = await supabaseClient
+    .from("campanhas_indicacao")
+    .select("*")
+    .order("criado_em", { ascending: false });
+
+  if (error) {
+    container.innerHTML = `<p class="texto-muted">Erro ao carregar: ${error.message}</p>`;
+    return;
+  }
+
+  campanhasIndicacaoCache = data || [];
+
+  if (campanhasIndicacaoCache.length === 0) {
+    container.innerHTML = '<p class="texto-muted">Nenhuma campanha criada ainda.</p>';
+    return;
+  }
+
+  container.innerHTML = campanhasIndicacaoCache.map(c => `
+    <div class="lista-item">
+      <span>
+        ${c.titulo} <span class="texto-muted">· indique ${c.meta_indicacoes} ganhe ${c.recompensa_quantidade} ${c.recompensa_unidade}</span>
+        ${c.ativa ? '<span class="selo-status selo-ativa">Ativa</span>' : '<span class="selo-status selo-inativa">Inativa</span>'}
+      </span>
+      <span>
+        ${c.ativa
+          ? `<button onclick="desativarCampanhaIndicacao('${c.id}')">Desativar</button>`
+          : `<button onclick="ativarCampanhaIndicacao('${c.id}')" style="color:var(--accent-teal); margin-right:10px;">Ativar</button>
+             <button onclick="apagarCampanhaIndicacao('${c.id}')">Apagar</button>`
+        }
+      </span>
+    </div>
+  `).join("");
+}
+
+async function salvarCampanhaIndicacao() {
+  const erroEl = document.getElementById("ind-erro");
+  erroEl.style.display = "none";
+
+  const titulo = document.getElementById("ind-titulo").value.trim();
+  const meta = parseInt(document.getElementById("ind-meta").value);
+  const recompensaQtd = parseInt(document.getElementById("ind-recompensa-qtd").value);
+  const recompensaUnidade = document.getElementById("ind-recompensa-unidade").value;
+
+  if (!titulo || !meta || meta <= 0 || !recompensaQtd || recompensaQtd <= 0) {
+    erroEl.textContent = "Preencha o título, uma meta e uma recompensa válidas.";
+    erroEl.style.display = "block";
+    return;
+  }
+
+  const { error } = await supabaseClient.from("campanhas_indicacao").insert({
+    titulo,
+    meta_indicacoes: meta,
+    recompensa_quantidade: recompensaQtd,
+    recompensa_unidade: recompensaUnidade,
+    ativa: false
+  });
+
+  if (error) {
+    erroEl.textContent = "Erro ao criar campanha: " + error.message;
+    erroEl.style.display = "block";
+    return;
+  }
+
+  document.getElementById("ind-titulo").value = "";
+  document.getElementById("ind-meta").value = 5;
+  document.getElementById("ind-recompensa-qtd").value = 1;
+  document.getElementById("ind-recompensa-unidade").value = "meses";
+  await carregarListaCampanhasIndicacao();
+}
+
+async function ativarCampanhaIndicacao(id) {
+  if (!confirm("Ativar essa campanha? A campanha ativa atual (se houver) será desativada automaticamente.")) return;
+  // Só uma campanha ativa por vez: desativa todas antes de ativar a escolhida
+  await supabaseClient.from("campanhas_indicacao").update({ ativa: false }).eq("ativa", true);
+  await supabaseClient.from("campanhas_indicacao").update({ ativa: true }).eq("id", id);
+  await carregarListaCampanhasIndicacao();
+}
+
+async function desativarCampanhaIndicacao(id) {
+  if (!confirm("Desativar essa campanha? Os clientes vão parar de ver o progresso de indicação até você ativar outra.")) return;
+  await supabaseClient.from("campanhas_indicacao").update({ ativa: false }).eq("id", id);
+  await carregarListaCampanhasIndicacao();
+}
+
+async function apagarCampanhaIndicacao(id) {
+  if (!confirm("Apagar esta campanha? Indicações já confirmadas nela continuam registradas, só não aparece mais na lista.")) return;
+  await supabaseClient.from("campanhas_indicacao").delete().eq("id", id);
+  await carregarListaCampanhasIndicacao();
+}
