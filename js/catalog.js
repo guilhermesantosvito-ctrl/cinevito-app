@@ -1,6 +1,7 @@
 let usuarioCatalogo = null;
 let assinanteAtual = false;
 let generosCache = [];
+let linhasNavegaveis = []; // navegação por controle de TV: array de linhas, cada uma com os elementos focáveis em ordem visual
 
 (async function iniciarCatalogo() {
   const usuario = await exigirLogin();
@@ -115,9 +116,86 @@ function habilitarScrollHorizontal(elemento) {
   }, { passive: false });
 }
 
+// ============================================================
+// Navegação por controle de TV / teclado (setas + Enter/OK)
+// ============================================================
+
+// Marca um elemento como navegável: foco visível, e Enter/Espaço
+// acionam a mesma ação de um clique (necessário pra <div>, já que
+// <a> e <button> já respondem a Enter nativamente no navegador).
+function marcarNavegavel(elemento) {
+  if (!elemento) return;
+  elemento.classList.add("focavel-tv");
+  if (!elemento.hasAttribute("tabindex")) elemento.setAttribute("tabindex", "0");
+  const tag = elemento.tagName;
+  if (tag !== "A" && tag !== "BUTTON") {
+    elemento.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        elemento.click();
+      }
+    });
+  }
+}
+
+// Registra uma "linha" de elementos navegáveis, na ordem visual da
+// esquerda pra direita. A ordem em que as linhas são registradas
+// define a ordem de cima pra baixo (usada nas setas ↑ e ↓).
+function registrarLinhaNavegavel(elementos) {
+  if (elementos && elementos.length > 0) linhasNavegaveis.push(Array.from(elementos));
+}
+
+function moverFocoHorizontal(elementoAtual, direcao) {
+  for (const linha of linhasNavegaveis) {
+    const indice = linha.indexOf(elementoAtual);
+    if (indice === -1) continue;
+    const proximoIndice = indice + direcao;
+    if (proximoIndice >= 0 && proximoIndice < linha.length) {
+      linha[proximoIndice].focus();
+      linha[proximoIndice].scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+    }
+    return;
+  }
+}
+
+function moverFocoVertical(elementoAtual, direcao) {
+  let indiceLinhaAtual = -1;
+  let indiceColunaAtual = -1;
+  linhasNavegaveis.forEach((linha, i) => {
+    const idx = linha.indexOf(elementoAtual);
+    if (idx !== -1) { indiceLinhaAtual = i; indiceColunaAtual = idx; }
+  });
+  if (indiceLinhaAtual === -1) return;
+
+  let proximaLinha = indiceLinhaAtual + direcao;
+  while (proximaLinha >= 0 && proximaLinha < linhasNavegaveis.length) {
+    const linha = linhasNavegaveis[proximaLinha];
+    if (linha.length > 0) {
+      const alvo = linha[Math.min(indiceColunaAtual, linha.length - 1)];
+      alvo.focus();
+      alvo.scrollIntoView({ behavior: "smooth", inline: "center", block: "center" });
+      return;
+    }
+    proximaLinha += direcao;
+  }
+}
+
+document.addEventListener("keydown", (e) => {
+  const ativo = document.activeElement;
+  if (!ativo || !ativo.classList || !ativo.classList.contains("focavel-tv")) return;
+
+  if (e.key === "ArrowLeft") { e.preventDefault(); moverFocoHorizontal(ativo, -1); }
+  else if (e.key === "ArrowRight") { e.preventDefault(); moverFocoHorizontal(ativo, 1); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); moverFocoVertical(ativo, -1); }
+  else if (e.key === "ArrowDown") { e.preventDefault(); moverFocoVertical(ativo, 1); }
+});
+
+// ============================================================
+
 async function montarPagina() {
   const container = document.getElementById("lista-categorias");
   container.innerHTML = "";
+  linhasNavegaveis = [];
 
   const { data: categorias } = await supabaseClient.from("categorias").select("*").order("ordem");
   const { data: colecoes } = await supabaseClient.from("colecoes").select("*").order("ordem");
@@ -162,6 +240,8 @@ async function montarPagina() {
     bloco.appendChild(carrossel);
     container.appendChild(bloco);
     habilitarScrollHorizontal(carrossel);
+    carrossel.querySelectorAll(".card-video").forEach(marcarNavegavel);
+    registrarLinhaNavegavel(carrossel.querySelectorAll(".card-video"));
   }
 
   (categorias || []).forEach(categoria => {
@@ -202,6 +282,9 @@ function montarLinha(container, idSecao, titulo, listaVideos) {
   bloco.appendChild(carrossel);
   container.appendChild(bloco);
   habilitarScrollHorizontal(carrossel);
+
+  carrossel.querySelectorAll(".card-video").forEach(marcarNavegavel);
+  registrarLinhaNavegavel(carrossel.querySelectorAll(".card-video"));
 }
 
 function montarAbasTopo(categorias, colecoes) {
@@ -232,6 +315,9 @@ function montarAbasTopo(categorias, colecoes) {
     aba.onclick = (e) => { e.preventDefault(); irParaSecao(`categoria-${cat.id}`); marcarAbaAtiva(aba); };
     nav.appendChild(aba);
   });
+
+  nav.querySelectorAll(".aba-topo").forEach(marcarNavegavel);
+  registrarLinhaNavegavel(nav.querySelectorAll(".aba-topo"));
 }
 
 function marcarAbaAtiva(abaClicada) {
@@ -266,6 +352,9 @@ function montarFiltroGeneros() {
     chip.onclick = () => aplicarFiltroGenero(g.nome, chip);
     linha.appendChild(chip);
   });
+
+  linha.querySelectorAll(".chip-filtro").forEach(marcarNavegavel);
+  registrarLinhaNavegavel(linha.querySelectorAll(".chip-filtro"));
 }
 
 function aplicarFiltroGenero(genero, chipClicado) {
