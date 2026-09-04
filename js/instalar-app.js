@@ -54,6 +54,7 @@ async function acionarInstalacao() {
   esconderBotaoInstalar();
 }
 
+// iOS não tem o prompt automático — mostra instrução simples
 if (ehIOS() && !jaInstalado()) {
   window.addEventListener("load", () => {
     if (document.getElementById("botao-instalar-app")) return;
