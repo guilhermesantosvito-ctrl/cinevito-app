@@ -1,9 +1,9 @@
-"""Verificador de links de vídeo usado pelo CineVito.
+"""Verificador de fontes de vídeo autorizado usado pelo CineVito.
 
-Este é o Python original reorganizado para ser reutilizável localmente.
-O painel web chama a Edge Function equivalente em
-supabase/functions/verificar-videos, porque HTML/Netlify não executam
-Python diretamente no navegador.
+O site analisado carrega filmes por JavaScript e normalmente não entrega um
+.mp4 ou .m3u8 no HTML inicial. Por isso, além dos arquivos diretos, o
+verificador identifica páginas individuais, iframes e IDs de vídeo. A mesma
+regra existe na Edge Function em supabase/functions/verificar-videos.
 """
 
 from __future__ import annotations
@@ -15,11 +15,19 @@ from urllib.parse import urlsplit
 
 import httpx
 
+
 DOMINIO_PERMITIDO = "pobreflixtv.city"
 URL_ALVO_PADRAO = "https://www.pobreflixtv.city/"
+
 # Mantido como alias para compatibilidade com o script Python original.
 URL_ALVO = URL_ALVO_PADRAO
-DELIMITADORES_DE_FECHAMENTO = {")": "(", "]": "[", "}": "{"}
+
+DELIMITADORES_DE_FECHAMENTO = {
+    ")": "(",
+    "]": "[",
+    "}": "{",
+}
+
 PONTUACAO_SEPARADORA_FINAL = ".,;:!?"
 
 
@@ -29,9 +37,15 @@ def remover_pontuacao_separadora(link: str) -> str:
         ultimo_caractere = link[-1]
 
         if ultimo_caractere in DELIMITADORES_DE_FECHAMENTO:
-            delimitador_abertura = DELIMITADORES_DE_FECHAMENTO[ultimo_caractere]
-            if link.count(delimitador_abertura) >= link.count(ultimo_caractere):
+            delimitador_abertura = DELIMITADORES_DE_FECHAMENTO[
+                ultimo_caractere
+            ]
+
+            if link.count(delimitador_abertura) >= link.count(
+                ultimo_caractere
+            ):
                 break
+
             link = link[:-1]
             continue
 
@@ -50,16 +64,26 @@ def validar_url_alvo(url_alvo: str) -> str:
     host = (partes.hostname or "").lower()
 
     if partes.scheme not in {"http", "https"}:
-        raise ValueError("A URL precisa começar com http:// ou https://.")
+        raise ValueError(
+            "A URL precisa começar com http:// ou https://."
+        )
 
-    if host != DOMINIO_PERMITIDO and not host.endswith(f".{DOMINIO_PERMITIDO}"):
-        raise ValueError("A análise fica limitada ao domínio pobreflixtv.city.")
+    if host != DOMINIO_PERMITIDO and not host.endswith(
+        f".{DOMINIO_PERMITIDO}"
+    ):
+        raise ValueError(
+            "Por segurança, a análise fica limitada ao domínio "
+            "pobreflixtv.city."
+        )
 
     return url_alvo.strip()
 
 
-def extrair_links_de_video(texto_do_site: str, url_alvo: str) -> list[str]:
-    """Encontra links absolutos .mp4/.m3u8 e remove pontuação externa."""
+def extrair_links_de_video(
+    texto_do_site: str,
+    url_alvo: str,
+) -> list[str]:
+    """Encontra links absolutos .mp4/.m3u8."""
     padrao_links = (
         r'https?://[^\s"\'<>]+?\.(?:mp4|m3u8)'
         r'(?:\?[^\s"\'<>#]*)?(?:#[^\s"\'<>]*)?'
@@ -67,7 +91,11 @@ def extrair_links_de_video(texto_do_site: str, url_alvo: str) -> list[str]:
 
     links = [
         remover_pontuacao_separadora(link)
-        for link in re.findall(padrao_links, texto_do_site, flags=re.IGNORECASE)
+        for link in re.findall(
+            padrao_links,
+            texto_do_site,
+            flags=re.IGNORECASE,
+        )
     ]
 
     caminho_url_alvo = urlsplit(url_alvo).path
@@ -78,8 +106,143 @@ def extrair_links_de_video(texto_do_site: str, url_alvo: str) -> list[str]:
     return list(dict.fromkeys(links))
 
 
-def verificar_videos(url_alvo: str = URL_ALVO_PADRAO) -> dict:
-    """Lê uma página e testa cada link de vídeo encontrado."""
+def _url_absoluta(
+    valor: str,
+    url_base: str,
+) -> str | None:
+    """Resolve um atributo HTML sem aceitar javascript: ou data:."""
+    valor = valor.strip().replace("&amp;", "&")
+
+    if not valor:
+        return None
+
+    if valor.lower().startswith(("javascript:", "data:", "#")):
+        return None
+
+    if valor.startswith("//"):
+        return f"{urlsplit(url_base).scheme}:{valor}"
+
+    if valor.startswith("/"):
+        origem = urlsplit(url_base)
+        return f"{origem.scheme}://{origem.netloc}{valor}"
+
+    if valor.startswith("http://") or valor.startswith("https://"):
+        return valor
+
+    return None
+
+
+def extrair_candidatos(
+    texto_do_site: str,
+    url_alvo: str,
+) -> list[dict]:
+    """Extrai arquivos, embeds e páginas individuais do HTML.
+
+    A home do PobreFlixTV possui cards e IDs de vídeo, mas normalmente
+    não possui o servidor final até a navegação para uma página individual.
+    """
+    candidatos: list[dict] = []
+    vistos: set[tuple[str, str]] = set()
+
+    def adicionar(
+        url: str,
+        tipo: str,
+        mensagem: str,
+    ) -> None:
+        chave = (url, tipo)
+
+        if chave in vistos:
+            return
+
+        vistos.add(chave)
+
+        candidatos.append(
+            {
+                "url": url,
+                "tipo": tipo,
+                "mensagem": mensagem,
+            }
+        )
+
+    for link in extrair_links_de_video(texto_do_site, url_alvo):
+        adicionar(
+            link,
+            "video",
+            "Arquivo de vídeo encontrado no HTML.",
+        )
+
+    for atributo in re.findall(
+        r"""<(?:iframe|video|source)[^>]+
+        (?:src|data-src)=["']([^"']+)["']""",
+        texto_do_site,
+        flags=re.IGNORECASE | re.VERBOSE,
+    ):
+        link = _url_absoluta(atributo, url_alvo)
+
+        if not link:
+            continue
+
+        tipo = (
+            "video"
+            if urlsplit(link).path.lower().endswith(
+                (".mp4", ".m3u8")
+            )
+            else "embed"
+        )
+
+        adicionar(
+            link,
+            tipo,
+            (
+                "Player incorporado encontrado no HTML."
+                if tipo == "embed"
+                else "Arquivo de vídeo encontrado no HTML."
+            ),
+        )
+
+    for pagina in re.findall(
+        r"""(?:href|data-url)=["']([^"']*
+        (?:/filmes/online/|/series/online/)[^"']+)["']""",
+        texto_do_site,
+        flags=re.IGNORECASE | re.VERBOSE,
+    ):
+        link = _url_absoluta(pagina, url_alvo)
+
+        if link:
+            adicionar(
+                link,
+                "pagina",
+                (
+                    "Página individual encontrada; os servidores são "
+                    "carregados ao abrir o título."
+                ),
+            )
+
+    ids = re.findall(
+        r"""data-video-id=["']([^"']+)["']""",
+        texto_do_site,
+        flags=re.IGNORECASE,
+    )
+
+    if ids:
+        ids_unicos = list(dict.fromkeys(ids))
+
+        adicionar(
+            url_alvo,
+            "pagina",
+            (
+                "ID(s) de vídeo identificado(s): "
+                f"{', '.join(ids_unicos)}."
+            ),
+        )
+
+    return candidatos
+
+
+def verificar_videos(
+    url_alvo: str = URL_ALVO_PADRAO,
+) -> dict:
+    """Lê uma página e testa cada fonte encontrada."""
     url_alvo = validar_url_alvo(url_alvo)
 
     try:
@@ -97,7 +260,7 @@ def verificar_videos(url_alvo: str = URL_ALVO_PADRAO) -> dict:
 
     except httpx.HTTPStatusError as erro:
         raise RuntimeError(
-            f"A página alvo respondeu com o código HTTP "
+            "A página alvo respondeu com o código HTTP "
             f"{erro.response.status_code}."
         ) from erro
 
@@ -106,10 +269,27 @@ def verificar_videos(url_alvo: str = URL_ALVO_PADRAO) -> dict:
             f"Erro ao acessar a página alvo: {erro}"
         ) from erro
 
-    links = extrair_links_de_video(response.text, url_alvo)
+    candidatos = extrair_candidatos(
+        response.text,
+        url_alvo,
+    )
+
     resultados = []
 
-    for link in links:
+    for candidato in candidatos:
+        link = candidato["url"]
+
+        if candidato["tipo"] == "pagina":
+            resultados.append(
+                {
+                    **candidato,
+                    "status": "identificado",
+                    "status_code": None,
+                    "mensagem": candidato["mensagem"],
+                }
+            )
+            continue
+
         try:
             checagem = httpx.head(
                 link,
@@ -120,7 +300,7 @@ def verificar_videos(url_alvo: str = URL_ALVO_PADRAO) -> dict:
             if checagem.status_code == 200:
                 resultados.append(
                     {
-                        "url": link,
+                        **candidato,
                         "status": "ativo",
                         "status_code": 200,
                         "mensagem": "Link ativo e funcionando.",
@@ -129,7 +309,7 @@ def verificar_videos(url_alvo: str = URL_ALVO_PADRAO) -> dict:
             else:
                 resultados.append(
                     {
-                        "url": link,
+                        **candidato,
                         "status": "erro",
                         "status_code": checagem.status_code,
                         "mensagem": "Link respondeu, mas com erro.",
@@ -139,17 +319,19 @@ def verificar_videos(url_alvo: str = URL_ALVO_PADRAO) -> dict:
         except httpx.TimeoutException:
             resultados.append(
                 {
-                    "url": link,
+                    **candidato,
                     "status": "indisponivel",
                     "status_code": None,
-                    "mensagem": "Tempo limite excedido ao testar o link.",
+                    "mensagem": (
+                        "Tempo limite excedido ao testar o link."
+                    ),
                 }
             )
 
         except httpx.HTTPError:
             resultados.append(
                 {
-                    "url": link,
+                    **candidato,
                     "status": "indisponivel",
                     "status_code": None,
                     "mensagem": "Link quebrado ou fora do ar.",
@@ -158,92 +340,46 @@ def verificar_videos(url_alvo: str = URL_ALVO_PADRAO) -> dict:
 
     return {
         "source_url": url_alvo,
-        "links_encontrados": len(links),
+        "links_encontrados": len(resultados),
+        "total": len(resultados),
+        "links": resultados,
         "resultados": resultados,
     }
 
 
-def buscar_e_validar(url_alvo: str | None = None) -> dict | None:
-    """Compatibilidade com a função pública do Python original.
-
-    Esta entrada mantém o comportamento de console do script recebido. A
-    interface web usa ``verificar_videos`` através da Edge Function, que
-    aplica a validação de domínio antes de fazer a requisição.
-    """
+def buscar_e_validar(
+    url_alvo: str | None = None,
+) -> dict | None:
+    """Compatibilidade com a função pública do Python original."""
     alvo = url_alvo or URL_ALVO
 
     try:
-        response = httpx.get(
-            alvo,
-            timeout=10.0,
-            follow_redirects=True,
-        )
-        links = extrair_links_de_video(response.text, alvo)
-
-    except httpx.TimeoutException:
-        print("❌ Tempo limite excedido ao acessar o site alvo.")
-        return None
+        resultado = verificar_videos(alvo)
 
     except Exception as erro:
-        print(f"❌ Erro ao acessar o site alvo: {erro}")
+        print(f"Erro ao acessar o site alvo: {erro}")
         return None
 
-    print(f"🔍 Encontramos {len(links)} link(s) de vídeo no texto do site.")
+    print(
+        "Encontramos "
+        f"{resultado['total']} fonte(s) no HTML analisado."
+    )
 
-    resultados = []
+    for item in resultado["resultados"]:
+        link = item["url"]
 
-    for link in links:
-        print(f"\n⚡ Testando o link: {link}")
+        print(f"\nTestando o link: {link}")
+        print(item["mensagem"])
 
-        try:
-            checagem = httpx.head(
-                link,
-                timeout=5.0,
-                follow_redirects=True,
-            )
-
-            if checagem.status_code == 200:
-                print("✅ LINK ATIVO E FUNCIONANDO! (Código HTTP 200)")
-                resultados.append(
-                    {
-                        "url": link,
-                        "status": "ativo",
-                        "status_code": 200,
-                    }
-                )
-            else:
-                print(
-                    "⚠️ Link respondeu, mas com erro. "
-                    f"Código: {checagem.status_code}"
-                )
-                resultados.append(
-                    {
-                        "url": link,
-                        "status": "erro",
-                        "status_code": checagem.status_code,
-                    }
-                )
-
-        except Exception:
-            print("❌ Link quebrado ou fora do ar.")
-            resultados.append(
-                {
-                    "url": link,
-                    "status": "indisponivel",
-                    "status_code": None,
-                }
-            )
-
-    return {
-        "source_url": alvo,
-        "links_encontrados": len(links),
-        "resultados": resultados,
-    }
+    return resultado
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Verifica links .mp4 e .m3u8."
+        description=(
+            "Verifica fontes de vídeo autorizadas "
+            "do PobreFlixTV."
+        )
     )
 
     parser.add_argument(
@@ -259,6 +395,7 @@ def main() -> None:
     )
 
     args = parser.parse_args()
+
     resultado = verificar_videos(args.url)
 
     if args.json:
@@ -271,10 +408,14 @@ def main() -> None:
         )
         return
 
-    print("=" * 10 + " INICIANDO SCRAPER ONLINE " + "=" * 10)
     print(
-        f"Encontramos {resultado['links_encontrados']} "
-        "link(s) de vídeo."
+        "=" * 10
+        + " INICIANDO VERIFICADOR CINEVITO "
+        + "=" * 10
+    )
+
+    print(
+        f"Encontramos {resultado['total']} fonte(s)."
     )
 
     for item in resultado["resultados"]:
