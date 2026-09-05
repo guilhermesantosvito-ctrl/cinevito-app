@@ -1,15 +1,9 @@
-// =========================================================
-// EDGE FUNCTION: verificar-videos
-// Equivalente web do verificador Python enviado pelo Guilherme.
-// O Python fica preservado em /python para execução local; esta
-// versão roda no Supabase para que o painel do CineVito consiga
-// usá-la sem expor credenciais nem depender de um servidor separado.
-// =========================================================
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -19,11 +13,15 @@ const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 const MAX_URL_LENGTH = 2048;
 const SOURCE_TIMEOUT_MS = 10_000;
 const VIDEO_TIMEOUT_MS = 5_000;
+const MAX_RESULTS = 80;
 
 function responseJson(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: {
+      ...corsHeaders,
+      "Content-Type": "application/json",
+    },
   });
 }
 
@@ -42,10 +40,13 @@ function removerPontuacaoSeparadora(link: string) {
 
     if (ultimoCaractere in delimitadoresDeFechamento) {
       const abertura = delimitadoresDeFechamento[ultimoCaractere];
+
       const abertas = resultado.split(abertura).length - 1;
       const fechadas = resultado.split(ultimoCaractere).length - 1;
 
-      if (abertas >= fechadas) break;
+      if (abertas >= fechadas) {
+        break;
+      }
 
       resultado = resultado.slice(0, -1);
       continue;
@@ -80,7 +81,9 @@ function validarUrlAlvo(valor: unknown) {
   }
 
   if (!["http:", "https:"].includes(url.protocol)) {
-    throw new Error("A URL precisa começar com http:// ou https://.");
+    throw new Error(
+      "A URL precisa começar com http:// ou https://."
+    );
   }
 
   const host = url.hostname.toLowerCase();
@@ -107,14 +110,129 @@ function extrairLinksDeVideo(texto: string, urlAlvo: string) {
 
   const caminho = new URL(urlAlvo).pathname.toLowerCase();
 
-  if (
-    caminho.endsWith(".mp4") ||
-    caminho.endsWith(".m3u8")
-  ) {
+  if (caminho.endsWith(".mp4") || caminho.endsWith(".m3u8")) {
     links.push(urlAlvo);
   }
 
   return [...new Set(links)];
+}
+
+function urlAbsoluta(valor: string, urlBase: string) {
+  const limpo = valor.trim().replaceAll("&amp;", "&");
+
+  if (
+    !limpo ||
+    /^(javascript|data):/i.test(limpo) ||
+    limpo.startsWith("#")
+  ) {
+    return null;
+  }
+
+  try {
+    return new URL(limpo, urlBase).toString();
+  } catch {
+    return null;
+  }
+}
+
+function extrairCandidatos(texto: string, urlAlvo: string) {
+  const candidatos: Array<{
+    url: string;
+    tipo: "video" | "embed" | "pagina";
+    mensagem: string;
+  }> = [];
+
+  const vistos = new Set<string>();
+
+  function adicionar(
+    url: string,
+    tipo: "video" | "embed" | "pagina",
+    mensagem: string
+  ) {
+    const chave = `${tipo}:${url}`;
+
+    if (vistos.has(chave)) {
+      return;
+    }
+
+    if (candidatos.length >= MAX_RESULTS) {
+      return;
+    }
+
+    vistos.add(chave);
+
+    candidatos.push({
+      url,
+      tipo,
+      mensagem,
+    });
+  }
+
+  for (const link of extrairLinksDeVideo(texto, urlAlvo)) {
+    adicionar(
+      link,
+      "video",
+      "Arquivo de vídeo encontrado no HTML."
+    );
+  }
+
+  const tagsComSrc =
+    /<(?:iframe|video|source)\b[^>]+(?:src|data-src)=["']([^"']+)["']/gi;
+
+  for (const match of texto.matchAll(tagsComSrc)) {
+    const link = urlAbsoluta(match[1], urlAlvo);
+
+    if (!link) {
+      continue;
+    }
+
+    const tipo = /\.(?:mp4|m3u8)(?:$|[?#])/i.test(
+      new URL(link).pathname
+    )
+      ? "video"
+      : "embed";
+
+    adicionar(
+      link,
+      tipo,
+      tipo === "embed"
+        ? "Player incorporado encontrado no HTML."
+        : "Arquivo de vídeo encontrado no HTML."
+    );
+  }
+
+  const paginas =
+    /(?:href|data-url)=["']([^"']*(?:\/filmes\/online\/|\/series\/online\/)[^"']+)["']/gi;
+
+  for (const match of texto.matchAll(paginas)) {
+    const link = urlAbsoluta(match[1], urlAlvo);
+
+    if (!link) {
+      continue;
+    }
+
+    adicionar(
+      link,
+      "pagina",
+      "Página individual encontrada; os servidores são carregados ao abrir o título."
+    );
+  }
+
+  const ids = [
+    ...texto.matchAll(/data-video-id=["']([^"']+)["']/gi),
+  ].map((match) => match[1]);
+
+  if (ids.length) {
+    const unicos = [...new Set(ids)];
+
+    adicionar(
+      urlAlvo,
+      "pagina",
+      `ID(s) de vídeo identificado(s): ${unicos.join(", ")}.`
+    );
+  }
+
+  return candidatos;
 }
 
 async function fetchComTimeout(
@@ -123,10 +241,10 @@ async function fetchComTimeout(
   timeoutMs: number
 ) {
   const controller = new AbortController();
-  const timer = setTimeout(
-    () => controller.abort(),
-    timeoutMs
-  );
+
+  const timer = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
 
   try {
     return await fetch(url, {
@@ -147,6 +265,7 @@ async function obterUsuarioAutenticado(req: Request) {
   }
 
   const token = authorization.slice("Bearer ".length);
+
   const { data, error } = await supabaseAdmin.auth.getUser(token);
 
   if (error || !data.user) {
@@ -165,7 +284,9 @@ Deno.serve(async (req) => {
 
   if (req.method !== "POST") {
     return responseJson(
-      { error: "Método não permitido." },
+      {
+        error: "Método não permitido.",
+      },
       405
     );
   }
@@ -175,7 +296,9 @@ Deno.serve(async (req) => {
 
     if (!usuario) {
       return responseJson(
-        { error: "Faça login para usar o verificador." },
+        {
+          error: "Faça login para usar o verificador.",
+        },
         401
       );
     }
@@ -205,7 +328,9 @@ Deno.serve(async (req) => {
     try {
       respostaPagina = await fetchComTimeout(
         urlAlvo,
-        { method: "GET" },
+        {
+          method: "GET",
+        },
         SOURCE_TIMEOUT_MS
       );
     } catch (erro) {
@@ -216,7 +341,9 @@ Deno.serve(async (req) => {
           : "Erro ao acessar a página alvo.";
 
       return responseJson(
-        { error: mensagem },
+        {
+          error: mensagem,
+        },
         502
       );
     }
@@ -224,9 +351,7 @@ Deno.serve(async (req) => {
     if (!respostaPagina.ok) {
       return responseJson(
         {
-          error:
-            `A página alvo respondeu com o código HTTP ` +
-            `${respostaPagina.status}.`,
+          error: `A página alvo respondeu com o código HTTP ${respostaPagina.status}.`,
           sourceStatus: respostaPagina.status,
         },
         502
@@ -234,30 +359,45 @@ Deno.serve(async (req) => {
     }
 
     const textoDaPagina = await respostaPagina.text();
-    const links = extrairLinksDeVideo(
+    const candidatos = extrairCandidatos(
       textoDaPagina,
       urlAlvo
     );
 
     const resultados = [];
 
-    for (const link of links) {
+    for (const candidato of candidatos) {
+      if (candidato.tipo === "pagina") {
+        resultados.push({
+          ...candidato,
+          status: "identificado",
+          statusCode: null,
+          mensagem: candidato.mensagem,
+        });
+
+        continue;
+      }
+
       try {
         const checagem = await fetchComTimeout(
-          link,
-          { method: "HEAD" },
+          candidato.url,
+          {
+            method: "HEAD",
+          },
           VIDEO_TIMEOUT_MS
         );
 
         resultados.push({
-          url: link,
-          status: checagem.status === 200
-            ? "ativo"
-            : "erro",
+          ...candidato,
+          status:
+            checagem.status === 200
+              ? "ativo"
+              : "erro",
           statusCode: checagem.status,
-          mensagem: checagem.status === 200
-            ? "Link ativo e funcionando."
-            : "Link respondeu, mas com erro.",
+          mensagem:
+            checagem.status === 200
+              ? "Link ativo e funcionando."
+              : "Link respondeu, mas com erro.",
         });
       } catch (erro) {
         const timeout =
@@ -265,7 +405,7 @@ Deno.serve(async (req) => {
           erro.name === "AbortError";
 
         resultados.push({
-          url: link,
+          ...candidato,
           status: "indisponivel",
           statusCode: null,
           mensagem: timeout
@@ -277,15 +417,18 @@ Deno.serve(async (req) => {
 
     return responseJson({
       sourceUrl: urlAlvo,
-      linksEncontrados: links.length,
+      linksEncontrados: resultados.length,
+      total: resultados.length,
+      links: resultados,
       resultados,
     });
   } catch (erro) {
     return responseJson(
       {
-        error: erro instanceof Error
-          ? erro.message
-          : "Erro inesperado.",
+        error:
+          erro instanceof Error
+            ? erro.message
+            : "Erro inesperado.",
       },
       400
     );
