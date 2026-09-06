@@ -18,27 +18,6 @@ export type Video = {
 };
 
 export type Plan = {
-  id: string; nome: string; categoria?: string | null; descricao?: string | null; preco?: number | null; duracao_meses?: number | null; duracao_dias?: number | null; limite_dispositivos?: number | null; dispositivos?: number | null; ativo?: boolean | null; ordem?: number | null;
-};port type SessionUser = {
-  id: string;
-  email?: string;
-  user_metadata?: { nome?: string; name?: string };
-};
-
-export type Video = {
-  id: string;
-  titulo: string;
-  descricao?: string | null;
-  genero?: string | null;
-  url_video?: string | null;
-  url_capa?: string | null;
-  ano?: number | null;
-  premium?: boolean | null;
-  categoria?: string | null;
-  categoria_id?: string | null;
-};
-
-export type Plan = {
   id: string;
   nome: string;
   categoria?: string | null;
@@ -47,6 +26,9 @@ export type Plan = {
   duracao_meses?: number | null;
   duracao_dias?: number | null;
   limite_dispositivos?: number | null;
+  dispositivos?: number | null;
+  ativo?: boolean | null;
+  ordem?: number | null;
 };
 
 const SUPABASE_URL = String(import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
