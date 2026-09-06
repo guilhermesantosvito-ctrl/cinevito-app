@@ -18,6 +18,27 @@ export type Video = {
 };
 
 export type Plan = {
+  id: string; nome: string; categoria?: string | null; descricao?: string | null; preco?: number | null; duracao_meses?: number | null; duracao_dias?: number | null; limite_dispositivos?: number | null; dispositivos?: number | null; ativo?: boolean | null; ordem?: number | null;
+};port type SessionUser = {
+  id: string;
+  email?: string;
+  user_metadata?: { nome?: string; name?: string };
+};
+
+export type Video = {
+  id: string;
+  titulo: string;
+  descricao?: string | null;
+  genero?: string | null;
+  url_video?: string | null;
+  url_capa?: string | null;
+  ano?: number | null;
+  premium?: boolean | null;
+  categoria?: string | null;
+  categoria_id?: string | null;
+};
+
+export type Plan = {
   id: string;
   nome: string;
   categoria?: string | null;
@@ -112,13 +133,13 @@ export async function fetchVideos(): Promise<Video[]> {
 }
 
 export async function fetchPlans(): Promise<Plan[]> {
-  return request<Plan[]>('/rest/v1/planos?select=*&order=preco.asc');
+  return request<Plan[]>('/rest/v1/planos?select=*&ativo=eq.true&order=ordem.asc,preco.asc');
 }
 
 export async function fetchProfile() {
   const user = getStoredUser();
   if (!user) return null;
-  const rows = await request<Array<{ nome?: string; email?: string; is_admin?: boolean; codigo_indicacao?: string }>>(
+  const rows = await request<Array<{ nome?: string; email?: string; is_admin?: boolean; admin_master?: boolean; codigo_indicacao?: string }>>(
     `/rest/v1/profiles?select=nome,email,is_admin,codigo_indicacao&id=eq.${encodeURIComponent(user.id)}&limit=1`,
   );
   return rows[0] || { nome: user.user_metadata?.nome || user.user_metadata?.name, email: user.email };
@@ -153,6 +174,11 @@ export async function submitSuggestion(payload: { titulo: string; mensagem: stri
     body: JSON.stringify({ titulo: payload.titulo, mensagem: payload.mensagem }),
   });
 }
+
+export async function fetchAdminPlans(): Promise<Plan[]> { return request<Plan[]>('/rest/v1/planos?select=*&order=ordem.asc,preco.asc'); }
+export async function updatePlanActive(id: string, ativo: boolean) { return request('/rest/v1/planos?id=eq.' + encodeURIComponent(id), { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ ativo }) }); }
+export async function fetchAdminVideos(): Promise<Video[]> { return request<Video[]>('/rest/v1/videos?select=*&order=criado_em.desc'); }
+export async function invokeCatalogSync(query = '') { return request<{ found: number; added: number; updated: number; titles: string[] }>('/functions/v1/sincronizar-catalogo', { method: 'POST', body: JSON.stringify({ query }) }); }
 
 export async function requestPasswordReset(email: string) {
   return request('/auth/v1/recover', {
