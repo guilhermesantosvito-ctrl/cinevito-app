@@ -15,6 +15,8 @@ export type Video = {
   premium?: boolean | null;
   categoria?: string | null;
   categoria_id?: string | null;
+  fonte?: string | null;
+  licenca?: string | null;
 };
 
 export type Plan = {
