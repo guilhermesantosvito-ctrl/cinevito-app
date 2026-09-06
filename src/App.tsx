@@ -269,7 +269,7 @@ function CatalogPage() {
     {loading && <div className="video-grid" data-testid="status-catalog-loading">{Array.from({ length: 5 }).map((_, index) => <div className="skeleton" style={{ aspectRatio: '2/3' }} key={index} />)}</div>}
     {error && <div className="notice notice-orange" role="alert" data-testid="status-catalog-error"><CircleAlert size={17} color="#ff8275" /><span>{error}</span><button className="quiet-button focus-tv" onClick={() => window.location.reload()} data-testid="button-retry-catalog"><RefreshCw size={15} />Tentar de novo</button></div>}
     {!loading && !error && <section className="shelf"><div className="shelf-heading"><h2 className="section-title">{shelf === 'Início' ? 'Em destaque' : shelf}</h2><div className="section-rule" /><span>{filtered.length.toString().padStart(2, '0')} títulos</span></div>{filtered.length ? <div className="video-grid">{filtered.map((video) => <Poster key={video.id} video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => setLocation(`/player/${video.id}`)} />)}</div> : <div className="empty-state" data-testid="status-catalog-empty"><Search size={25} /><h3>Nenhum título encontrado</h3><p>Tente outro termo ou limpe os filtros para voltar ao catálogo.</p><button className="quiet-button focus-tv" onClick={() => { setQuery(''); setGenre('Todos os gêneros'); setShelf('Início'); }} data-testid="button-clear-catalog-filters">Limpar filtros</button></div>}</section>}
-    <section className="shelf"><div className="notice notice-cyan"><ShieldCheck size={18} color="#00c8ff" /><span><strong>Feito para a sala.</strong> Use as setas do controle ou do teclado para navegar pelos cards. Pressione Enter para abrir.</span></div></section>
+
   </div>;
 }
 
