@@ -1,7 +1,8 @@
 export type SessionUser = {
   id: string;
   email?: string;
-  user_metadata?: { nome?: string; name?: string };
+  user_metadata?: { nome?: string; name?: string; nascimento?: string; [key: string]: unknown };
+  created_at?: string;
 };
 
 export type Video = {
@@ -36,10 +37,19 @@ export type Plan = {
 const SUPABASE_URL = String(import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
 const SUPABASE_ANON_KEY = String(import.meta.env.VITE_SUPABASE_ANON_KEY || '');
 const SESSION_KEY = 'cinevito-auth-session';
+const SUPABASE_SESSION_KEY = 'sb-cefyzitdkvtynhwsxdvv-auth-token';
+const BACKGROUND_KEY = 'cinevito-background-since';
+const BACKGROUND_LIMIT_MS = 3 * 60 * 1000;
+export const MASTER_ADMIN_EMAIL = 'guilhermesantosvito@gmail.com';
 
 export const hasRuntimeConfig = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 
-function storedSession(): { access_token: string; user: SessionUser } | null {
+function isExpiredSession() {
+  const since = Number(localStorage.getItem(BACKGROUND_KEY) || 0);
+  return since > 0 && Date.now() - since >= BACKGROUND_LIMIT_MS;
+}
+
+function storedSession(): { access_token: string; refresh_token?: string; expires_in?: number; expires_at?: number; token_type?: string; user: SessionUser } | null {
   try {
     const value = localStorage.getItem(SESSION_KEY);
     return value ? JSON.parse(value) : null;
@@ -49,6 +59,7 @@ function storedSession(): { access_token: string; user: SessionUser } | null {
 }
 
 export function getStoredUser(): SessionUser | null {
+  if (isExpiredSession()) { clearSession(); return null; }
   const sessionUser = storedSession()?.user;
   if (sessionUser) return sessionUser;
   const demoEmail = localStorage.getItem('cinevito-demo-user');
@@ -59,13 +70,29 @@ export function getAccessToken(): string | null {
   return storedSession()?.access_token ?? null;
 }
 
-function saveSession(session: { access_token: string; user: SessionUser }) {
+function saveSession(session: { access_token: string; refresh_token?: string; expires_in?: number; expires_at?: number; token_type?: string; user: SessionUser }) {
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  localStorage.setItem(SUPABASE_SESSION_KEY, JSON.stringify({ ...session, expires_at: session.expires_at || (session.expires_in ? Math.floor(Date.now() / 1000) + session.expires_in : undefined) }));
+  localStorage.removeItem(BACKGROUND_KEY);
   window.dispatchEvent(new Event('cinevito-auth-change'));
+}
+
+function checkBackgroundLogout() {
+  if (isExpiredSession()) clearSession();
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) localStorage.setItem(BACKGROUND_KEY, String(Date.now()));
+    else checkBackgroundLogout();
+  });
+  window.addEventListener('pageshow', checkBackgroundLogout);
 }
 
 export function clearSession() {
   localStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(SUPABASE_SESSION_KEY);
+  localStorage.removeItem(BACKGROUND_KEY);
   localStorage.removeItem('cinevito-demo-user');
   window.dispatchEvent(new Event('cinevito-auth-change'));
 }
@@ -95,7 +122,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export async function signIn(email: string, password: string) {
-  const result = await request<{ access_token: string; user: SessionUser }>(
+  const result = await request<{ access_token: string; refresh_token?: string; expires_in?: number; expires_at?: number; token_type?: string; user: SessionUser }>(
     '/auth/v1/token?grant_type=password',
     { method: 'POST', body: JSON.stringify({ email, password }) },
   );
@@ -104,7 +131,7 @@ export async function signIn(email: string, password: string) {
 }
 
 export async function signUp(nome: string, email: string, password: string, nascimento?: string, codigo?: string) {
-  const result = await request<{ access_token?: string; user: SessionUser }>(
+  const result = await request<{ access_token?: string; refresh_token?: string; expires_in?: number; expires_at?: number; token_type?: string; user: SessionUser }>(
     '/auth/v1/signup',
     { method: 'POST', body: JSON.stringify({ email, password, data: { nome, nascimento, codigo_indicacao: codigo || undefined } }) },
   );
@@ -123,8 +150,8 @@ export async function fetchPlans(): Promise<Plan[]> {
 export async function fetchProfile() {
   const user = getStoredUser();
   if (!user) return null;
-  const rows = await request<Array<{ nome?: string; email?: string; is_admin?: boolean; admin_master?: boolean; codigo_indicacao?: string }>>(
-    `/rest/v1/profiles?select=nome,email,is_admin,codigo_indicacao&id=eq.${encodeURIComponent(user.id)}&limit=1`,
+  const rows = await request<Array<{ nome?: string; email?: string; is_admin?: boolean; admin_master?: boolean; codigo_indicacao?: string; nascimento?: string }>>(
+    `/rest/v1/profiles?select=nome,email,is_admin,admin_master,codigo_indicacao&id=eq.${encodeURIComponent(user.id)}&limit=1`,
   );
   return rows[0] || { nome: user.user_metadata?.nome || user.user_metadata?.name, email: user.email };
 }
@@ -157,6 +184,20 @@ export async function submitSuggestion(payload: { titulo: string; mensagem: stri
     headers: { Prefer: 'return=minimal' },
     body: JSON.stringify({ titulo: payload.titulo, mensagem: payload.mensagem }),
   });
+}
+
+export async function updateProfile(payload: { nome: string }) {
+  const user = getStoredUser();
+  if (!user) throw new Error('Faça login para editar o perfil.');
+  const updated = await request<SessionUser>('/auth/v1/user', { method: 'PUT', body: JSON.stringify({ data: { ...(user.user_metadata || {}), nome: payload.nome.trim() } }) });
+  const session = storedSession();
+  if (session) saveSession({ ...session, user: updated });
+  try { await request('/rest/v1/profiles?on_conflict=id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ id: user.id, nome: payload.nome.trim(), email: user.email }) }); } catch { /* O perfil de autenticação já foi atualizado; algumas bases antigas não permitem upsert em profiles. */ }
+  return updated;
+}
+
+export async function processPayment(payload: { usuario_id: string; plano_id: string; formData: unknown; cupom?: string | null }) {
+  return request<{ status: string; motivo?: string; pix_copia_cola?: string; pix_qr_base64?: string }>('/functions/v1/processar-pagamento', { method: 'POST', body: JSON.stringify(payload) });
 }
 
 export async function fetchAdminPlans(): Promise<Plan[]> { return request<Plan[]>('/rest/v1/planos?select=*&order=ordem.asc,preco.asc'); }
