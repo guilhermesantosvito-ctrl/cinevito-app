@@ -264,3 +264,20 @@ export async function grantAccess(payload: { usuario_id: string; quantidade: num
     }),
   });
 }
+
+// Cancela o acesso do cliente: marca como "inativa" qualquer assinatura
+// dele que esteja "ativa" ou em "trial". Não apaga nada, só desliga o
+// acesso — o histórico da assinatura continua registrado no banco.
+export async function revokeAccess(usuario_id: string) {
+  const emUso = await request<Array<{ id: string }>>(
+    `/rest/v1/assinaturas?select=id&usuario_id=eq.${encodeURIComponent(usuario_id)}&status=in.(ativa,trial)`,
+  );
+  if (!emUso.length) return;
+  await Promise.all(
+    emUso.map((row) => request(`/rest/v1/assinaturas?id=eq.${encodeURIComponent(row.id)}`, {
+      method: 'PATCH',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ status: 'inativa' }),
+    })),
+  );
+}
