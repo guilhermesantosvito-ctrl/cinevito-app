@@ -11,7 +11,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import {
-  clearSession, fetchAdminClients, fetchAdminPlans, fetchAdminVideos, fetchPlans, fetchProfile, fetchVideos, getAccessToken, getStoredUser, grantAccess, hasRuntimeConfig,
+  checkCatalogAccess, clearSession, fetchAdminClients, fetchAdminPlans, fetchAdminVideos, fetchPlans, fetchProfile, fetchVideos, getAccessToken, getStoredUser, grantAccess, hasRuntimeConfig,
   invokeCatalogSync, invokeVerifier, processPayment, requestPasswordReset, revokeAccess, signIn, signUp, submitSuggestion, updatePlanActive, type Cliente, type Plan, type SessionUser, type Video,
 } from '@/lib/cinevito-client';
 import '@/index.css';
@@ -66,6 +66,21 @@ function useAuth() {
     };
   }, []);
   return user;
+}
+// Retorna null enquanto ainda não sabe, true/false depois de checar.
+// Sem usuário logado, já resolve como false sem precisar consultar nada.
+function useCatalogAccess(user: SessionUser | null) {
+  const [access, setAccess] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!user) { setAccess(false); return; }
+    let cancelled = false;
+    setAccess(null);
+    checkCatalogAccess()
+      .then((value) => { if (!cancelled) setAccess(value); })
+      .catch(() => { if (!cancelled) setAccess(false); });
+    return () => { cancelled = true; };
+  }, [user?.id]);
+  return access;
 }
 function ToastMessage({ message, onClose }: { message: string; onClose: () => void }) {
   return <div className="toast" role="status" data-testid="status-toast"><span>{message}</span><button className="icon-button" onClick={onClose} aria-label="Fechar aviso" data-testid="button-close-toast"><X size={15} /></button></div>;
@@ -235,6 +250,7 @@ function useVideos() {
 function CatalogPage() {
   const [, setLocation] = useLocation();
   const user = useAuth();
+  const access = useCatalogAccess(user);
   const { videos, loading, error } = useVideos();
   const [shelf, setShelf] = useState('Início');
   const [genre, setGenre] = useState('Todos os gêneros');
@@ -253,16 +269,20 @@ function CatalogPage() {
     setFavorites(next);
     localStorage.setItem('cinevito-favorites', JSON.stringify(next));
   }
+  function openVideo(id: string) {
+    setLocation(access ? `/player/${id}` : '/assinatura');
+  }
   return <div className="content-wrap page-main">
     <PageHeader eyebrow="A sua sala de cinema" title={`Olá, ${titleCaseName(user)}.`} description="Escolha algo para assistir. O catálogo se adapta à sua tela, do celular à Smart TV." action={<Link href="/assinatura" className="primary-button focus-tv" data-testid="link-subscription"><Sparkles size={16} />Ver planos</Link>} />
     {!hasRuntimeConfig && <div className="notice notice-cyan" data-testid="status-runtime-demo"><Info size={17} color="#00c8ff" /><span><strong>Modo de demonstração.</strong> O ambiente ainda não está conectado ao Supabase; os dados desta sessão ficam apenas neste aparelho.</span></div>}
     {!user && <div className="notice notice-orange" data-testid="status-catalog-auth"><CircleAlert size={17} color="#ff8228" /><span><strong>Você está navegando como visitante.</strong> Entre para salvar favoritos e continuar assistindo em outros dispositivos.</span><Link href="/" className="quiet-button focus-tv" data-testid="link-catalog-login">Entrar</Link></div>}
+    {user && access === false && <div className="notice notice-orange" data-testid="status-catalog-locked"><CircleAlert size={17} color="#ff8228" /><span><strong>Seu acesso gratuito acabou.</strong> Assine um plano para continuar assistindo ao catálogo completo.</span><Link href="/assinatura" className="quiet-button focus-tv">Ver planos</Link></div>}
     <div className="catalog-toolbar"><div className="search-wrap"><Search size={16} /><input className="input focus-tv" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar no catálogo" aria-label="Buscar no catálogo" data-testid="input-search-catalog" /></div><Link href="/colecao" className="secondary-button focus-tv" data-testid="link-open-collection"><Heart size={15} />Minha coleção</Link></div>
     <div className="chip-row" role="tablist" aria-label="Categorias do catálogo">{fallbackShelves.map((item) => <button key={item} className={`chip focus-tv ${shelf === item ? 'active' : ''}`} onClick={() => { setShelf(item); setGenre('Todos os gêneros'); setQuery(''); }} role="tab" aria-selected={shelf === item} data-testid={`tab-shelf-${item.toLowerCase().replaceAll(' ', '-')}`}>{item}</button>)}</div>
     <div className="chip-row" aria-label="Filtrar por gênero">{genres.map((item) => <button key={item} className={`chip focus-tv ${genre === item ? 'active' : ''}`} onClick={() => setGenre(item)} data-testid={`button-genre-${item.toLowerCase().replaceAll(' ', '-')}`}>{item}</button>)}</div>
     {loading && <div className="video-grid" data-testid="status-catalog-loading">{Array.from({ length: 5 }).map((_, index) => <div className="skeleton" style={{ aspectRatio: '2/3' }} key={index} />)}</div>}
     {error && <div className="notice notice-orange" role="alert" data-testid="status-catalog-error"><CircleAlert size={17} color="#ff8275" /><span>{error}</span><button className="quiet-button focus-tv" onClick={() => window.location.reload()} data-testid="button-retry-catalog"><RefreshCw size={15} />Tentar de novo</button></div>}
-    {!loading && !error && <section className="shelf"><div className="shelf-heading"><h2 className="section-title">{shelf === 'Início' ? 'Em destaque' : shelf}</h2><div className="section-rule" /><span>{filtered.length.toString().padStart(2, '0')} títulos</span></div>{filtered.length ? <div className="video-grid">{filtered.map((video) => <Poster key={video.id} video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => setLocation(`/player/${video.id}`)} />)}</div> : <div className="empty-state" data-testid="status-catalog-empty"><Search size={25} /><h3>Nenhum título encontrado</h3><p>Tente outro termo ou limpe os filtros para voltar ao catálogo.</p><button className="quiet-button focus-tv" onClick={() => { setQuery(''); setGenre('Todos os gêneros'); setShelf('Início'); }} data-testid="button-clear-catalog-filters">Limpar filtros</button></div>}</section>}
+    {!loading && !error && <section className="shelf"><div className="shelf-heading"><h2 className="section-title">{shelf === 'Início' ? 'Em destaque' : shelf}</h2><div className="section-rule" /><span>{filtered.length.toString().padStart(2, '0')} títulos</span></div>{filtered.length ? <div className="video-grid">{filtered.map((video) => <Poster key={video.id} video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} />)}</div> : <div className="empty-state" data-testid="status-catalog-empty"><Search size={25} /><h3>Nenhum título encontrado</h3><p>Tente outro termo ou limpe os filtros para voltar ao catálogo.</p><button className="quiet-button focus-tv" onClick={() => { setQuery(''); setGenre('Todos os gêneros'); setShelf('Início'); }} data-testid="button-clear-catalog-filters">Limpar filtros</button></div>}</section>}
   </div>;
 }
 function findVideo(videos: Video[], id: string) {
@@ -273,6 +293,10 @@ function PlayerPage() {
   const [, setLocation] = useLocation();
   const { videos, loading } = useVideos();
   const user = useAuth();
+  const access = useCatalogAccess(user);
+  useEffect(() => {
+    if (access === false) setLocation('/assinatura');
+  }, [access]);
   const video = findVideo(videos, params.id || new URLSearchParams(window.location.search).get('id') || '');
   const [saved, setSaved] = useState(() => JSON.parse(localStorage.getItem('cinevito-favorites') || '[]').includes(video.id));
   function toggle() {
@@ -281,11 +305,13 @@ function PlayerPage() {
     localStorage.setItem('cinevito-favorites', JSON.stringify(next));
     setSaved(!saved);
   }
-  if (loading) return <div className="content-wrap page-main"><div className="skeleton" style={{ aspectRatio: '16/9' }} /></div>;
+  if (loading || access === null || access === false) return <div className="content-wrap page-main"><div className="skeleton" style={{ aspectRatio: '16/9' }} /></div>;
   return <div className="content-wrap page-main"><button className="quiet-button focus-tv" onClick={() => setLocation('/catalogo')} data-testid="button-back-catalog"><ArrowLeft size={16} />Voltar ao catálogo</button><div className="player-stage" style={{ marginTop: 17 }}><div className="player-box">{video.url_video ? <video src={video.url_video} controls playsInline data-testid="video-player" /> : <div className="player-idle"><Play size={38} /><strong>Pronto para assistir</strong><span>O endereço do vídeo será carregado quando o catálogo estiver conectado ao backend.</span></div>}</div><div className="player-details"><div><div className="eyebrow">{video.genero || video.categoria || 'CineVito'} {video.ano ? ` / ${video.ano}` : ''}</div><h1 className="section-title" style={{ marginTop: 7 }} data-testid="text-player-title">{video.titulo}</h1><p>{video.descricao || 'Este título faz parte do catálogo CineVito.'}</p></div><div className="player-actions"><button className={`secondary-button focus-tv ${saved ? 'active' : ''}`} onClick={toggle} data-testid="button-player-favorite"><Heart size={15} fill={saved ? 'currentColor' : 'none'} />{saved ? 'Na coleção' : 'Salvar'}</button>{!user && <Link href="/" className="primary-button focus-tv" data-testid="link-player-login">Entrar</Link>}</div></div></div></div>;
 }
 function CollectionPage() {
   const [, setLocation] = useLocation();
+  const user = useAuth();
+  const access = useCatalogAccess(user);
   const { videos } = useVideos();
   const [favorites, setFavorites] = useState<string[]>(() => JSON.parse(localStorage.getItem('cinevito-favorites') || '[]'));
   const collection = videos.filter((video) => favorites.includes(video.id));
@@ -294,7 +320,10 @@ function CollectionPage() {
     setFavorites(next);
     localStorage.setItem('cinevito-favorites', JSON.stringify(next));
   }
-  return <div className="content-wrap page-main"><PageHeader eyebrow="O que você guardou" title="Minha coleção" description="Seus títulos favoritos em um só lugar, prontos para a próxima sessão." />{collection.length ? <div className="video-grid">{collection.map((video) => <Poster key={video.id} video={video} favorite onFavorite={() => remove(video.id)} onOpen={() => setLocation(`/player/${video.id}`)} />)}</div> : <div className="empty-state" data-testid="status-collection-empty"><Heart size={27} /><h3>Ainda está vazio</h3><p>Use o coração nos títulos do catálogo para montar sua coleção.</p><Link href="/catalogo" className="primary-button focus-tv" data-testid="link-collection-catalog">Explorar catálogo</Link></div>}</div>;
+  function openVideo(id: string) {
+    setLocation(access ? `/player/${id}` : '/assinatura');
+  }
+  return <div className="content-wrap page-main"><PageHeader eyebrow="O que você guardou" title="Minha coleção" description="Seus títulos favoritos em um só lugar, prontos para a próxima sessão." />{collection.length ? <div className="video-grid">{collection.map((video) => <Poster key={video.id} video={video} favorite onFavorite={() => remove(video.id)} onOpen={() => openVideo(video.id)} />)}</div> : <div className="empty-state" data-testid="status-collection-empty"><Heart size={27} /><h3>Ainda está vazio</h3><p>Use o coração nos títulos do catálogo para montar sua coleção.</p><Link href="/catalogo" className="primary-button focus-tv" data-testid="link-collection-catalog">Explorar catálogo</Link></div>}</div>;
 }
 function ProfilePage() {
   const user = useAuth();
