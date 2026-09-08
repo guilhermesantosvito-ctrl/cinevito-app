@@ -31,6 +31,23 @@ export type Plan = {
   ativo?: boolean | null;
   ordem?: number | null;
 };
+export type ClienteAssinatura = {
+  status?: string | null;
+  plano?: string | null;
+  data_expiracao?: string | null;
+  data_inicio?: string | null;
+  criado_em?: string | null;
+  limite_dispositivos?: number | null;
+};
+export type Cliente = {
+  id: string;
+  nome?: string | null;
+  email?: string | null;
+  data_nascimento?: string | null;
+  criado_em?: string | null;
+  is_admin?: boolean | null;
+  assinatura?: ClienteAssinatura | null;
+};
 const SUPABASE_URL = String(import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
 const SUPABASE_ANON_KEY = String(import.meta.env.VITE_SUPABASE_ANON_KEY || '');
 const SESSION_KEY = 'cinevito-auth-session';
@@ -67,10 +84,6 @@ function saveSession(session: { access_token: string; refresh_token?: string; ex
   localStorage.removeItem(BACKGROUND_KEY);
   window.dispatchEvent(new Event('cinevito-auth-change'));
 }
-// Sempre que a página volta a ficar visível (troca de aba, volta de outro
-// app, ou o navegador restaura a página do cache ao apertar "voltar"),
-// reconfere a sessão de verdade e avisa toda a interface — em vez de
-// confiar numa versão "congelada" da tela de antes de sair.
 function checkBackgroundLogout() {
   if (isExpiredSession()) clearSession();
   window.dispatchEvent(new Event('cinevito-auth-change'));
@@ -190,5 +203,64 @@ export async function requestPasswordReset(email: string) {
   return request('/auth/v1/recover', {
     method: 'POST',
     body: JSON.stringify({ email, redirect_to: `${window.location.origin}/redefinir-senha` }),
+  });
+}
+
+// ================= CRM: Clientes =================
+
+export async function fetchAdminClients(): Promise<Cliente[]> {
+  const [perfis, assinaturas] = await Promise.all([
+    request<Array<{ id: string; nome?: string; email?: string; data_nascimento?: string; criado_em?: string; is_admin?: boolean }>>(
+      '/rest/v1/profiles?select=id,nome,email,data_nascimento,criado_em,is_admin&order=criado_em.desc',
+    ),
+    request<Array<{ usuario_id: string; status?: string; plano?: string; data_expiracao?: string; data_inicio?: string; criado_em?: string; limite_dispositivos?: number }>>(
+      '/rest/v1/assinaturas?select=usuario_id,status,plano,data_expiracao,data_inicio,criado_em,limite_dispositivos&order=criado_em.desc',
+    ),
+  ]);
+  const latestByUser = new Map<string, ClienteAssinatura>();
+  assinaturas.forEach((row) => {
+    if (!latestByUser.has(row.usuario_id)) latestByUser.set(row.usuario_id, row);
+  });
+  return perfis
+    .filter((perfil) => !perfil.is_admin)
+    .map((perfil) => ({ ...perfil, assinatura: latestByUser.get(perfil.id) || null }));
+}
+
+export async function grantAccess(payload: { usuario_id: string; quantidade: number; unidade: 'dias' | 'meses'; motivo?: string }) {
+  const ativas = await request<Array<{ id: string; data_expiracao?: string; limite_dispositivos?: number }>>(
+    `/rest/v1/assinaturas?select=id,data_expiracao,limite_dispositivos&usuario_id=eq.${encodeURIComponent(payload.usuario_id)}&status=eq.ativa&order=criado_em.desc&limit=1`,
+  );
+  const atual = ativas[0];
+  const agora = new Date();
+  let base = agora;
+  let dispositivosHerdados = 1;
+
+  if (atual) {
+    dispositivosHerdados = atual.limite_dispositivos || 1;
+    if (atual.data_expiracao && new Date(atual.data_expiracao) > agora) base = new Date(atual.data_expiracao);
+    await request(`/rest/v1/assinaturas?id=eq.${encodeURIComponent(atual.id)}`, {
+      method: 'PATCH',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ status: 'substituida' }),
+    });
+  }
+
+  const expiracao = new Date(base);
+  if (payload.unidade === 'dias') expiracao.setDate(expiracao.getDate() + payload.quantidade);
+  else expiracao.setMonth(expiracao.getMonth() + payload.quantidade);
+
+  return request('/rest/v1/assinaturas', {
+    method: 'POST',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      usuario_id: payload.usuario_id,
+      status: 'ativa',
+      plano: 'Cortesia (concedido pelo admin)',
+      limite_dispositivos: dispositivosHerdados,
+      data_inicio: agora.toISOString(),
+      data_expiracao: expiracao.toISOString(),
+      concedido_por_admin: true,
+      motivo_concessao: payload.motivo || null,
+    }),
   });
 }
