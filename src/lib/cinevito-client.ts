@@ -84,8 +84,20 @@ function saveSession(session: { access_token: string; refresh_token?: string; ex
   localStorage.removeItem(BACKGROUND_KEY);
   window.dispatchEvent(new Event('cinevito-auth-change'));
 }
+// Sempre que a página volta a ficar visível (troca de aba, volta de outro
+// app, ou o navegador restaura a página do cache ao apertar "voltar"),
+// reconfere a sessão de verdade. Se os 3 minutos de inatividade já
+// passaram, encerra a sessão E leva a pessoa de volta pra tela de
+// entrada — em vez de deixá-la "presa" numa tela que exige login.
 function checkBackgroundLogout() {
-  if (isExpiredSession()) clearSession();
+  const estavaExpirada = isExpiredSession();
+  if (estavaExpirada) {
+    clearSession();
+    if (typeof window !== 'undefined' && window.location.pathname !== '/' && window.location.pathname !== '/index.html') {
+      window.location.href = '/';
+      return;
+    }
+  }
   window.dispatchEvent(new Event('cinevito-auth-change'));
 }
 if (typeof document !== 'undefined') {
