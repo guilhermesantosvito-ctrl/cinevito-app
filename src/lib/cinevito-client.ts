@@ -84,11 +84,6 @@ function saveSession(session: { access_token: string; refresh_token?: string; ex
   localStorage.removeItem(BACKGROUND_KEY);
   window.dispatchEvent(new Event('cinevito-auth-change'));
 }
-// Sempre que a página volta a ficar visível (troca de aba, volta de outro
-// app, ou o navegador restaura a página do cache ao apertar "voltar"),
-// reconfere a sessão de verdade. Se os 3 minutos de inatividade já
-// passaram, encerra a sessão E leva a pessoa de volta pra tela de
-// entrada — em vez de deixá-la "presa" numa tela que exige login.
 function checkBackgroundLogout() {
   const estavaExpirada = isExpiredSession();
   if (estavaExpirada) {
@@ -292,4 +287,41 @@ export async function revokeAccess(usuario_id: string) {
       body: JSON.stringify({ status: 'inativa' }),
     })),
   );
+}
+
+// ================= CONTROLE DE ACESSO AO CATÁLOGO =================
+
+// Decide se a pessoa logada pode assistir vídeo agora. Regra:
+// 1) admin sempre pode;
+// 2) senão, precisa ter uma assinatura "ativa" ou "trial" cuja
+//    data_expiracao ainda não passou;
+// 3) se não existir nenhum registro de assinatura, cai na rede de
+//    segurança do teste grátis de 3 dias contados da criação da conta
+//    (mesma regra usada no restante do app).
+export async function checkCatalogAccess(): Promise<boolean> {
+  const user = getStoredUser();
+  if (!user) return false;
+  if (!hasRuntimeConfig) return true; // modo de demonstração sem backend: libera
+
+  const perfil = await request<Array<{ is_admin?: boolean; criado_em?: string }>>(
+    `/rest/v1/profiles?select=is_admin,criado_em&id=eq.${encodeURIComponent(user.id)}&limit=1`,
+  );
+  const info = perfil[0];
+  if (info?.is_admin) return true;
+
+  const assinaturas = await request<Array<{ status?: string; data_expiracao?: string }>>(
+    `/rest/v1/assinaturas?select=status,data_expiracao&usuario_id=eq.${encodeURIComponent(user.id)}&status=in.(ativa,trial)&order=criado_em.desc&limit=1`,
+  );
+  const atual = assinaturas[0];
+  if (atual) {
+    if (!atual.data_expiracao) return true;
+    return new Date(atual.data_expiracao) > new Date();
+  }
+
+  if (info?.criado_em) {
+    const limite = new Date(info.criado_em);
+    limite.setDate(limite.getDate() + 3);
+    return new Date() < limite;
+  }
+  return false;
 }
