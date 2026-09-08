@@ -10,15 +10,19 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // Funções auxiliares reutilizadas em várias telas
 // ---------------------------------------------------------
 
+// Usa getSession() (lê a sessão local, sem precisar esperar rede) em vez
+// de getUser() (que faz uma chamada de rede toda vez) — evita "deslogar"
+// só porque a internet demorou um instante pra responder.
 async function getUsuarioLogado() {
-  const { data: { user } } = await supabaseClient.auth.getUser();
-  return user;
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  return session?.user || null;
 }
 
 async function exigirLogin() {
   const user = await getUsuarioLogado();
   if (!user) {
     window.location.href = "index.html";
+    return null;
   }
   return user;
 }
@@ -53,7 +57,7 @@ async function usuarioEhAssinante(usuarioId) {
 
   // Rede de segurança: mesmo sem registro de assinatura (ou se o
   // teste grátis não foi concedido por algum motivo), ninguém é
-  // cobrado antes de completar 2 dias desde a criação da conta.
+  // cobrado antes de completar 3 dias desde a criação da conta.
   return await aindaDentroDoPrazoDeContaNova(usuarioId);
 }
 
@@ -88,9 +92,9 @@ async function aindaDentroDoPrazoDeContaNova(usuarioId) {
 
   if (!perfil?.criado_em) return false;
 
-  const doisDiasDepois = new Date(perfil.criado_em);
-  doisDiasDepois.setDate(doisDiasDepois.getDate() + 2);
-  return new Date() < doisDiasDepois;
+  const tresDiasDepois = new Date(perfil.criado_em);
+  tresDiasDepois.setDate(tresDiasDepois.getDate() + 3);
+  return new Date() < tresDiasDepois;
 }
 
 // Retorna os detalhes da assinatura/teste atual, para mostrar avisos
@@ -117,7 +121,7 @@ async function obterStatusAssinatura(usuarioId) {
   if (!perfil?.criado_em) return null;
 
   const expiracao = new Date(perfil.criado_em);
-  expiracao.setDate(expiracao.getDate() + 2);
+  expiracao.setDate(expiracao.getDate() + 3);
 
   return { status: "trial", data_expiracao: expiracao.toISOString() };
 }
@@ -157,3 +161,22 @@ document.addEventListener("visibilitychange", () => {
 // Confere também assim que a página carrega, pra pegar o caso em que
 // o navegador "matou" a aba enquanto ela estava em segundo plano
 verificarLogoutPorInatividade();
+
+// ---------------------------------------------------------
+// Corrige o "voltar do navegador mostra tela logada depois do logout":
+// quando o navegador restaura a página de um cache interno (bfcache)
+// em vez de recarregar de verdade, o código não roda de novo sozinho.
+// Isso força uma checagem de sessão sempre que isso acontecer.
+// ---------------------------------------------------------
+window.addEventListener("pageshow", (evento) => {
+  if (evento.persisted) {
+    verificarSessaoAoVoltarDoCache();
+  }
+});
+
+async function verificarSessaoAoVoltarDoCache() {
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (!session) {
+    window.location.href = "index.html";
+  }
+}
