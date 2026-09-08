@@ -15,9 +15,7 @@ import {
   invokeCatalogSync, invokeVerifier, requestPasswordReset, signIn, signUp, submitSuggestion, updatePlanActive, type Plan, type SessionUser, type Video,
 } from '@/lib/cinevito-client';
 import '@/index.css';
-
 const queryClient = new QueryClient();
-
 const fallbackVideos: Video[] = [
   { id: 'meio-acre-da-natureza', titulo: 'Meio Acre da Natureza', genero: 'Natureza', categoria: 'Natureza & Relaxamento', premium: false },
   { id: 'a-noite-dos-mortos-vivos', titulo: 'A Noite dos Mortos Vivos', genero: 'Terror', categoria: 'Filmes Clássicos', premium: false },
@@ -27,10 +25,8 @@ const fallbackVideos: Video[] = [
   { id: 'a-ultima-sessao', titulo: 'A Última Sessão', genero: 'Drama', categoria: 'Curtas-Metragens', ano: 2023, premium: false },
   { id: 'entre-dois-mundos', titulo: 'Entre Dois Mundos', genero: 'Aventura', categoria: 'Curtas-Metragens', ano: 2024, premium: false },
 ];
-
 const fallbackShelves = ['Início', 'Filmes Clássicos', 'Documentários', 'Curtas-Metragens'];
 const genres = ['Todos os gêneros', 'Ação', 'Aventura', 'Comédia', 'Documentário', 'Drama', 'Natureza', 'Terror'];
-
 function normalizeCatalogLabel(value: string | null | undefined) {
   return (value || '')
     .normalize('NFD')
@@ -39,10 +35,8 @@ function normalizeCatalogLabel(value: string | null | undefined) {
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
 }
-
 function videoBelongsToShelf(video: Video, shelf: string) {
   if (shelf === 'Início') return true;
-
   const category = normalizeCatalogLabel(video.categoria);
   const target = normalizeCatalogLabel(shelf);
   const aliases: Record<string, string[]> = {
@@ -50,19 +44,15 @@ function videoBelongsToShelf(video: Video, shelf: string) {
     documentarios: ['documentarios', 'documentario'],
     'curtas metragens': ['curtas metragens', 'curtas', 'curta'],
   };
-
   return (aliases[target] || [target]).some((label) => category === label || category.includes(label));
 }
-
 function initials(user: SessionUser | null) {
   const name = user?.user_metadata?.nome || user?.user_metadata?.name || user?.email || '?';
   return name.split(/[ @]/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || '?';
 }
-
 function titleCaseName(user: SessionUser | null) {
   return user?.user_metadata?.nome || user?.user_metadata?.name || user?.email?.split('@')[0] || 'visitante';
 }
-
 function useAuth() {
   const [user, setUser] = useState<SessionUser | null>(() => getStoredUser());
   useEffect(() => {
@@ -76,25 +66,30 @@ function useAuth() {
   }, []);
   return user;
 }
-
 function ToastMessage({ message, onClose }: { message: string; onClose: () => void }) {
   return <div className="toast" role="status" data-testid="status-toast"><span>{message}</span><button className="icon-button" onClick={onClose} aria-label="Fechar aviso" data-testid="button-close-toast"><X size={15} /></button></div>;
 }
-
 function Brand() {
   return <Link href="/" className="brand-mark focus-tv" data-testid="link-brand"><Clapperboard size={22} strokeWidth={1.8} /><span>CineVito</span></Link>;
 }
-
 const navigation = [
   { href: '/catalogo', label: 'Catálogo', icon: Film },
   { href: '/colecao', label: 'Minha coleção', icon: Library },
   { href: '/sugestao', label: 'Sugerir', icon: Send },
   { href: '/faq', label: 'Ajuda', icon: Info },
 ];
-
 function AppShell({ children }: { children: ReactNode }) {
   const [location, setLocation] = useLocation();
   const user = useAuth();
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    if (!user || !hasRuntimeConfig) { setIsAdmin(false); return; }
+    let cancelled = false;
+    fetchProfile()
+      .then((profile) => { if (!cancelled) setIsAdmin(Boolean((profile as { is_admin?: boolean } | null)?.is_admin)); })
+      .catch(() => { if (!cancelled) setIsAdmin(false); });
+    return () => { cancelled = true; };
+  }, [user]);
   const isHome = location === '/' || location === '/index.html';
   const active = (href: string) => location === href || location === `${href}.html` || (href === '/catalogo' && location.startsWith('/player'));
   async function logout() {
@@ -112,7 +107,7 @@ function AppShell({ children }: { children: ReactNode }) {
             {navigation.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className="nav-link focus-tv" aria-current={active(href) ? 'page' : undefined} data-testid={`link-nav-${label.toLowerCase().replaceAll(' ', '-')}`}><Icon size={16} />{label}</Link>)}
           </nav>
           <div className="topbar-actions">
-            {user && <Link href="/admin" className="nav-link focus-tv" data-testid="link-admin"><Settings size={16} />Painel</Link>}{user ? <><Link href="/perfil" className="avatar focus-tv" aria-label="Abrir perfil" data-testid="link-profile-avatar">{initials(user)}</Link><button className="icon-button focus-tv" onClick={logout} title="Sair" aria-label="Sair" data-testid="button-logout"><LogOut size={17} /></button></> : <Link href="/" className="secondary-button focus-tv" data-testid="link-login"><LogIn size={15} />Entrar</Link>}
+            {isAdmin && <Link href="/admin" className="nav-link focus-tv" data-testid="link-admin"><Settings size={16} />Painel</Link>}{user ? <><Link href="/perfil" className="avatar focus-tv" aria-label="Abrir perfil" data-testid="link-profile-avatar">{initials(user)}</Link><button className="icon-button focus-tv" onClick={logout} title="Sair" aria-label="Sair" data-testid="button-logout"><LogOut size={17} /></button></> : <Link href="/" className="secondary-button focus-tv" data-testid="link-login"><LogIn size={15} />Entrar</Link>}
           </div>
         </div>
       </header>
@@ -124,7 +119,6 @@ function AppShell({ children }: { children: ReactNode }) {
     </div>
   );
 }
-
 function AuthPage() {
   const [, setLocation] = useLocation();
   const [mode, setMode] = useState<'login' | 'signup'>('login');
@@ -133,7 +127,6 @@ function AuthPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [form, setForm] = useState({ nome: '', email: '', password: '', nascimento: '', codigo: '', lembrar: false });
-
   useEffect(() => {
     const ref = new URLSearchParams(window.location.search).get('ref');
     if (ref) {
@@ -141,7 +134,6 @@ function AuthPage() {
       setForm((current) => ({ ...current, codigo: ref.toUpperCase() }));
     }
   }, []);
-
   function update(field: keyof typeof form, value: string | boolean) {
     setForm((current) => ({ ...current, [field]: value }));
     setError('');
@@ -218,11 +210,9 @@ function AuthPage() {
     </div>
   );
 }
-
 function PageHeader({ eyebrow, title, description, action }: { eyebrow: string; title: string; description?: string; action?: ReactNode }) {
   return <div className="page-head"><div className="page-head-copy"><div className="eyebrow">{eyebrow}</div><h1 className="page-title">{title}</h1>{description && <p>{description}</p>}</div>{action}</div>;
 }
-
 function Poster({ video, favorite, onFavorite, onOpen }: { video: Video; favorite: boolean; onFavorite: () => void; onOpen: () => void }) {
   const poster = video.url_capa ? undefined : ({
     '--poster': video.titulo.includes('Mortos') ? 'linear-gradient(145deg, #263a43, #11151f 54%, #cf552c)' :
@@ -231,13 +221,11 @@ function Poster({ video, favorite, onFavorite, onOpen }: { video: Video; favorit
   } as CSSProperties);
   return <article className="video-card reveal" data-testid={`card-video-${video.id}`}><div className="poster focus-tv" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen()} style={poster}><div className="poster-art" style={video.url_capa ? { backgroundImage: `url(${video.url_capa})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}><span className="poster-meta">{video.ano || 'CINEVITO'}</span><strong className="poster-word">{video.titulo}</strong></div>{video.premium && <span className="premium-badge">Premium</span>}<button className={`poster-favorite focus-tv ${favorite ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); onFavorite(); }} aria-label={favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'} data-testid={`button-favorite-${video.id}`}><Heart size={15} fill={favorite ? 'currentColor' : 'none'} /></button></div><div className="video-info"><div><h3 className="video-title" data-testid={`text-video-title-${video.id}`}>{video.titulo}</h3><p className="video-subtitle">{video.genero || video.categoria || 'Catálogo CineVito'}</p></div><Play size={14} color="#00c8ff" /></div></article>;
 }
-
 function useVideos() {
   const [videos, setVideos] = useState<Video[]>(fallbackVideos); const [loading, setLoading] = useState(hasRuntimeConfig); const [error, setError] = useState('');
   useEffect(() => { if (!hasRuntimeConfig) return; let cancelled = false; (async () => { try { const lastSync = Number(localStorage.getItem('cinevito-catalog-sync-at') || 0); if (getAccessToken() && Date.now() - lastSync > 15 * 60 * 1000) { await invokeCatalogSync(); localStorage.setItem('cinevito-catalog-sync-at', String(Date.now())); } const items = await fetchVideos(); if (!cancelled && items.length) setVideos(items); } catch (fetchError) { if (!cancelled) setError(fetchError instanceof Error ? fetchError.message : 'Não foi possível carregar o catálogo.'); } finally { if (!cancelled) setLoading(false); } })(); return () => { cancelled = true; }; }, []);
   return { videos, loading, error };
 }
-
 function CatalogPage() {
   const [, setLocation] = useLocation();
   const user = useAuth();
@@ -269,14 +257,11 @@ function CatalogPage() {
     {loading && <div className="video-grid" data-testid="status-catalog-loading">{Array.from({ length: 5 }).map((_, index) => <div className="skeleton" style={{ aspectRatio: '2/3' }} key={index} />)}</div>}
     {error && <div className="notice notice-orange" role="alert" data-testid="status-catalog-error"><CircleAlert size={17} color="#ff8275" /><span>{error}</span><button className="quiet-button focus-tv" onClick={() => window.location.reload()} data-testid="button-retry-catalog"><RefreshCw size={15} />Tentar de novo</button></div>}
     {!loading && !error && <section className="shelf"><div className="shelf-heading"><h2 className="section-title">{shelf === 'Início' ? 'Em destaque' : shelf}</h2><div className="section-rule" /><span>{filtered.length.toString().padStart(2, '0')} títulos</span></div>{filtered.length ? <div className="video-grid">{filtered.map((video) => <Poster key={video.id} video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => setLocation(`/player/${video.id}`)} />)}</div> : <div className="empty-state" data-testid="status-catalog-empty"><Search size={25} /><h3>Nenhum título encontrado</h3><p>Tente outro termo ou limpe os filtros para voltar ao catálogo.</p><button className="quiet-button focus-tv" onClick={() => { setQuery(''); setGenre('Todos os gêneros'); setShelf('Início'); }} data-testid="button-clear-catalog-filters">Limpar filtros</button></div>}</section>}
-
   </div>;
 }
-
 function findVideo(videos: Video[], id: string) {
   return videos.find((video) => video.id === id) || fallbackVideos.find((video) => video.id === id) || fallbackVideos[0];
 }
-
 function PlayerPage() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
@@ -293,7 +278,6 @@ function PlayerPage() {
   if (loading) return <div className="content-wrap page-main"><div className="skeleton" style={{ aspectRatio: '16/9' }} /></div>;
   return <div className="content-wrap page-main"><button className="quiet-button focus-tv" onClick={() => setLocation('/catalogo')} data-testid="button-back-catalog"><ArrowLeft size={16} />Voltar ao catálogo</button><div className="player-stage" style={{ marginTop: 17 }}><div className="player-box">{video.url_video ? <video src={video.url_video} controls playsInline data-testid="video-player" /> : <div className="player-idle"><Play size={38} /><strong>Pronto para assistir</strong><span>O endereço do vídeo será carregado quando o catálogo estiver conectado ao backend.</span></div>}</div><div className="player-details"><div><div className="eyebrow">{video.genero || video.categoria || 'CineVito'} {video.ano ? ` / ${video.ano}` : ''}</div><h1 className="section-title" style={{ marginTop: 7 }} data-testid="text-player-title">{video.titulo}</h1><p>{video.descricao || 'Este título faz parte do catálogo CineVito.'}</p></div><div className="player-actions"><button className={`secondary-button focus-tv ${saved ? 'active' : ''}`} onClick={toggle} data-testid="button-player-favorite"><Heart size={15} fill={saved ? 'currentColor' : 'none'} />{saved ? 'Na coleção' : 'Salvar'}</button>{!user && <Link href="/" className="primary-button focus-tv" data-testid="link-player-login">Entrar</Link>}</div></div></div></div>;
 }
-
 function CollectionPage() {
   const [, setLocation] = useLocation();
   const { videos } = useVideos();
@@ -306,7 +290,6 @@ function CollectionPage() {
   }
   return <div className="content-wrap page-main"><PageHeader eyebrow="O que você guardou" title="Minha coleção" description="Seus títulos favoritos em um só lugar, prontos para a próxima sessão." />{collection.length ? <div className="video-grid">{collection.map((video) => <Poster key={video.id} video={video} favorite onFavorite={() => remove(video.id)} onOpen={() => setLocation(`/player/${video.id}`)} />)}</div> : <div className="empty-state" data-testid="status-collection-empty"><Heart size={27} /><h3>Ainda está vazio</h3><p>Use o coração nos títulos do catálogo para montar sua coleção.</p><Link href="/catalogo" className="primary-button focus-tv" data-testid="link-collection-catalog">Explorar catálogo</Link></div>}</div>;
 }
-
 function ProfilePage() {
   const user = useAuth();
   const [profile, setProfile] = useState<{ nome?: string; email?: string; codigo_indicacao?: string } | null>(null);
@@ -322,7 +305,6 @@ function ProfilePage() {
   }
   return <div className="content-wrap page-main"><PageHeader eyebrow="Sua conta" title="Perfil" description="Gerencie seus dados, sua assinatura e o acesso do CineVito." /><div className="two-col"><section className="panel panel-pad"><div className="profile-hero"><div className="profile-avatar">{initials(user)}</div><div><h1>{name}</h1><p data-testid="text-profile-email">{profile?.email || user?.email || 'Sessão local'}</p></div></div><div className="status-card" data-testid="status-profile-subscription"><h3>Acesso ao CineVito</h3><p>{user ? 'Sua conta está pronta para continuar assistindo em seus dispositivos.' : 'Entre para consultar sua assinatura.'}</p><Link href="/assinatura" className="primary-button focus-tv" style={{ width: 'fit-content', marginTop: 7 }} data-testid="link-profile-subscription">Ver assinatura</Link></div></section><section className="panel panel-pad"><h2 className="panel-title">Seu código de indicação</h2>{profile?.codigo_indicacao ? <><p className="muted" style={{ fontSize: '.8rem', lineHeight: 1.5 }}>Compartilhe o link. A indicação só é confirmada depois que a pessoa fizer um pagamento.</p><div className="code-box"><code data-testid="text-referral-code">{profile.codigo_indicacao}</code><button className="icon-button focus-tv" onClick={copyReferral} aria-label="Copiar link de indicação" data-testid="button-copy-referral">{copied ? <Check size={16} /> : <Copy size={16} />}</button></div><p className="muted" style={{ fontSize: '.72rem', marginBottom: 0 }}>{copied ? 'Link copiado.' : 'Não há campanha ativa no momento? Seu código continua válido.'}</p></> : <div className="notice notice-cyan"><Info size={16} /><span>Seu código aparece aqui depois do primeiro pagamento aprovado.</span></div>}</section></div></div>;
 }
-
 function SubscriptionPage() {
   const [plans, setPlans] = useState<Plan[]>([]); const [loading, setLoading] = useState(hasRuntimeConfig); const [selected, setSelected] = useState(''); const [category, setCategory] = useState('');
   useEffect(() => { if (hasRuntimeConfig) fetchPlans().then((items) => { setPlans(items); setCategory(items[0]?.categoria || ''); }).catch(() => setPlans([])).finally(() => setLoading(false)); }, []);
@@ -330,7 +312,6 @@ function SubscriptionPage() {
   const categories = Array.from(new Set(plans.map((plan) => plan.categoria || 'Plano'))); const visiblePlans = plans.filter((plan) => (plan.categoria || 'Plano') === category);
   return <div className="content-wrap page-main"><PageHeader eyebrow="Escolha o seu acesso" title="Assine o CineVito" description="Assista ao catálogo completo em seus dispositivos. O pagamento é processado com segurança pelo Mercado Pago." /><div className="two-col"><section className="panel panel-pad"><h2 className="panel-title">Planos disponíveis</h2>{loading ? <div className="plan-list">{[1, 2].map((n) => <div className="skeleton" style={{ height: 94 }} key={n} />)}</div> : plans.length ? <><div className="chip-row" role="tablist">{categories.map((item) => <button key={item} className={'chip focus-tv ' + (category === item ? 'active' : '')} onClick={() => { setCategory(item); setSelected(''); }} role="tab" aria-selected={category === item}>{item}</button>)}</div><div className="plan-list">{visiblePlans.map((plan) => <div className={'plan-card ' + (selected === plan.id ? 'selected' : '')} key={plan.id} onClick={() => setSelected(plan.id)}><div><h3>{plan.nome}</h3><p>{plan.descricao || ((plan.dispositivos || 1) + ' dispositivo(s) · ' + duration(plan))}</p></div><div style={{ display: 'grid', justifyItems: 'end', gap: 8 }}><strong className="plan-price">{typeof plan.preco === 'number' ? 'R$ ' + plan.preco.toFixed(2).replace('.', ',') : 'Consultar'}</strong><button className="primary-button focus-tv" onClick={(event) => { event.stopPropagation(); setSelected(plan.id); }} data-testid={'button-select-plan-' + plan.id}>{selected === plan.id ? 'Selecionado' : 'Escolher'}</button></div></div>)}</div></> : <div className="empty-state"><Settings size={24} /><h3>Planos em configuração</h3><p>Quando os planos estiverem publicados, eles aparecerão aqui para checkout.</p></div>}</section><aside className="panel panel-pad"><div className="eyebrow">Pagamento seguro</div><h2 className="panel-title" style={{ marginTop: 9 }}>Mercado Pago</h2><p className="muted" style={{ fontSize: '.82rem', lineHeight: 1.65 }}>O CineVito mantém o fluxo de checkout transparente com cartão e Pix. Nenhum dado de cartão fica salvo nesta interface.</p><div className="notice notice-orange" style={{ marginTop: 16 }}><Info size={16} color="#ff8228" /><span>Selecione um plano para continuar ao checkout seguro.</span></div></aside></div></div>;
 }
-
 function SuggestionPage() {
   const [form, setForm] = useState({ titulo: '', mensagem: '' });
   const [state, setState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -347,12 +328,10 @@ function SuggestionPage() {
   }
   return <div className="content-wrap page-main"><PageHeader eyebrow="Ajude a curadoria" title="Sugira um filme" description="Não encontrou o que queria? Conte para a gente qual título deveria entrar no CineVito." /><div className="two-col"><form className="panel panel-pad" onSubmit={submit}><h2 className="panel-title">Sua sugestão</h2><div className="field"><label htmlFor="suggestion-title">Nome do filme/vídeo</label><input id="suggestion-title" className="input focus-tv" value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} placeholder="Digite o nome do título" data-testid="input-suggestion-title" /></div><div className="field"><label htmlFor="suggestion-message">Por que você quer assistir?</label><textarea id="suggestion-message" className="input focus-tv" value={form.mensagem} onChange={(e) => setForm({ ...form, mensagem: e.target.value })} placeholder="Uma frase já ajuda nossa curadoria." data-testid="input-suggestion-message" /></div>{state === 'success' && <p className="form-success" data-testid="status-suggestion-success">Sugestão enviada. Obrigado por ajudar o catálogo.</p>}{state === 'error' && <p className="form-error" data-testid="status-suggestion-error">Não foi possível enviar agora. Tente novamente.</p>}<button className="primary-button focus-tv" type="submit" disabled={state === 'loading'} data-testid="button-submit-suggestion"><Send size={16} />{state === 'loading' ? 'Enviando...' : 'Enviar sugestão'}</button></form><aside className="panel panel-pad"><div className="eyebrow">Como funciona</div><h2 className="panel-title" style={{ marginTop: 9 }}>Curadoria viva</h2><p className="muted" style={{ fontSize: '.82rem', lineHeight: 1.65 }}>As sugestões ajudam a orientar os próximos títulos do catálogo. Para dúvidas sobre sua conta ou assinatura, consulte a central de ajuda.</p><Link href="/faq" className="secondary-button focus-tv" style={{ marginTop: 10 }} data-testid="link-suggestion-faq">Ir para perguntas frequentes <ArrowLeft size={15} className="rotate-180" /></Link></aside></div></div>;
 }
-
 function FaqPage() {
   const faqs = [['Como sugiro um filme que não está no catálogo?', 'Use a página Sugira um filme para enviar o título e, se quiser, uma breve justificativa. Nossa curadoria consulta as sugestões para orientar as próximas adições.'], ['Como funciona o programa de indicação?', 'Seu código é fixo e aparece no perfil. A indicação só é confirmada quando a pessoa indicada realiza um pagamento aprovado dentro do prazo da campanha ativa.'], ['Posso assistir em uma Smart TV?', 'Sim. O catálogo funciona no navegador da sua Smart TV e os elementos navegáveis têm destaque de foco para uso com controle remoto.'], ['Como funciona o teste grátis?', 'O período e as condições do seu acesso aparecem na área de assinatura e seguem a configuração vigente da plataforma.'], ['Como redefino minha senha?', 'Use o link Esqueci minha senha na tela de entrada. Você receberá as instruções no e-mail da conta.']];
   return <div className="content-wrap page-main"><PageHeader eyebrow="CineVito ajuda" title="Perguntas frequentes" description="Respostas rápidas para aproveitar melhor o seu acesso." /><div className="faq-list">{faqs.map(([question, answer], index) => <details className="faq-item" key={question} open={index === 0} data-testid={`faq-item-${index}`}><summary>{question}<ChevronDown size={17} /></summary><div className="faq-answer">{answer}</div></details>)}</div><div className="notice notice-cyan" style={{ maxWidth: 820, marginTop: 24 }}><Info size={17} /><span>Não encontrou a resposta? <a href="mailto:contatocinevito@gmail.com" style={{ color: '#56e0ff' }} data-testid="link-contact-email">contatocinevito@gmail.com</a></span></div></div>;
 }
-
 function AdminPage() {
   const user = useAuth(); const [profile, setProfile] = useState<{ is_admin?: boolean; admin_master?: boolean } | null>(null); const [tab, setTab] = useState('catalogo'); const [loading, setLoading] = useState(Boolean(user && hasRuntimeConfig)); const [busy, setBusy] = useState(false); const [query, setQuery] = useState('O Justiceiro'); const [message, setMessage] = useState(''); const [syncResult, setSyncResult] = useState<{ found?: number; added?: number; updated?: number; titles?: string[] } | null>(null); const [plans, setPlans] = useState<Plan[]>([]); const [videos, setVideos] = useState<Video[]>([]); const [url, setUrl] = useState('https://www.pobreflixtv.city/'); const [verifyBusy, setVerifyBusy] = useState(false); const [verifyResult, setVerifyResult] = useState<{ links?: Array<{ url: string; status?: string; detalhe?: string; tipo?: string }>; total?: number } | null>(null);
   useEffect(() => { if (!user || !hasRuntimeConfig) return; fetchProfile().then((value) => setProfile(value as { is_admin?: boolean; admin_master?: boolean })).catch(() => setProfile(null)).finally(() => setLoading(false)); }, [user]);
@@ -362,11 +341,9 @@ function AdminPage() {
   if (!user) return <LockedPage title="Área administrativa" description="Entre com uma conta autorizada para acessar este painel." />; if (!hasRuntimeConfig) return <div className="content-wrap page-main"><PageHeader eyebrow="Administração" title="Área protegida" description="O painel administrativo precisa da configuração do Supabase." /><div className="notice notice-orange"><KeyRound size={17} color="#ff8228" /><span>Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no Netlify.</span></div></div>; if (loading) return <div className="content-wrap page-main"><PageHeader eyebrow="Administração" title="Verificando acesso" description="Confirmando as permissões da sua conta." /><div className="skeleton" style={{ height: 120 }} /></div>; if (!profile?.is_admin) return <LockedPage title="Acesso restrito" description="Esta área é exclusiva para administradores CineVito." />;
   const tabs = ['catalogo', 'planos', 'verificar']; return <div className="content-wrap page-main"><PageHeader eyebrow="Painel protegido" title="Administração" description={profile.admin_master ? 'Controle completo do catálogo e dos planos CineVito.' : 'Gerencie as ferramentas liberadas para sua equipe.'} /><div className="admin-tabs" role="tablist">{tabs.map((item) => <button key={item} className={'admin-tab focus-tv ' + (tab === item ? 'active' : '')} onClick={() => { setTab(item); if (item === 'catalogo') loadVideos(); if (item === 'planos') loadPlans(); }} role="tab" aria-selected={tab === item}>{item === 'catalogo' ? 'Catálogo' : item[0].toUpperCase() + item.slice(1)}</button>)}</div>{message && <div className="notice notice-orange" role="status">{message}</div>}{tab === 'catalogo' && <section className="panel panel-pad"><div className="eyebrow">Fonte externa</div><h2 className="panel-title" style={{ marginTop: 8 }}>Sincronizar PobreFlixTV</h2><p className="muted" style={{ fontSize: '.82rem', lineHeight: 1.6 }}>A sincronização procura títulos atuais, inclusive buscas específicas como O Justiceiro, e atualiza pôster, ano e página de origem no catálogo.</p><div className="verifier-form"><div className="field" style={{ marginBottom: 0, flex: 1 }}><label htmlFor="catalog-sync-query">Busca opcional</label><input id="catalog-sync-query" className="input focus-tv" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="O Justiceiro" /></div><button className="primary-button focus-tv" onClick={syncCatalog} disabled={busy}><RefreshCw size={16} />{busy ? 'Sincronizando...' : 'Sincronizar catálogo'}</button></div>{syncResult && <div className="notice notice-cyan" style={{ marginTop: 16 }}><Check size={17} /><span>{syncResult.found || 0} encontrados. {syncResult.titles?.slice(0, 5).join(', ')}</span></div>}<div className="admin-list" style={{ marginTop: 18 }}>{videos.length ? videos.slice(0, 30).map((video) => <div className="result-row" key={video.id}><span><strong>{video.titulo}</strong><small style={{ display: 'block', color: '#96a0af', marginTop: 3 }}>{video.fonte || 'Catálogo'} · {video.ano || 'sem ano'}</small></span><span className="muted">{video.genero || 'sem categoria'}</span></div>) : <button className="secondary-button focus-tv" onClick={loadVideos}>Carregar catálogo</button>}</div></section>}{tab === 'planos' && <section className="panel panel-pad"><div className="eyebrow">Admin master</div><h2 className="panel-title" style={{ marginTop: 8 }}>Planos publicados</h2>{!profile.admin_master ? <div className="notice notice-orange"><CircleAlert size={17} /><span>Apenas o admin master pode alterar a publicação dos planos.</span></div> : plans.length ? <div className="plan-list">{plans.map((plan) => <div className="plan-card" key={plan.id}><div><h3>{plan.nome}</h3><p>{plan.categoria || 'Sem categoria'} · R$ {Number(plan.preco || 0).toFixed(2).replace('.', ',')} · {plan.dispositivos || 1} dispositivo(s)</p></div><button className="secondary-button focus-tv" onClick={() => togglePlan(plan)}>{plan.ativo ? 'Desativar' : 'Ativar'}</button></div>)}</div> : <button className="secondary-button focus-tv" onClick={loadPlans}>Carregar planos</button>}</section>}{tab === 'verificar' && <section className="panel panel-pad"><div className="eyebrow">Ferramenta de integração</div><h2 className="panel-title" style={{ marginTop: 8 }}>Verificador de fontes</h2><form className="verifier-form" onSubmit={verify}><div className="field" style={{ marginBottom: 0, flex: 1 }}><label htmlFor="verify-url">URL da página</label><input id="verify-url" className="input focus-tv" type="url" value={url} onChange={(event) => setUrl(event.target.value)} /></div><button className="primary-button focus-tv" type="submit" disabled={verifyBusy}><RefreshCw size={16} />{verifyBusy ? 'Verificando...' : 'Verificar fontes'}</button></form>{verifyResult && <div className="verifier-results" style={{ marginTop: 16 }}><div className="notice notice-cyan"><Check size={17} /><span>{verifyResult.total || verifyResult.links?.length || 0} fonte(s) encontrada(s)</span></div>{verifyResult.links?.map((link, index) => <div className="result-row" key={link.url + index}><span style={{ overflowWrap: 'anywhere' }}>{link.url}</span><span>{link.status || link.detalhe || 'analisado'}</span></div>)}</div>}</section>}</div>;
 }
-
 function LockedPage({ title, description }: { title: string; description: string }) {
   return <div className="content-wrap page-main"><div className="empty-state"><KeyRound size={28} /><h3>{title}</h3><p>{description}</p><Link href="/" className="primary-button focus-tv" style={{ marginTop: 12 }} data-testid="link-locked-login">Ir para entrada</Link></div></div>;
 }
-
 function ResetPage() {
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
@@ -385,11 +362,9 @@ function ResetPage() {
   }
   return <div className="home-shell"><div className="auth-layout" style={{ maxWidth: 620 }}><section className="auth-panel" style={{ borderLeft: 0 }}><Brand /><h2 style={{ marginTop: 42 }}>Redefinir senha</h2><p>Informe o e-mail da sua conta para receber um link de recuperação.</p>{sent ? <div className="notice notice-cyan" data-testid="status-reset-success"><Check size={17} /><span>Se o e-mail existir, as instruções de recuperação serão enviadas.</span></div> : <form onSubmit={submit}><div className="field"><label htmlFor="reset-email">E-mail</label><input id="reset-email" type="email" required className="input focus-tv" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="voce@exemplo.com" data-testid="input-reset-email" /></div><button className="primary-button button-wide focus-tv" type="submit" disabled={busy} data-testid="button-submit-reset"> {busy ? 'Enviando...' : 'Enviar instruções'} <Send size={15} /></button></form>}<Link href="/" className="quiet-button button-wide focus-tv" style={{ marginTop: 10 }} data-testid="link-reset-back"><ArrowLeft size={15} />Voltar</Link></section></div></div>;
 }
-
 function NotFoundPage() {
   return <div className="content-wrap page-main"><div className="empty-state"><CircleAlert size={28} /><h3>Página não encontrada</h3><p>Esse endereço não faz parte do catálogo CineVito.</p><Link href="/catalogo" className="primary-button focus-tv" style={{ marginTop: 12 }} data-testid="link-not-found-catalog">Voltar ao catálogo</Link></div></div>;
 }
-
 function Router() {
   return <Switch>
     <Route path="/" component={AuthPage} /><Route path="/index.html" component={AuthPage} />
@@ -405,7 +380,6 @@ function Router() {
     <Route component={NotFoundPage} />
   </Switch>;
 }
-
 function App() {
   useEffect(() => {
     if ('serviceWorker' in navigator) {
@@ -414,5 +388,4 @@ function App() {
   }, []);
   return <QueryClientProvider client={queryClient}><TooltipProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><ErrorBoundary><AppShell><Router /></AppShell></ErrorBoundary></WouterRouter><Toaster /></TooltipProvider></QueryClientProvider>;
 }
-
 export default App;
