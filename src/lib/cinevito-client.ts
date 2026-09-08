@@ -48,6 +48,15 @@ export type Cliente = {
   is_admin?: boolean | null;
   assinatura?: ClienteAssinatura | null;
 };
+export type MinhaAssinatura = {
+  status?: string | null;
+  plano?: string | null;
+  data_inicio?: string | null;
+  data_expiracao?: string | null;
+  concedido_por_admin?: boolean | null;
+  motivo_concessao?: string | null;
+  id_pagamento_gateway?: string | null;
+};
 const SUPABASE_URL = String(import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
 const SUPABASE_ANON_KEY = String(import.meta.env.VITE_SUPABASE_ANON_KEY || '');
 const SESSION_KEY = 'cinevito-auth-session';
@@ -84,14 +93,19 @@ function saveSession(session: { access_token: string; refresh_token?: string; ex
   localStorage.removeItem(BACKGROUND_KEY);
   window.dispatchEvent(new Event('cinevito-auth-change'));
 }
+// Leva a pessoa de volta pra tela de entrada sempre que a sessão for
+// encerrada enquanto ela está numa página que exige login.
+function irParaEntrada() {
+  if (typeof window === 'undefined') return;
+  if (window.location.pathname !== '/' && window.location.pathname !== '/index.html') {
+    window.location.href = '/';
+  }
+}
 function checkBackgroundLogout() {
-  const estavaExpirada = isExpiredSession();
-  if (estavaExpirada) {
+  if (isExpiredSession()) {
     clearSession();
-    if (typeof window !== 'undefined' && window.location.pathname !== '/' && window.location.pathname !== '/index.html') {
-      window.location.href = '/';
-      return;
-    }
+    irParaEntrada();
+    return;
   }
   window.dispatchEvent(new Event('cinevito-auth-change'));
 }
@@ -101,6 +115,24 @@ if (typeof document !== 'undefined') {
     else checkBackgroundLogout();
   });
   window.addEventListener('pageshow', checkBackgroundLogout);
+  window.addEventListener('focus', checkBackgroundLogout);
+  // Marca "desde quando" a aba está sem interação, mesmo continuando
+  // visível o tempo todo — sem isso, deixar a aba aberta e parada
+  // nunca disparava o relógio de 3 minutos (só disparava ao trocar
+  // de aba/app). Qualquer clique/tecla/toque reinicia a contagem.
+  const registrarAtividade = () => localStorage.setItem(BACKGROUND_KEY, String(Date.now()));
+  ['click', 'keydown', 'touchstart', 'scroll'].forEach((evento) => {
+    window.addEventListener(evento, registrarAtividade, { passive: true });
+  });
+  // Confere sozinho, a cada 15 segundos, se os 3 minutos já passaram —
+  // funciona mesmo com a aba continuamente visível e sem depender de
+  // nenhum evento específico do navegador.
+  window.setInterval(() => {
+    if (isExpiredSession() && getStoredUser()) {
+      clearSession();
+      irParaEntrada();
+    }
+  }, 15000);
 }
 export function clearSession() {
   localStorage.removeItem(SESSION_KEY);
@@ -291,17 +323,10 @@ export async function revokeAccess(usuario_id: string) {
 
 // ================= CONTROLE DE ACESSO AO CATÁLOGO =================
 
-// Decide se a pessoa logada pode assistir vídeo agora. Regra:
-// 1) admin sempre pode;
-// 2) senão, precisa ter uma assinatura "ativa" ou "trial" cuja
-//    data_expiracao ainda não passou;
-// 3) se não existir nenhum registro de assinatura, cai na rede de
-//    segurança do teste grátis de 3 dias contados da criação da conta
-//    (mesma regra usada no restante do app).
 export async function checkCatalogAccess(): Promise<boolean> {
   const user = getStoredUser();
   if (!user) return false;
-  if (!hasRuntimeConfig) return true; // modo de demonstração sem backend: libera
+  if (!hasRuntimeConfig) return true;
 
   const perfil = await request<Array<{ is_admin?: boolean; criado_em?: string }>>(
     `/rest/v1/profiles?select=is_admin,criado_em&id=eq.${encodeURIComponent(user.id)}&limit=1`,
@@ -324,4 +349,16 @@ export async function checkCatalogAccess(): Promise<boolean> {
     return new Date() < limite;
   }
   return false;
+}
+
+// Busca a assinatura mais recente da pessoa logada, pra mostrar no
+// Perfil qual é o plano dela, a validade, e a origem (pago, cortesia
+// concedida pelo admin, ou recompensa de indicação).
+export async function fetchMySubscription(): Promise<MinhaAssinatura | null> {
+  const user = getStoredUser();
+  if (!user) return null;
+  const rows = await request<MinhaAssinatura[]>(
+    `/rest/v1/assinaturas?select=status,plano,data_inicio,data_expiracao,concedido_por_admin,motivo_concessao,id_pagamento_gateway&usuario_id=eq.${encodeURIComponent(user.id)}&order=criado_em.desc&limit=1`,
+  );
+  return rows[0] || null;
 }
