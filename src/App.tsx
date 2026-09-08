@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent, ReactNode } from 'react';
 import { Link, Route, Switch, useLocation, useParams, Router as WouterRouter } from 'wouter';
 import {
@@ -12,10 +12,11 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import {
   clearSession, fetchAdminClients, fetchAdminPlans, fetchAdminVideos, fetchPlans, fetchProfile, fetchVideos, getAccessToken, getStoredUser, grantAccess, hasRuntimeConfig,
-  invokeCatalogSync, invokeVerifier, requestPasswordReset, revokeAccess, signIn, signUp, submitSuggestion, updatePlanActive, type Cliente, type Plan, type SessionUser, type Video,
+  invokeCatalogSync, invokeVerifier, processPayment, requestPasswordReset, revokeAccess, signIn, signUp, submitSuggestion, updatePlanActive, type Cliente, type Plan, type SessionUser, type Video,
 } from '@/lib/cinevito-client';
 import '@/index.css';
 const queryClient = new QueryClient();
+const MP_PUBLIC_KEY = 'APP_USR-471c3a9b-ff0f-4743-a417-e54b9f13e902';
 const fallbackVideos: Video[] = [
   { id: 'meio-acre-da-natureza', titulo: 'Meio Acre da Natureza', genero: 'Natureza', categoria: 'Natureza & Relaxamento', premium: false },
   { id: 'a-noite-dos-mortos-vivos', titulo: 'A Noite dos Mortos Vivos', genero: 'Terror', categoria: 'Filmes Clássicos', premium: false },
@@ -310,12 +311,118 @@ function ProfilePage() {
   }
   return <div className="content-wrap page-main"><PageHeader eyebrow="Sua conta" title="Perfil" description="Gerencie seus dados, sua assinatura e o acesso do CineVito." /><div className="two-col"><section className="panel panel-pad"><div className="profile-hero"><div className="profile-avatar">{initials(user)}</div><div><h1>{name}</h1><p data-testid="text-profile-email">{profile?.email || user?.email || 'Sessão local'}</p></div></div><div className="status-card" data-testid="status-profile-subscription"><h3>Acesso ao CineVito</h3><p>{user ? 'Sua conta está pronta para continuar assistindo em seus dispositivos.' : 'Entre para consultar sua assinatura.'}</p><Link href="/assinatura" className="primary-button focus-tv" style={{ width: 'fit-content', marginTop: 7 }} data-testid="link-profile-subscription">Ver assinatura</Link></div></section><section className="panel panel-pad"><h2 className="panel-title">Seu código de indicação</h2>{profile?.codigo_indicacao ? <><p className="muted" style={{ fontSize: '.8rem', lineHeight: 1.5 }}>Compartilhe o link. A indicação só é confirmada depois que a pessoa fizer um pagamento.</p><div className="code-box"><code data-testid="text-referral-code">{profile.codigo_indicacao}</code><button className="icon-button focus-tv" onClick={copyReferral} aria-label="Copiar link de indicação" data-testid="button-copy-referral">{copied ? <Check size={16} /> : <Copy size={16} />}</button></div><p className="muted" style={{ fontSize: '.72rem', marginBottom: 0 }}>{copied ? 'Link copiado.' : 'Não há campanha ativa no momento? Seu código continua válido.'}</p></> : <div className="notice notice-cyan"><Info size={16} /><span>Seu código aparece aqui depois do primeiro pagamento aprovado.</span></div>}</section></div></div>;
 }
+function loadMercadoPagoSdk(): Promise<void> {
+  if ((window as unknown as { MercadoPago?: unknown }).MercadoPago) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const existing = document.getElementById('mp-sdk-script') as HTMLScriptElement | null;
+    if (existing) {
+      existing.addEventListener('load', () => resolve());
+      existing.addEventListener('error', () => reject(new Error('Não foi possível carregar o checkout.')));
+      return;
+    }
+    const script = document.createElement('script');
+    script.id = 'mp-sdk-script';
+    script.src = 'https://sdk.mercadopago.com/js/v2';
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Não foi possível carregar o checkout.'));
+    document.head.appendChild(script);
+  });
+}
 function SubscriptionPage() {
+  const user = useAuth();
   const [plans, setPlans] = useState<Plan[]>([]); const [loading, setLoading] = useState(hasRuntimeConfig); const [selected, setSelected] = useState(''); const [category, setCategory] = useState('');
+  const [cupom, setCupom] = useState('');
+  const [checkoutStatus, setCheckoutStatus] = useState<'idle' | 'loading' | 'ready' | 'submitting' | 'approved' | 'pending' | 'rejected' | 'error'>('idle');
+  const [checkoutMessage, setCheckoutMessage] = useState('');
+  const [pix, setPix] = useState<{ copiaCola?: string | null; qrBase64?: string | null } | null>(null);
+  const brickRef = useRef<{ unmount: () => void } | null>(null);
   useEffect(() => { if (hasRuntimeConfig) fetchPlans().then((items) => { setPlans(items); setCategory(items[0]?.categoria || ''); }).catch(() => setPlans([])).finally(() => setLoading(false)); }, []);
   function duration(plan: Plan) { return plan.duracao_dias ? plan.duracao_dias + ' dias' : plan.duracao_meses ? plan.duracao_meses + (plan.duracao_meses === 1 ? ' mês' : ' meses') : 'período definido no plano'; }
   const categories = Array.from(new Set(plans.map((plan) => plan.categoria || 'Plano'))); const visiblePlans = plans.filter((plan) => (plan.categoria || 'Plano') === category);
-  return <div className="content-wrap page-main"><PageHeader eyebrow="Escolha o seu acesso" title="Assine o CineVito" description="Assista ao catálogo completo em seus dispositivos. O pagamento é processado com segurança, direto por dentro do CineVito." /><div className="two-col"><section className="panel panel-pad"><h2 className="panel-title">Planos disponíveis</h2>{loading ? <div className="plan-list">{[1, 2].map((n) => <div className="skeleton" style={{ height: 94 }} key={n} />)}</div> : plans.length ? <><div className="chip-row" role="tablist">{categories.map((item) => <button key={item} className={'chip focus-tv ' + (category === item ? 'active' : '')} onClick={() => { setCategory(item); setSelected(''); }} role="tab" aria-selected={category === item}>{item}</button>)}</div><div className="plan-list">{visiblePlans.map((plan) => <div className={'plan-card ' + (selected === plan.id ? 'selected' : '')} key={plan.id} onClick={() => setSelected(plan.id)}><div><h3>{plan.nome}</h3><p>{plan.descricao || ((plan.dispositivos || 1) + ' dispositivo(s) · ' + duration(plan))}</p></div><div style={{ display: 'grid', justifyItems: 'end', gap: 8 }}><strong className="plan-price">{typeof plan.preco === 'number' ? 'R$ ' + plan.preco.toFixed(2).replace('.', ',') : 'Consultar'}</strong><button className="primary-button focus-tv" onClick={(event) => { event.stopPropagation(); setSelected(plan.id); }} data-testid={'button-select-plan-' + plan.id}>{selected === plan.id ? 'Selecionado' : 'Escolher'}</button></div></div>)}</div></> : <div className="empty-state"><Settings size={24} /><h3>Planos em configuração</h3><p>Quando os planos estiverem publicados, eles aparecerão aqui para checkout.</p></div>}</section><aside className="panel panel-pad"><div className="eyebrow">Pagamento seguro</div><h2 className="panel-title" style={{ marginTop: 9 }}>Checkout protegido</h2><p className="muted" style={{ fontSize: '.82rem', lineHeight: 1.65 }}>O CineVito processa o pagamento com cartão e Pix direto por dentro do app. Nenhum dado de cartão fica salvo nesta interface.</p><div className="notice notice-orange" style={{ marginTop: 16 }}><Info size={16} color="#ff8228" /><span>Selecione um plano para continuar ao checkout seguro.</span></div></aside></div></div>;
+  const selectedPlan = plans.find((plan) => plan.id === selected) || null;
+
+  useEffect(() => {
+    setPix(null);
+    setCheckoutMessage('');
+    if (brickRef.current) { try { brickRef.current.unmount(); } catch { /* ignore */ } brickRef.current = null; }
+    const container = document.getElementById('payment-brick-container');
+    if (container) container.innerHTML = '';
+    if (!selectedPlan || !user || !hasRuntimeConfig) { setCheckoutStatus('idle'); return; }
+
+    let cancelled = false;
+    setCheckoutStatus('loading');
+    (async () => {
+      try {
+        await loadMercadoPagoSdk();
+        if (cancelled) return;
+        const MercadoPagoCtor = (window as unknown as { MercadoPago: new (key: string, opts: { locale: string }) => { bricks: () => { create: (type: string, containerId: string, settings: unknown) => Promise<{ unmount: () => void }> } } }).MercadoPago;
+        const mp = new MercadoPagoCtor(MP_PUBLIC_KEY, { locale: 'pt-BR' });
+        const brick = await mp.bricks().create('payment', 'payment-brick-container', {
+          initialization: {
+            amount: Number(selectedPlan.preco) || 0,
+            payer: { email: user.email || '' },
+          },
+          customization: {
+            paymentMethods: { creditCard: 'all', debitCard: 'all', bankTransfer: 'all' },
+          },
+          callbacks: {
+            onReady: () => { if (!cancelled) setCheckoutStatus('ready'); },
+            onError: () => { if (!cancelled) { setCheckoutStatus('error'); setCheckoutMessage('Não foi possível carregar o checkout. Tente novamente.'); } },
+            onSubmit: ({ formData }: { formData: unknown }) => new Promise<void>((resolve, reject) => {
+              setCheckoutStatus('submitting');
+              setCheckoutMessage('');
+              processPayment({ usuario_id: user.id, plano_id: selectedPlan.id, formData, cupom: cupom.trim() || null })
+                .then((result) => {
+                  if (result.status === 'approved') {
+                    setCheckoutStatus('approved');
+                    setCheckoutMessage('Pagamento aprovado! Sua assinatura já está ativa.');
+                  } else if (result.status === 'pending') {
+                    setCheckoutStatus('pending');
+                    setPix({ copiaCola: result.pix_copia_cola, qrBase64: result.pix_qr_base64 });
+                    setCheckoutMessage('Pagamento em análise. Se for Pix, finalize com o código abaixo.');
+                  } else {
+                    setCheckoutStatus('rejected');
+                    setCheckoutMessage(result.motivo || 'Pagamento recusado. Tente outro cartão ou meio de pagamento.');
+                  }
+                  resolve();
+                })
+                .catch((error) => {
+                  setCheckoutStatus('error');
+                  setCheckoutMessage(error instanceof Error ? error.message : 'Não foi possível processar o pagamento.');
+                  reject(error);
+                });
+            }),
+          },
+        });
+        if (cancelled) { brick.unmount(); return; }
+        brickRef.current = brick;
+      } catch (error) {
+        if (!cancelled) {
+          setCheckoutStatus('error');
+          setCheckoutMessage(error instanceof Error ? error.message : 'Não foi possível carregar o checkout.');
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (brickRef.current) { try { brickRef.current.unmount(); } catch { /* ignore */ } brickRef.current = null; }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPlan?.id, user?.id]);
+
+  return <div className="content-wrap page-main"><PageHeader eyebrow="Escolha o seu acesso" title="Assine o CineVito" description="Assista ao catálogo completo em seus dispositivos. O pagamento é processado com segurança, direto por dentro do CineVito." /><div className="two-col"><section className="panel panel-pad"><h2 className="panel-title">Planos disponíveis</h2>{loading ? <div className="plan-list">{[1, 2].map((n) => <div className="skeleton" style={{ height: 94 }} key={n} />)}</div> : plans.length ? <><div className="chip-row" role="tablist">{categories.map((item) => <button key={item} className={'chip focus-tv ' + (category === item ? 'active' : '')} onClick={() => { setCategory(item); setSelected(''); }} role="tab" aria-selected={category === item}>{item}</button>)}</div><div className="plan-list">{visiblePlans.map((plan) => <div className={'plan-card ' + (selected === plan.id ? 'selected' : '')} key={plan.id} onClick={() => setSelected(plan.id)}><div><h3>{plan.nome}</h3><p>{plan.descricao || ((plan.dispositivos || 1) + ' dispositivo(s) · ' + duration(plan))}</p></div><div style={{ display: 'grid', justifyItems: 'end', gap: 8 }}><strong className="plan-price">{typeof plan.preco === 'number' ? 'R$ ' + plan.preco.toFixed(2).replace('.', ',') : 'Consultar'}</strong><button className="primary-button focus-tv" onClick={(event) => { event.stopPropagation(); setSelected(plan.id); }} data-testid={'button-select-plan-' + plan.id}>{selected === plan.id ? 'Selecionado' : 'Escolher'}</button></div></div>)}</div></> : <div className="empty-state"><Settings size={24} /><h3>Planos em configuração</h3><p>Quando os planos estiverem publicados, eles aparecerão aqui para checkout.</p></div>}</section><aside className="panel panel-pad"><div className="eyebrow">Pagamento seguro</div><h2 className="panel-title" style={{ marginTop: 9 }}>Checkout protegido</h2><p className="muted" style={{ fontSize: '.82rem', lineHeight: 1.65 }}>Pagamento com cartão ou Pix, processado com segurança direto por dentro do CineVito. Nenhum dado de cartão fica salvo nesta interface.</p>
+    {!user && <div className="notice notice-orange" style={{ marginTop: 16 }}><Info size={16} color="#ff8228" /><span>Entre na sua conta para continuar o checkout.</span><Link href="/" className="quiet-button focus-tv">Entrar</Link></div>}
+    {user && !selectedPlan && <div className="notice notice-orange" style={{ marginTop: 16 }}><Info size={16} color="#ff8228" /><span>Selecione um plano para continuar ao checkout seguro.</span></div>}
+    {user && selectedPlan && checkoutStatus !== 'approved' && <>
+      <div className="field" style={{ marginTop: 12 }}><label htmlFor="checkout-cupom">Cupom de desconto (opcional)</label><input id="checkout-cupom" className="input focus-tv" value={cupom} onChange={(event) => setCupom(event.target.value.toUpperCase())} placeholder="Ex.: ANIVERSARIO10" /></div>
+      {checkoutStatus === 'loading' && <p className="muted" style={{ fontSize: '.8rem', marginTop: 10 }}>Carregando checkout seguro...</p>}
+      {checkoutStatus !== 'pending' && <div id="payment-brick-container" style={{ marginTop: 12 }} />}
+    </>}
+    {checkoutMessage && <div className={checkoutStatus === 'approved' ? 'notice notice-cyan' : checkoutStatus === 'pending' ? 'notice notice-cyan' : 'notice notice-orange'} style={{ marginTop: 16 }}>{checkoutStatus === 'approved' ? <Check size={16} /> : <Info size={16} />}<span>{checkoutMessage}</span></div>}
+    {checkoutStatus === 'pending' && pix?.copiaCola && <div className="notice notice-cyan" style={{ marginTop: 12, display: 'block' }}><strong>Pague com Pix</strong>{pix.qrBase64 && <img src={`data:image/png;base64,${pix.qrBase64}`} alt="QR Code Pix" style={{ width: 180, marginTop: 10, display: 'block' }} />}<p className="muted" style={{ fontSize: '.72rem', marginTop: 8, wordBreak: 'break-all' }}>{pix.copiaCola}</p><button className="secondary-button focus-tv" style={{ marginTop: 8 }} onClick={() => navigator.clipboard?.writeText(pix.copiaCola || '')}>Copiar código Pix</button></div>}
+    {checkoutStatus === 'approved' && <Link href="/catalogo" className="primary-button focus-tv" style={{ marginTop: 12 }}>Ir para o catálogo</Link>}
+  </aside></div></div>;
 }
 function SuggestionPage() {
   const [form, setForm] = useState({ titulo: '', mensagem: '' });
