@@ -11,8 +11,8 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import {
-  checkCatalogAccess, clearSession, fetchAdminClients, fetchAdminPlans, fetchAdminVideos, fetchPlans, fetchProfile, fetchVideos, getAccessToken, getStoredUser, grantAccess, hasRuntimeConfig,
-  invokeCatalogSync, invokeVerifier, processPayment, requestPasswordReset, revokeAccess, signIn, signUp, submitSuggestion, updatePlanActive, type Cliente, type Plan, type SessionUser, type Video,
+  checkCatalogAccess, clearSession, fetchAdminClients, fetchAdminPlans, fetchAdminVideos, fetchMySubscription, fetchPlans, fetchProfile, fetchVideos, getAccessToken, getStoredUser, grantAccess, hasRuntimeConfig,
+  invokeCatalogSync, invokeVerifier, processPayment, requestPasswordReset, revokeAccess, signIn, signUp, submitSuggestion, updatePlanActive, type Cliente, type MinhaAssinatura, type Plan, type SessionUser, type Video,
 } from '@/lib/cinevito-client';
 import '@/index.css';
 const queryClient = new QueryClient();
@@ -67,8 +67,6 @@ function useAuth() {
   }, []);
   return user;
 }
-// Retorna null enquanto ainda não sabe, true/false depois de checar.
-// Sem usuário logado, já resolve como false sem precisar consultar nada.
 function useCatalogAccess(user: SessionUser | null) {
   const [access, setAccess] = useState<boolean | null>(null);
   useEffect(() => {
@@ -107,6 +105,13 @@ function AppShell({ children }: { children: ReactNode }) {
       .catch(() => { if (!cancelled) setIsAdmin(false); });
     return () => { cancelled = true; };
   }, [user]);
+  // Se a sessão cair enquanto a pessoa está numa página que exige
+  // login (qualquer uma além da entrada), leva ela de volta pra lá.
+  useEffect(() => {
+    if (!user && location !== '/' && location !== '/index.html') {
+      setLocation('/');
+    }
+  }, [user, location]);
   const isHome = location === '/' || location === '/index.html';
   const active = (href: string) => location === href || location === `${href}.html` || (href === '/catalogo' && location.startsWith('/player'));
   async function logout() {
@@ -325,12 +330,24 @@ function CollectionPage() {
   }
   return <div className="content-wrap page-main"><PageHeader eyebrow="O que você guardou" title="Minha coleção" description="Seus títulos favoritos em um só lugar, prontos para a próxima sessão." />{collection.length ? <div className="video-grid">{collection.map((video) => <Poster key={video.id} video={video} favorite onFavorite={() => remove(video.id)} onOpen={() => openVideo(video.id)} />)}</div> : <div className="empty-state" data-testid="status-collection-empty"><Heart size={27} /><h3>Ainda está vazio</h3><p>Use o coração nos títulos do catálogo para montar sua coleção.</p><Link href="/catalogo" className="primary-button focus-tv" data-testid="link-collection-catalog">Explorar catálogo</Link></div>}</div>;
 }
+function subscriptionLabel(sub: MinhaAssinatura | null): { status: string; origem: string } {
+  if (!sub) return { status: 'Sem plano', origem: 'Nenhuma assinatura registrada ainda.' };
+  const status = sub.status === 'ativa' ? 'Ativa' : sub.status === 'trial' ? 'Teste grátis' : sub.status === 'pendente' ? 'Pagamento em análise' : 'Inativa';
+  let origem = 'Pagamento confirmado.';
+  if (sub.plano?.startsWith('Indicação')) origem = 'Recompensa do programa de indicação.';
+  else if (sub.concedido_por_admin) origem = sub.motivo_concessao ? `Cortesia concedida pelo admin — ${sub.motivo_concessao}` : 'Cortesia concedida pelo admin.';
+  else if (sub.status === 'trial') origem = 'Teste grátis de novo cadastro.';
+  else if (!sub.id_pagamento_gateway) origem = 'Sem pagamento registrado.';
+  return { status, origem };
+}
 function ProfilePage() {
   const user = useAuth();
   const [profile, setProfile] = useState<{ nome?: string; email?: string; codigo_indicacao?: string } | null>(null);
+  const [subscription, setSubscription] = useState<MinhaAssinatura | null>(null);
   const [copied, setCopied] = useState(false);
-  useEffect(() => { if (hasRuntimeConfig && user) fetchProfile().then(setProfile).catch(() => setProfile(null)); }, [user]);
+  useEffect(() => { if (hasRuntimeConfig && user) { fetchProfile().then(setProfile).catch(() => setProfile(null)); fetchMySubscription().then(setSubscription).catch(() => setSubscription(null)); } }, [user]);
   const name = profile?.nome || titleCaseName(user);
+  const { status, origem } = subscriptionLabel(subscription);
   async function copyReferral() {
     const code = profile?.codigo_indicacao;
     if (!code) return;
@@ -338,7 +355,7 @@ function ProfilePage() {
     setCopied(true);
     window.setTimeout(() => setCopied(false), 2200);
   }
-  return <div className="content-wrap page-main"><PageHeader eyebrow="Sua conta" title="Perfil" description="Gerencie seus dados, sua assinatura e o acesso do CineVito." /><div className="two-col"><section className="panel panel-pad"><div className="profile-hero"><div className="profile-avatar">{initials(user)}</div><div><h1>{name}</h1><p data-testid="text-profile-email">{profile?.email || user?.email || 'Sessão local'}</p></div></div><div className="status-card" data-testid="status-profile-subscription"><h3>Acesso ao CineVito</h3><p>{user ? 'Sua conta está pronta para continuar assistindo em seus dispositivos.' : 'Entre para consultar sua assinatura.'}</p><Link href="/assinatura" className="primary-button focus-tv" style={{ width: 'fit-content', marginTop: 7 }} data-testid="link-profile-subscription">Ver assinatura</Link></div></section><section className="panel panel-pad"><h2 className="panel-title">Seu código de indicação</h2>{profile?.codigo_indicacao ? <><p className="muted" style={{ fontSize: '.8rem', lineHeight: 1.5 }}>Compartilhe o link. A indicação só é confirmada depois que a pessoa fizer um pagamento.</p><div className="code-box"><code data-testid="text-referral-code">{profile.codigo_indicacao}</code><button className="icon-button focus-tv" onClick={copyReferral} aria-label="Copiar link de indicação" data-testid="button-copy-referral">{copied ? <Check size={16} /> : <Copy size={16} />}</button></div><p className="muted" style={{ fontSize: '.72rem', marginBottom: 0 }}>{copied ? 'Link copiado.' : 'Não há campanha ativa no momento? Seu código continua válido.'}</p></> : <div className="notice notice-cyan"><Info size={16} /><span>Seu código aparece aqui depois do primeiro pagamento aprovado.</span></div>}</section></div></div>;
+  return <div className="content-wrap page-main"><PageHeader eyebrow="Sua conta" title="Perfil" description="Gerencie seus dados, sua assinatura e o acesso do CineVito." /><div className="two-col"><section className="panel panel-pad"><div className="profile-hero"><div className="profile-avatar">{initials(user)}</div><div><h1>{name}</h1><p data-testid="text-profile-email">{profile?.email || user?.email || 'Sessão local'}</p></div></div><div className="status-card" data-testid="status-profile-subscription"><h3>Acesso ao CineVito</h3>{subscription ? <><p><strong>{subscription.plano || 'Plano'}</strong> · {status}</p><p className="muted" style={{ fontSize: '.8rem' }}>{origem}</p>{subscription.data_expiracao && <p className="muted" style={{ fontSize: '.8rem' }}>Válido até {new Date(subscription.data_expiracao).toLocaleDateString('pt-BR')}</p>}</> : <p>{user ? 'Você ainda não tem nenhuma assinatura registrada.' : 'Entre para consultar sua assinatura.'}</p>}<Link href="/assinatura" className="primary-button focus-tv" style={{ width: 'fit-content', marginTop: 7 }} data-testid="link-profile-subscription">Ver assinatura</Link></div></section><section className="panel panel-pad"><h2 className="panel-title">Seu código de indicação</h2>{profile?.codigo_indicacao ? <><p className="muted" style={{ fontSize: '.8rem', lineHeight: 1.5 }}>Compartilhe o link. A indicação só é confirmada depois que a pessoa fizer um pagamento.</p><div className="code-box"><code data-testid="text-referral-code">{profile.codigo_indicacao}</code><button className="icon-button focus-tv" onClick={copyReferral} aria-label="Copiar link de indicação" data-testid="button-copy-referral">{copied ? <Check size={16} /> : <Copy size={16} />}</button></div><p className="muted" style={{ fontSize: '.72rem', marginBottom: 0 }}>{copied ? 'Link copiado.' : 'Não há campanha ativa no momento? Seu código continua válido.'}</p></> : <div className="notice notice-cyan"><Info size={16} /><span>Seu código aparece aqui depois do primeiro pagamento aprovado.</span></div>}</section></div></div>;
 }
 function loadMercadoPagoSdk(): Promise<void> {
   if ((window as unknown as { MercadoPago?: unknown }).MercadoPago) return Promise.resolve();
