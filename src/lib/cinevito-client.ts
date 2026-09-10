@@ -18,6 +18,8 @@ export type Video = {
   fonte?: string | null;
   licenca?: string | null;
 };
+export type Categoria = { id: string; nome: string; slug?: string | null; ordem?: number | null };
+export type Genero = { id: string; nome: string; ordem?: number | null };
 export type Plan = {
   id: string;
   nome: string;
@@ -93,8 +95,6 @@ function saveSession(session: { access_token: string; refresh_token?: string; ex
   localStorage.removeItem(BACKGROUND_KEY);
   window.dispatchEvent(new Event('cinevito-auth-change'));
 }
-// Leva a pessoa de volta pra tela de entrada sempre que a sessão for
-// encerrada enquanto ela está numa página que exige login.
 function irParaEntrada() {
   if (typeof window === 'undefined') return;
   if (window.location.pathname !== '/' && window.location.pathname !== '/index.html') {
@@ -116,17 +116,10 @@ if (typeof document !== 'undefined') {
   });
   window.addEventListener('pageshow', checkBackgroundLogout);
   window.addEventListener('focus', checkBackgroundLogout);
-  // Marca "desde quando" a aba está sem interação, mesmo continuando
-  // visível o tempo todo — sem isso, deixar a aba aberta e parada
-  // nunca disparava o relógio de 3 minutos (só disparava ao trocar
-  // de aba/app). Qualquer clique/tecla/toque reinicia a contagem.
   const registrarAtividade = () => localStorage.setItem(BACKGROUND_KEY, String(Date.now()));
   ['click', 'keydown', 'touchstart', 'scroll'].forEach((evento) => {
     window.addEventListener(evento, registrarAtividade, { passive: true });
   });
-  // Confere sozinho, a cada 15 segundos, se os 3 minutos já passaram —
-  // funciona mesmo com a aba continuamente visível e sem depender de
-  // nenhum evento específico do navegador.
   window.setInterval(() => {
     if (isExpiredSession() && getStoredUser()) {
       clearSession();
@@ -194,27 +187,6 @@ export async function fetchProfile() {
   );
   return rows[0] || { nome: user.user_metadata?.nome || user.user_metadata?.name, email: user.email };
 }
-export async function invokeVerifier(url: string) {
-  const result = await request<{
-    links?: Array<{ url: string; status?: string; detalhe?: string; mensagem?: string; tipo?: string }>;
-    resultados?: Array<{ url: string; status?: string; detalhe?: string; mensagem?: string; tipo?: string }>;
-    total?: number;
-    linksEncontrados?: number;
-    error?: string;
-  }>(
-    '/functions/v1/verificar-videos',
-    { method: 'POST', body: JSON.stringify({ url }) },
-  );
-  const links = result.links ?? result.resultados ?? [];
-  return {
-    ...result,
-    total: result.total ?? result.linksEncontrados ?? links.length,
-    links: links.map((item) => ({
-      ...item,
-      detalhe: item.detalhe ?? item.mensagem,
-    })),
-  };
-}
 export async function submitSuggestion(payload: { titulo: string; mensagem: string }) {
   return request('/rest/v1/sugestoes_filmes', {
     method: 'POST',
@@ -237,12 +209,29 @@ export async function processPayment(payload: { usuario_id: string; plano_id: st
 export async function fetchAdminPlans(): Promise<Plan[]> { return request<Plan[]>('/rest/v1/planos?select=*&order=ordem.asc,preco.asc'); }
 export async function updatePlanActive(id: string, ativo: boolean) { return request('/rest/v1/planos?id=eq.' + encodeURIComponent(id), { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ ativo }) }); }
 export async function fetchAdminVideos(): Promise<Video[]> { return request<Video[]>('/rest/v1/videos?select=*&order=criado_em.desc'); }
-export async function invokeCatalogSync(query = '') { return request<{ found: number; added: number; updated: number; titles: string[] }>('/functions/v1/sincronizar-catalogo', { method: 'POST', body: JSON.stringify({ query }) }); }
 export async function requestPasswordReset(email: string) {
   return request('/auth/v1/recover', {
     method: 'POST',
     body: JSON.stringify({ email, redirect_to: `${window.location.origin}/redefinir-senha` }),
   });
+}
+
+// ================= CATÁLOGO MANUAL (Vídeos) =================
+
+export async function fetchCategorias(): Promise<Categoria[]> {
+  return request<Categoria[]>('/rest/v1/categorias?select=*&order=ordem.asc');
+}
+export async function fetchGenerosList(): Promise<Genero[]> {
+  return request<Genero[]>('/rest/v1/generos?select=*&order=ordem.asc');
+}
+export async function adminCreateVideo(payload: Partial<Video>) {
+  return request('/rest/v1/videos', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(payload) });
+}
+export async function adminUpdateVideo(id: string, payload: Partial<Video>) {
+  return request('/rest/v1/videos?id=eq.' + encodeURIComponent(id), { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(payload) });
+}
+export async function adminDeleteVideo(id: string) {
+  return request('/rest/v1/videos?id=eq.' + encodeURIComponent(id), { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
 }
 
 // ================= CRM: Clientes =================
@@ -304,9 +293,6 @@ export async function grantAccess(payload: { usuario_id: string; quantidade: num
   });
 }
 
-// Cancela o acesso do cliente: marca como "inativa" qualquer assinatura
-// dele que esteja "ativa" ou em "trial". Não apaga nada, só desliga o
-// acesso — o histórico da assinatura continua registrado no banco.
 export async function revokeAccess(usuario_id: string) {
   const emUso = await request<Array<{ id: string }>>(
     `/rest/v1/assinaturas?select=id&usuario_id=eq.${encodeURIComponent(usuario_id)}&status=in.(ativa,trial)`,
@@ -351,9 +337,6 @@ export async function checkCatalogAccess(): Promise<boolean> {
   return false;
 }
 
-// Busca a assinatura mais recente da pessoa logada, pra mostrar no
-// Perfil qual é o plano dela, a validade, e a origem (pago, cortesia
-// concedida pelo admin, ou recompensa de indicação).
 export async function fetchMySubscription(): Promise<MinhaAssinatura | null> {
   const user = getStoredUser();
   if (!user) return null;
