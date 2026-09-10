@@ -11,21 +11,12 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import {
-  checkCatalogAccess, clearSession, fetchAdminClients, fetchAdminPlans, fetchAdminVideos, fetchMySubscription, fetchPlans, fetchProfile, fetchVideos, getAccessToken, getStoredUser, grantAccess, hasRuntimeConfig,
-  invokeCatalogSync, invokeVerifier, processPayment, requestPasswordReset, revokeAccess, signIn, signUp, submitSuggestion, updatePlanActive, type Cliente, type MinhaAssinatura, type Plan, type SessionUser, type Video,
+  adminCreateVideo, adminDeleteVideo, adminUpdateVideo, checkCatalogAccess, clearSession, fetchAdminClients, fetchAdminPlans, fetchAdminVideos, fetchCategorias, fetchGenerosList, fetchMySubscription, fetchPlans, fetchProfile, fetchVideos, getAccessToken, getStoredUser, grantAccess, hasRuntimeConfig,
+  processPayment, requestPasswordReset, revokeAccess, signIn, signUp, submitSuggestion, updatePlanActive, type Categoria, type Cliente, type Genero, type MinhaAssinatura, type Plan, type SessionUser, type Video,
 } from '@/lib/cinevito-client';
 import '@/index.css';
 const queryClient = new QueryClient();
 const MP_PUBLIC_KEY = 'APP_USR-471c3a9b-ff0f-4743-a417-e54b9f13e902';
-const fallbackVideos: Video[] = [
-  { id: 'meio-acre-da-natureza', titulo: 'Meio Acre da Natureza', genero: 'Natureza', categoria: 'Natureza & Relaxamento', premium: false },
-  { id: 'a-noite-dos-mortos-vivos', titulo: 'A Noite dos Mortos Vivos', genero: 'Terror', categoria: 'Filmes Clássicos', premium: false },
-  { id: 'nada-como-uma-mulher', titulo: 'Nada Como uma Mulher', genero: 'Comédia', categoria: 'Filmes Clássicos', premium: false },
-  { id: 'o-planeta-em-transformacao', titulo: 'O Planeta em Transformação', genero: 'Documentário', categoria: 'Documentários', ano: 2021, premium: false },
-  { id: 'memorias-de-um-rio', titulo: 'Memórias de um Rio', genero: 'Documentário', categoria: 'Documentários', ano: 2022, premium: false },
-  { id: 'a-ultima-sessao', titulo: 'A Última Sessão', genero: 'Drama', categoria: 'Curtas-Metragens', ano: 2023, premium: false },
-  { id: 'entre-dois-mundos', titulo: 'Entre Dois Mundos', genero: 'Aventura', categoria: 'Curtas-Metragens', ano: 2024, premium: false },
-];
 const fallbackShelves = ['Início', 'Filmes Clássicos', 'Documentários', 'Curtas-Metragens'];
 const genres = ['Todos os gêneros', 'Ação', 'Aventura', 'Comédia', 'Documentário', 'Drama', 'Natureza', 'Terror'];
 function normalizeCatalogLabel(value: string | null | undefined) {
@@ -80,6 +71,22 @@ function useCatalogAccess(user: SessionUser | null) {
   }, [user?.id]);
   return access;
 }
+// Detecta o tipo de link colado (YouTube, Vimeo, Internet Archive ou
+// arquivo direto) e devolve o endereço certo pra tocar embutido, sem
+// nunca levar a pessoa pra fora do CineVito.
+function getEmbedInfo(url?: string | null): { type: 'file' | 'embed' | 'none'; src: string } {
+  if (!url) return { type: 'none', src: '' };
+  const trimmed = url.trim();
+  const yt = trimmed.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{6,})/);
+  if (yt) return { type: 'embed', src: `https://www.youtube.com/embed/${yt[1]}` };
+  const vimeo = trimmed.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+  if (vimeo) return { type: 'embed', src: `https://player.vimeo.com/video/${vimeo[1]}` };
+  const archive = trimmed.match(/archive\.org\/details\/([^/?#]+)/);
+  if (archive) return { type: 'embed', src: `https://archive.org/embed/${archive[1]}` };
+  if (trimmed.includes('archive.org/embed/')) return { type: 'embed', src: trimmed };
+  if (/\.(mp4|webm|ogv|m3u8)(\?|$)/i.test(trimmed)) return { type: 'file', src: trimmed };
+  return { type: 'embed', src: trimmed };
+}
 function ToastMessage({ message, onClose }: { message: string; onClose: () => void }) {
   return <div className="toast" role="status" data-testid="status-toast"><span>{message}</span><button className="icon-button" onClick={onClose} aria-label="Fechar aviso" data-testid="button-close-toast"><X size={15} /></button></div>;
 }
@@ -105,8 +112,6 @@ function AppShell({ children }: { children: ReactNode }) {
       .catch(() => { if (!cancelled) setIsAdmin(false); });
     return () => { cancelled = true; };
   }, [user]);
-  // Se a sessão cair enquanto a pessoa está numa página que exige
-  // login (qualquer uma além da entrada), leva ela de volta pra lá.
   useEffect(() => {
     if (!user && location !== '/' && location !== '/index.html') {
       setLocation('/');
@@ -241,15 +246,13 @@ function PageHeader({ eyebrow, title, description, action }: { eyebrow: string; 
 }
 function Poster({ video, favorite, onFavorite, onOpen }: { video: Video; favorite: boolean; onFavorite: () => void; onOpen: () => void }) {
   const poster = video.url_capa ? undefined : ({
-    '--poster': video.titulo.includes('Mortos') ? 'linear-gradient(145deg, #263a43, #11151f 54%, #cf552c)' :
-      video.titulo.includes('Mulher') ? 'linear-gradient(145deg, #202e47, #9c5a4c 48%, #e8b176)' :
-        'linear-gradient(145deg, #0d596c, #172532 50%, #e58d49)',
+    '--poster': 'linear-gradient(145deg, #0d596c, #172532 50%, #e58d49)',
   } as CSSProperties);
   return <article className="video-card reveal" data-testid={`card-video-${video.id}`}><div className="poster focus-tv" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen()} style={poster}><div className="poster-art" style={video.url_capa ? { backgroundImage: `url(${video.url_capa})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}><span className="poster-meta">{video.ano || 'CINEVITO'}</span><strong className="poster-word">{video.titulo}</strong></div>{video.premium && <span className="premium-badge">Premium</span>}<button className={`poster-favorite focus-tv ${favorite ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); onFavorite(); }} aria-label={favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'} data-testid={`button-favorite-${video.id}`}><Heart size={15} fill={favorite ? 'currentColor' : 'none'} /></button></div><div className="video-info"><div><h3 className="video-title" data-testid={`text-video-title-${video.id}`}>{video.titulo}</h3><p className="video-subtitle">{video.genero || video.categoria || 'Catálogo CineVito'}</p></div><Play size={14} color="#00c8ff" /></div></article>;
 }
 function useVideos() {
-  const [videos, setVideos] = useState<Video[]>(fallbackVideos); const [loading, setLoading] = useState(hasRuntimeConfig); const [error, setError] = useState('');
-  useEffect(() => { if (!hasRuntimeConfig) return; let cancelled = false; (async () => { try { const lastSync = Number(localStorage.getItem('cinevito-catalog-sync-at') || 0); if (getAccessToken() && Date.now() - lastSync > 15 * 60 * 1000) { await invokeCatalogSync(); localStorage.setItem('cinevito-catalog-sync-at', String(Date.now())); } const items = await fetchVideos(); if (!cancelled && items.length) setVideos(items); } catch (fetchError) { if (!cancelled) setError(fetchError instanceof Error ? fetchError.message : 'Não foi possível carregar o catálogo.'); } finally { if (!cancelled) setLoading(false); } })(); return () => { cancelled = true; }; }, []);
+  const [videos, setVideos] = useState<Video[]>([]); const [loading, setLoading] = useState(hasRuntimeConfig); const [error, setError] = useState('');
+  useEffect(() => { if (!hasRuntimeConfig) { setLoading(false); return; } let cancelled = false; (async () => { try { const items = await fetchVideos(); if (!cancelled) setVideos(items); } catch (fetchError) { if (!cancelled) setError(fetchError instanceof Error ? fetchError.message : 'Não foi possível carregar o catálogo.'); } finally { if (!cancelled) setLoading(false); } })(); return () => { cancelled = true; }; }, []);
   return { videos, loading, error };
 }
 function CatalogPage() {
@@ -287,11 +290,11 @@ function CatalogPage() {
     <div className="chip-row" aria-label="Filtrar por gênero">{genres.map((item) => <button key={item} className={`chip focus-tv ${genre === item ? 'active' : ''}`} onClick={() => setGenre(item)} data-testid={`button-genre-${item.toLowerCase().replaceAll(' ', '-')}`}>{item}</button>)}</div>
     {loading && <div className="video-grid" data-testid="status-catalog-loading">{Array.from({ length: 5 }).map((_, index) => <div className="skeleton" style={{ aspectRatio: '2/3' }} key={index} />)}</div>}
     {error && <div className="notice notice-orange" role="alert" data-testid="status-catalog-error"><CircleAlert size={17} color="#ff8275" /><span>{error}</span><button className="quiet-button focus-tv" onClick={() => window.location.reload()} data-testid="button-retry-catalog"><RefreshCw size={15} />Tentar de novo</button></div>}
-    {!loading && !error && <section className="shelf"><div className="shelf-heading"><h2 className="section-title">{shelf === 'Início' ? 'Em destaque' : shelf}</h2><div className="section-rule" /><span>{filtered.length.toString().padStart(2, '0')} títulos</span></div>{filtered.length ? <div className="video-grid">{filtered.map((video) => <Poster key={video.id} video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} />)}</div> : <div className="empty-state" data-testid="status-catalog-empty"><Search size={25} /><h3>Nenhum título encontrado</h3><p>Tente outro termo ou limpe os filtros para voltar ao catálogo.</p><button className="quiet-button focus-tv" onClick={() => { setQuery(''); setGenre('Todos os gêneros'); setShelf('Início'); }} data-testid="button-clear-catalog-filters">Limpar filtros</button></div>}</section>}
+    {!loading && !error && <section className="shelf"><div className="shelf-heading"><h2 className="section-title">{shelf === 'Início' ? 'Em destaque' : shelf}</h2><div className="section-rule" /><span>{filtered.length.toString().padStart(2, '0')} títulos</span></div>{filtered.length ? <div className="video-grid">{filtered.map((video) => <Poster key={video.id} video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} />)}</div> : <div className="empty-state" data-testid="status-catalog-empty"><Search size={25} /><h3>{videos.length ? 'Nenhum título encontrado' : 'Catálogo ainda vazio'}</h3><p>{videos.length ? 'Tente outro termo ou limpe os filtros para voltar ao catálogo.' : 'Os títulos aparecem aqui assim que forem cadastrados no painel administrativo.'}</p>{videos.length > 0 && <button className="quiet-button focus-tv" onClick={() => { setQuery(''); setGenre('Todos os gêneros'); setShelf('Início'); }} data-testid="button-clear-catalog-filters">Limpar filtros</button>}</div>}</section>}
   </div>;
 }
 function findVideo(videos: Video[], id: string) {
-  return videos.find((video) => video.id === id) || fallbackVideos.find((video) => video.id === id) || fallbackVideos[0];
+  return videos.find((video) => video.id === id);
 }
 function PlayerPage() {
   const params = useParams<{ id: string }>();
@@ -303,15 +306,22 @@ function PlayerPage() {
     if (access === false) setLocation('/assinatura');
   }, [access]);
   const video = findVideo(videos, params.id || new URLSearchParams(window.location.search).get('id') || '');
-  const [saved, setSaved] = useState(() => JSON.parse(localStorage.getItem('cinevito-favorites') || '[]').includes(video.id));
+  const [saved, setSaved] = useState(() => JSON.parse(localStorage.getItem('cinevito-favorites') || '[]').includes(video?.id));
   function toggle() {
+    if (!video) return;
     const current: string[] = JSON.parse(localStorage.getItem('cinevito-favorites') || '[]');
     const next = current.includes(video.id) ? current.filter((id) => id !== video.id) : [...current, video.id];
     localStorage.setItem('cinevito-favorites', JSON.stringify(next));
     setSaved(!saved);
   }
   if (loading || access === null || access === false) return <div className="content-wrap page-main"><div className="skeleton" style={{ aspectRatio: '16/9' }} /></div>;
-  return <div className="content-wrap page-main"><button className="quiet-button focus-tv" onClick={() => setLocation('/catalogo')} data-testid="button-back-catalog"><ArrowLeft size={16} />Voltar ao catálogo</button><div className="player-stage" style={{ marginTop: 17 }}><div className="player-box">{video.url_video ? <video src={video.url_video} controls playsInline data-testid="video-player" /> : <div className="player-idle"><Play size={38} /><strong>Pronto para assistir</strong><span>O endereço do vídeo será carregado quando o catálogo estiver conectado ao backend.</span></div>}</div><div className="player-details"><div><div className="eyebrow">{video.genero || video.categoria || 'CineVito'} {video.ano ? ` / ${video.ano}` : ''}</div><h1 className="section-title" style={{ marginTop: 7 }} data-testid="text-player-title">{video.titulo}</h1><p>{video.descricao || 'Este título faz parte do catálogo CineVito.'}</p></div><div className="player-actions"><button className={`secondary-button focus-tv ${saved ? 'active' : ''}`} onClick={toggle} data-testid="button-player-favorite"><Heart size={15} fill={saved ? 'currentColor' : 'none'} />{saved ? 'Na coleção' : 'Salvar'}</button>{!user && <Link href="/" className="primary-button focus-tv" data-testid="link-player-login">Entrar</Link>}</div></div></div></div>;
+  if (!video) return <div className="content-wrap page-main"><div className="empty-state"><CircleAlert size={26} /><h3>Vídeo não encontrado</h3><p>Esse título não está mais disponível no catálogo.</p><Link href="/catalogo" className="primary-button focus-tv">Voltar ao catálogo</Link></div></div>;
+  const embed = getEmbedInfo(video.url_video);
+  return <div className="content-wrap page-main"><button className="quiet-button focus-tv" onClick={() => setLocation('/catalogo')} data-testid="button-back-catalog"><ArrowLeft size={16} />Voltar ao catálogo</button><div className="player-stage" style={{ marginTop: 17 }}><div className="player-box">
+    {embed.type === 'file' && <video src={embed.src} controls playsInline data-testid="video-player" style={{ width: '100%', height: '100%' }} />}
+    {embed.type === 'embed' && <iframe src={embed.src} title={video.titulo} allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowFullScreen style={{ width: '100%', height: '100%', border: 0 }} data-testid="video-player" />}
+    {embed.type === 'none' && <div className="player-idle"><Play size={38} /><strong>Pronto para assistir</strong><span>Este título ainda não tem um link de vídeo cadastrado.</span></div>}
+  </div><div className="player-details"><div><div className="eyebrow">{video.genero || video.categoria || 'CineVito'} {video.ano ? ` / ${video.ano}` : ''}</div><h1 className="section-title" style={{ marginTop: 7 }} data-testid="text-player-title">{video.titulo}</h1><p>{video.descricao || 'Este título faz parte do catálogo CineVito.'}</p></div><div className="player-actions"><button className={`secondary-button focus-tv ${saved ? 'active' : ''}`} onClick={toggle} data-testid="button-player-favorite"><Heart size={15} fill={saved ? 'currentColor' : 'none'} />{saved ? 'Na coleção' : 'Salvar'}</button></div></div></div></div>;
 }
 function CollectionPage() {
   const [, setLocation] = useLocation();
@@ -491,14 +501,86 @@ function FaqPage() {
   return <div className="content-wrap page-main"><PageHeader eyebrow="CineVito ajuda" title="Perguntas frequentes" description="Respostas rápidas para aproveitar melhor o seu acesso." /><div className="faq-list">{faqs.map(([question, answer], index) => <details className="faq-item" key={question} open={index === 0} data-testid={`faq-item-${index}`}><summary>{question}<ChevronDown size={17} /></summary><div className="faq-answer">{answer}</div></details>)}</div><div className="notice notice-cyan" style={{ maxWidth: 820, marginTop: 24 }}><Info size={17} /><span>Não encontrou a resposta? <a href="mailto:contatocinevito@gmail.com" style={{ color: '#56e0ff' }} data-testid="link-contact-email">contatocinevito@gmail.com</a></span></div></div>;
 }
 function AdminPage() {
-  const user = useAuth(); const [profile, setProfile] = useState<{ is_admin?: boolean; admin_master?: boolean } | null>(null); const [tab, setTab] = useState('catalogo'); const [loading, setLoading] = useState(Boolean(user && hasRuntimeConfig)); const [busy, setBusy] = useState(false); const [query, setQuery] = useState('O Justiceiro'); const [message, setMessage] = useState(''); const [syncResult, setSyncResult] = useState<{ found?: number; added?: number; updated?: number; titles?: string[] } | null>(null); const [plans, setPlans] = useState<Plan[]>([]); const [videos, setVideos] = useState<Video[]>([]); const [url, setUrl] = useState('https://www.pobreflixtv.city/'); const [verifyBusy, setVerifyBusy] = useState(false); const [verifyResult, setVerifyResult] = useState<{ links?: Array<{ url: string; status?: string; detalhe?: string; tipo?: string }>; total?: number } | null>(null);
+  const user = useAuth(); const [profile, setProfile] = useState<{ is_admin?: boolean; admin_master?: boolean } | null>(null); const [tab, setTab] = useState('videos'); const [loading, setLoading] = useState(Boolean(user && hasRuntimeConfig)); const [message, setMessage] = useState('');
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [videos, setVideos] = useState<Video[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [generos, setGeneros] = useState<Genero[]>([]);
+  const [videoForm, setVideoForm] = useState({ url_video: '', titulo: '', descricao: '', categoria_id: '', genero: '', url_capa: '', licenca: '', ano: '' });
+  const [editingVideoId, setEditingVideoId] = useState<string | null>(null);
+  const [savingVideo, setSavingVideo] = useState(false);
+  const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
   const [clients, setClients] = useState<Cliente[]>([]);
   const [grantTarget, setGrantTarget] = useState<Cliente | null>(null);
   const [grantForm, setGrantForm] = useState<{ quantidade: number; unidade: 'dias' | 'meses'; motivo: string }>({ quantidade: 30, unidade: 'dias', motivo: '' });
   const [grantBusy, setGrantBusy] = useState(false);
   const [revokeBusyId, setRevokeBusyId] = useState<string | null>(null);
   useEffect(() => { if (!user || !hasRuntimeConfig) return; fetchProfile().then((value) => setProfile(value as { is_admin?: boolean; admin_master?: boolean })).catch(() => setProfile(null)).finally(() => setLoading(false)); }, [user]);
-  async function loadPlans() { try { setPlans(await fetchAdminPlans()); } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível carregar os planos.'); } } async function loadVideos() { try { setVideos(await fetchAdminVideos()); } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível carregar o catálogo.'); } }
+
+  async function loadVideos() { try { setVideos(await fetchAdminVideos()); } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível carregar o catálogo.'); } }
+  async function loadCategoriasEGeneros() {
+    try { const [cats, gens] = await Promise.all([fetchCategorias(), fetchGenerosList()]); setCategorias(cats); setGeneros(gens); } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível carregar categorias/gêneros.'); }
+  }
+  function resetVideoForm() {
+    setVideoForm({ url_video: '', titulo: '', descricao: '', categoria_id: '', genero: '', url_capa: '', licenca: '', ano: '' });
+    setEditingVideoId(null);
+  }
+  function editVideo(video: Video) {
+    setEditingVideoId(video.id);
+    setVideoForm({
+      url_video: video.url_video || '',
+      titulo: video.titulo || '',
+      descricao: video.descricao || '',
+      categoria_id: video.categoria_id || '',
+      genero: video.genero || '',
+      url_capa: video.url_capa || '',
+      licenca: video.licenca || '',
+      ano: video.ano ? String(video.ano) : '',
+    });
+  }
+  async function saveVideo() {
+    setMessage('');
+    if (!videoForm.url_video.trim() || !videoForm.titulo.trim()) {
+      setMessage('Preencha ao menos o link do vídeo e o título.');
+      return;
+    }
+    setSavingVideo(true);
+    const payload: Partial<Video> = {
+      url_video: videoForm.url_video.trim(),
+      titulo: videoForm.titulo.trim(),
+      descricao: videoForm.descricao.trim() || null,
+      categoria_id: videoForm.categoria_id || null,
+      genero: videoForm.genero || null,
+      url_capa: videoForm.url_capa.trim() || null,
+      licenca: videoForm.licenca.trim() || null,
+      ano: videoForm.ano ? Number(videoForm.ano) : null,
+      fonte: 'Cadastrado manualmente',
+    };
+    try {
+      if (editingVideoId) await adminUpdateVideo(editingVideoId, payload);
+      else await adminCreateVideo(payload);
+      resetVideoForm();
+      await loadVideos();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Não foi possível salvar o vídeo.');
+    } finally {
+      setSavingVideo(false);
+    }
+  }
+  async function deleteVideo(id: string) {
+    if (!window.confirm('Apagar este vídeo do catálogo?')) return;
+    setDeletingVideoId(id);
+    try {
+      await adminDeleteVideo(id);
+      await loadVideos();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Não foi possível apagar o vídeo.');
+    } finally {
+      setDeletingVideoId(null);
+    }
+  }
+
+  async function loadPlans() { try { setPlans(await fetchAdminPlans()); } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível carregar os planos.'); } }
   async function loadClients() { try { setClients(await fetchAdminClients()); } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível carregar os clientes.'); } }
   function openGrant(client: Cliente) { setGrantTarget(client); setGrantForm({ quantidade: 30, unidade: 'dias', motivo: '' }); }
   function closeGrant() { setGrantTarget(null); }
@@ -530,10 +612,32 @@ function AdminPage() {
       setRevokeBusyId(null);
     }
   }
-  async function syncCatalog() { setBusy(true); setMessage(''); setSyncResult(null); try { const result = await invokeCatalogSync(query); setSyncResult(result); await loadVideos(); setMessage((result.added || 0) + ' novos títulos e ' + (result.updated || 0) + ' atualizados.'); } catch (error) { setMessage(error instanceof Error ? error.message : 'Falha ao sincronizar o catálogo.'); } finally { setBusy(false); } }
-  async function togglePlan(plan: Plan) { try { await updatePlanActive(plan.id, !plan.ativo); await loadPlans(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível atualizar o plano.'); } } async function verify(event: FormEvent) { event.preventDefault(); setVerifyBusy(true); setVerifyResult(null); try { setVerifyResult(await invokeVerifier(url)); } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível executar o verificador.'); } finally { setVerifyBusy(false); } }
+  async function togglePlan(plan: Plan) { try { await updatePlanActive(plan.id, !plan.ativo); await loadPlans(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível atualizar o plano.'); } }
+
   if (!user) return <LockedPage title="Área administrativa" description="Entre com uma conta autorizada para acessar este painel." />; if (!hasRuntimeConfig) return <div className="content-wrap page-main"><PageHeader eyebrow="Administração" title="Área protegida" description="O painel administrativo precisa da configuração do Supabase." /><div className="notice notice-orange"><KeyRound size={17} color="#ff8228" /><span>Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no Netlify.</span></div></div>; if (loading) return <div className="content-wrap page-main"><PageHeader eyebrow="Administração" title="Verificando acesso" description="Confirmando as permissões da sua conta." /><div className="skeleton" style={{ height: 120 }} /></div>; if (!profile?.is_admin) return <LockedPage title="Acesso restrito" description="Esta área é exclusiva para administradores CineVito." />;
-  const tabs = ['catalogo', 'clientes', 'planos', 'verificar']; return <div className="content-wrap page-main"><PageHeader eyebrow="Painel protegido" title="Administração" description={profile.admin_master ? 'Controle completo do catálogo e dos planos CineVito.' : 'Gerencie as ferramentas liberadas para sua equipe.'} /><div className="admin-tabs" role="tablist">{tabs.map((item) => <button key={item} className={'admin-tab focus-tv ' + (tab === item ? 'active' : '')} onClick={() => { setTab(item); if (item === 'catalogo') loadVideos(); if (item === 'planos') loadPlans(); if (item === 'clientes') loadClients(); }} role="tab" aria-selected={tab === item}>{item === 'catalogo' ? 'Catálogo' : item[0].toUpperCase() + item.slice(1)}</button>)}</div>{message && <div className="notice notice-orange" role="status">{message}</div>}{tab === 'catalogo' && <section className="panel panel-pad"><div className="eyebrow">Fonte externa</div><h2 className="panel-title" style={{ marginTop: 8 }}>Sincronizar PobreFlixTV</h2><p className="muted" style={{ fontSize: '.82rem', lineHeight: 1.6 }}>A sincronização procura títulos atuais, inclusive buscas específicas como O Justiceiro, e atualiza pôster, ano e página de origem no catálogo.</p><div className="verifier-form"><div className="field" style={{ marginBottom: 0, flex: 1 }}><label htmlFor="catalog-sync-query">Busca opcional</label><input id="catalog-sync-query" className="input focus-tv" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="O Justiceiro" /></div><button className="primary-button focus-tv" onClick={syncCatalog} disabled={busy}><RefreshCw size={16} />{busy ? 'Sincronizando...' : 'Sincronizar catálogo'}</button></div>{syncResult && <div className="notice notice-cyan" style={{ marginTop: 16 }}><Check size={17} /><span>{syncResult.found || 0} encontrados. {syncResult.titles?.slice(0, 5).join(', ')}</span></div>}<div className="admin-list" style={{ marginTop: 18 }}>{videos.length ? videos.slice(0, 30).map((video) => <div className="result-row" key={video.id}><span><strong>{video.titulo}</strong><small style={{ display: 'block', color: '#96a0af', marginTop: 3 }}>{video.fonte || 'Catálogo'} · {video.ano || 'sem ano'}</small></span><span className="muted">{video.genero || 'sem categoria'}</span></div>) : <button className="secondary-button focus-tv" onClick={loadVideos}>Carregar catálogo</button>}</div></section>}{tab === 'clientes' && <section className="panel panel-pad"><div className="eyebrow">CRM</div><h2 className="panel-title" style={{ marginTop: 8 }}>Clientes</h2><p className="muted" style={{ fontSize: '.82rem', lineHeight: 1.6 }}>Lista de clientes cadastrados. "Conceder acesso" soma tempo sem passar pelo Mercado Pago. "Cancelar acesso" desativa a assinatura imediatamente.</p>{grantTarget && <div className="notice notice-cyan" style={{ marginTop: 14, display: 'block' }}><strong>Conceder acesso para: {grantTarget.nome || grantTarget.email}</strong><div className="field" style={{ marginTop: 10 }}><label htmlFor="grant-quantidade">Quantidade</label><input id="grant-quantidade" type="number" min={1} className="input focus-tv" value={grantForm.quantidade} onChange={(event) => setGrantForm({ ...grantForm, quantidade: Number(event.target.value) || 1 })} /></div><div className="field"><label htmlFor="grant-unidade">Unidade</label><select id="grant-unidade" className="input focus-tv" value={grantForm.unidade} onChange={(event) => setGrantForm({ ...grantForm, unidade: event.target.value as 'dias' | 'meses' })}><option value="dias">Dias</option><option value="meses">Meses</option></select></div><div className="field"><label htmlFor="grant-motivo">Motivo (fica registrado)</label><input id="grant-motivo" className="input focus-tv" value={grantForm.motivo} onChange={(event) => setGrantForm({ ...grantForm, motivo: event.target.value })} placeholder="Ex.: cortesia, indicação premiada..." /></div><button className="primary-button focus-tv" onClick={confirmGrant} disabled={grantBusy}>{grantBusy ? 'Concedendo...' : 'Conceder acesso'}</button><button className="quiet-button focus-tv" style={{ marginLeft: 10 }} onClick={closeGrant}>Cancelar</button></div>}<div className="admin-list" style={{ marginTop: 18 }}>{clients.length ? clients.map((client) => { const status = client.assinatura?.status === 'ativa' ? 'Assinante' : client.assinatura?.status === 'trial' ? 'Teste grátis' : client.assinatura?.status ? 'Inativo' : 'Sem plano'; const validade = client.assinatura?.data_expiracao ? new Date(client.assinatura.data_expiracao).toLocaleDateString('pt-BR') : '-'; const podeCancelar = client.assinatura?.status === 'ativa' || client.assinatura?.status === 'trial'; return <div className="result-row" key={client.id}><span><strong>{client.nome || 'Sem nome'}</strong><small style={{ display: 'block', color: '#96a0af', marginTop: 3 }}>{client.email} · {status} · {client.assinatura?.plano || 'sem plano'} · até {validade}</small></span><span style={{ display: 'flex', gap: 8 }}>{podeCancelar && <button className="quiet-button focus-tv" onClick={() => handleRevoke(client)} disabled={revokeBusyId === client.id}>{revokeBusyId === client.id ? 'Cancelando...' : 'Cancelar acesso'}</button>}<button className="secondary-button focus-tv" onClick={() => openGrant(client)}>Conceder acesso</button></span></div>; }) : <button className="secondary-button focus-tv" onClick={loadClients}>Carregar clientes</button>}</div></section>}{tab === 'planos' && <section className="panel panel-pad"><div className="eyebrow">Admin master</div><h2 className="panel-title" style={{ marginTop: 8 }}>Planos publicados</h2>{!profile.admin_master ? <div className="notice notice-orange"><CircleAlert size={17} /><span>Apenas o admin master pode alterar a publicação dos planos.</span></div> : plans.length ? <div className="plan-list">{plans.map((plan) => <div className="plan-card" key={plan.id}><div><h3>{plan.nome}</h3><p>{plan.categoria || 'Sem categoria'} · R$ {Number(plan.preco || 0).toFixed(2).replace('.', ',')} · {plan.dispositivos || 1} dispositivo(s)</p></div><button className="secondary-button focus-tv" onClick={() => togglePlan(plan)}>{plan.ativo ? 'Desativar' : 'Ativar'}</button></div>)}</div> : <button className="secondary-button focus-tv" onClick={loadPlans}>Carregar planos</button>}</section>}{tab === 'verificar' && <section className="panel panel-pad"><div className="eyebrow">Ferramenta de integração</div><h2 className="panel-title" style={{ marginTop: 8 }}>Verificador de fontes</h2><form className="verifier-form" onSubmit={verify}><div className="field" style={{ marginBottom: 0, flex: 1 }}><label htmlFor="verify-url">URL da página</label><input id="verify-url" className="input focus-tv" type="url" value={url} onChange={(event) => setUrl(event.target.value)} /></div><button className="primary-button focus-tv" type="submit" disabled={verifyBusy}><RefreshCw size={16} />{verifyBusy ? 'Verificando...' : 'Verificar fontes'}</button></form>{verifyResult && <div className="verifier-results" style={{ marginTop: 16 }}><div className="notice notice-cyan"><Check size={17} /><span>{verifyResult.total || verifyResult.links?.length || 0} fonte(s) encontrada(s)</span></div>{verifyResult.links?.map((link, index) => <div className="result-row" key={link.url + index}><span style={{ overflowWrap: 'anywhere' }}>{link.url}</span><span>{link.status || link.detalhe || 'analisado'}</span></div>)}</div>}</section>}</div>;
+
+  const tabs = ['videos', 'clientes', 'planos'];
+  return <div className="content-wrap page-main"><PageHeader eyebrow="Painel protegido" title="Administração" description={profile.admin_master ? 'Controle completo do catálogo e dos planos CineVito.' : 'Gerencie as ferramentas liberadas para sua equipe.'} /><div className="admin-tabs" role="tablist">{tabs.map((item) => <button key={item} className={'admin-tab focus-tv ' + (tab === item ? 'active' : '')} onClick={() => { setTab(item); if (item === 'videos') { loadVideos(); loadCategoriasEGeneros(); } if (item === 'planos') loadPlans(); if (item === 'clientes') loadClients(); }} role="tab" aria-selected={tab === item}>{item[0].toUpperCase() + item.slice(1)}</button>)}</div>{message && <div className="notice notice-orange" role="status">{message}</div>}
+
+  {tab === 'videos' && <section className="panel panel-pad"><div className="eyebrow">Catálogo manual</div><h2 className="panel-title" style={{ marginTop: 8 }}>{editingVideoId ? 'Editar vídeo' : 'Adicionar vídeo'}</h2><p className="muted" style={{ fontSize: '.82rem', lineHeight: 1.6 }}>Cole o link do vídeo (YouTube, Vimeo, Internet Archive ou um arquivo .mp4 direto). Ele toca sempre dentro do CineVito, sem sair do app.</p>
+    <div className="field"><label htmlFor="v-url">Link do vídeo</label><input id="v-url" className="input focus-tv" value={videoForm.url_video} onChange={(e) => setVideoForm({ ...videoForm, url_video: e.target.value })} placeholder="https://..." /></div>
+    <div className="field"><label htmlFor="v-titulo">Título</label><input id="v-titulo" className="input focus-tv" value={videoForm.titulo} onChange={(e) => setVideoForm({ ...videoForm, titulo: e.target.value })} placeholder="Nome do filme/vídeo" /></div>
+    <div className="field"><label htmlFor="v-descricao">Sinopse</label><input id="v-descricao" className="input focus-tv" value={videoForm.descricao} onChange={(e) => setVideoForm({ ...videoForm, descricao: e.target.value })} placeholder="Uma linha sobre o vídeo" /></div>
+    <div className="field"><label htmlFor="v-categoria">Categoria</label><select id="v-categoria" className="input focus-tv" value={videoForm.categoria_id} onChange={(e) => setVideoForm({ ...videoForm, categoria_id: e.target.value })}><option value="">Selecione...</option>{categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select></div>
+    <div className="field"><label htmlFor="v-genero">Gênero</label><select id="v-genero" className="input focus-tv" value={videoForm.genero} onChange={(e) => setVideoForm({ ...videoForm, genero: e.target.value })}><option value="">Selecione...</option>{generos.map((g) => <option key={g.id} value={g.nome}>{g.nome}</option>)}</select></div>
+    <div className="field"><label htmlFor="v-capa">URL da capa (opcional)</label><input id="v-capa" className="input focus-tv" value={videoForm.url_capa} onChange={(e) => setVideoForm({ ...videoForm, url_capa: e.target.value })} placeholder="https://..." /></div>
+    <div className="field"><label htmlFor="v-licenca">Licença</label><input id="v-licenca" className="input focus-tv" value={videoForm.licenca} onChange={(e) => setVideoForm({ ...videoForm, licenca: e.target.value })} placeholder="Ex.: Domínio Público" /></div>
+    <div className="field"><label htmlFor="v-ano">Ano</label><input id="v-ano" type="number" className="input focus-tv" value={videoForm.ano} onChange={(e) => setVideoForm({ ...videoForm, ano: e.target.value })} placeholder="Ex.: 1968" /></div>
+    <button className="primary-button focus-tv" onClick={saveVideo} disabled={savingVideo}>{savingVideo ? 'Salvando...' : editingVideoId ? 'Salvar alterações' : 'Adicionar ao catálogo'}</button>
+    {editingVideoId && <button className="quiet-button focus-tv" style={{ marginLeft: 10 }} onClick={resetVideoForm}>Cancelar edição</button>}
+    <h3 style={{ marginTop: 26 }}>Vídeos cadastrados</h3>
+    <div className="admin-list" style={{ marginTop: 10 }}>{videos.length ? videos.map((video) => <div className="result-row" key={video.id}><span><strong>{video.titulo}</strong><small style={{ display: 'block', color: '#96a0af', marginTop: 3 }}>{video.genero || 'sem gênero'} · {video.ano || 'sem ano'}</small></span><span style={{ display: 'flex', gap: 8 }}><button className="quiet-button focus-tv" onClick={() => editVideo(video)}>Editar</button><button className="quiet-button focus-tv" onClick={() => deleteVideo(video.id)} disabled={deletingVideoId === video.id}>{deletingVideoId === video.id ? 'Apagando...' : 'Apagar'}</button></span></div>) : <p className="muted">Nenhum vídeo cadastrado ainda.</p>}</div>
+  </section>}
+
+  {tab === 'clientes' && <section className="panel panel-pad"><div className="eyebrow">CRM</div><h2 className="panel-title" style={{ marginTop: 8 }}>Clientes</h2><p className="muted" style={{ fontSize: '.82rem', lineHeight: 1.6 }}>Lista de clientes cadastrados. "Conceder acesso" soma tempo sem passar pelo Mercado Pago. "Cancelar acesso" desativa a assinatura imediatamente.</p>{grantTarget && <div className="notice notice-cyan" style={{ marginTop: 14, display: 'block' }}><strong>Conceder acesso para: {grantTarget.nome || grantTarget.email}</strong><div className="field" style={{ marginTop: 10 }}><label htmlFor="grant-quantidade">Quantidade</label><input id="grant-quantidade" type="number" min={1} className="input focus-tv" value={grantForm.quantidade} onChange={(event) => setGrantForm({ ...grantForm, quantidade: Number(event.target.value) || 1 })} /></div><div className="field"><label htmlFor="grant-unidade">Unidade</label><select id="grant-unidade" className="input focus-tv" value={grantForm.unidade} onChange={(event) => setGrantForm({ ...grantForm, unidade: event.target.value as 'dias' | 'meses' })}><option value="dias">Dias</option><option value="meses">Meses</option></select></div><div className="field"><label htmlFor="grant-motivo">Motivo (fica registrado)</label><input id="grant-motivo" className="input focus-tv" value={grantForm.motivo} onChange={(event) => setGrantForm({ ...grantForm, motivo: event.target.value })} placeholder="Ex.: cortesia, indicação premiada..." /></div><button className="primary-button focus-tv" onClick={confirmGrant} disabled={grantBusy}>{grantBusy ? 'Concedendo...' : 'Conceder acesso'}</button><button className="quiet-button focus-tv" style={{ marginLeft: 10 }} onClick={closeGrant}>Cancelar</button></div>}<div className="admin-list" style={{ marginTop: 18 }}>{clients.length ? clients.map((client) => { const status = client.assinatura?.status === 'ativa' ? 'Assinante' : client.assinatura?.status === 'trial' ? 'Teste grátis' : client.assinatura?.status ? 'Inativo' : 'Sem plano'; const validade = client.assinatura?.data_expiracao ? new Date(client.assinatura.data_expiracao).toLocaleDateString('pt-BR') : '-'; const podeCancelar = client.assinatura?.status === 'ativa' || client.assinatura?.status === 'trial'; return <div className="result-row" key={client.id}><span><strong>{client.nome || 'Sem nome'}</strong><small style={{ display: 'block', color: '#96a0af', marginTop: 3 }}>{client.email} · {status} · {client.assinatura?.plano || 'sem plano'} · até {validade}</small></span><span style={{ display: 'flex', gap: 8 }}>{podeCancelar && <button className="quiet-button focus-tv" onClick={() => handleRevoke(client)} disabled={revokeBusyId === client.id}>{revokeBusyId === client.id ? 'Cancelando...' : 'Cancelar acesso'}</button>}<button className="secondary-button focus-tv" onClick={() => openGrant(client)}>Conceder acesso</button></span></div>; }) : <button className="secondary-button focus-tv" onClick={loadClients}>Carregar clientes</button>}</div></section>}
+
+  {tab === 'planos' && <section className="panel panel-pad"><div className="eyebrow">Admin master</div><h2 className="panel-title" style={{ marginTop: 8 }}>Planos publicados</h2>{!profile.admin_master ? <div className="notice notice-orange"><CircleAlert size={17} /><span>Apenas o admin master pode alterar a publicação dos planos.</span></div> : plans.length ? <div className="plan-list">{plans.map((plan) => <div className="plan-card" key={plan.id}><div><h3>{plan.nome}</h3><p>{plan.categoria || 'Sem categoria'} · R$ {Number(plan.preco || 0).toFixed(2).replace('.', ',')} · {plan.dispositivos || 1} dispositivo(s)</p></div><button className="secondary-button focus-tv" onClick={() => togglePlan(plan)}>{plan.ativo ? 'Desativar' : 'Ativar'}</button></div>)}</div> : <button className="secondary-button focus-tv" onClick={loadPlans}>Carregar planos</button>}</section>}
+  </div>;
 }
 function LockedPage({ title, description }: { title: string; description: string }) {
   return <div className="content-wrap page-main"><div className="empty-state"><KeyRound size={28} /><h3>{title}</h3><p>{description}</p><Link href="/" className="primary-button focus-tv" style={{ marginTop: 12 }} data-testid="link-locked-login">Ir para entrada</Link></div></div>;
