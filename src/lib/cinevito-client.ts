@@ -20,6 +20,7 @@ export type Video = {
 };
 export type Categoria = { id: string; nome: string; slug?: string | null; ordem?: number | null };
 export type Genero = { id: string; nome: string; ordem?: number | null };
+export type Colecao = { id: string; titulo: string; slug?: string | null; descricao?: string | null; capa_url?: string | null; ordem?: number | null };
 export type Plan = {
   id: string;
   nome: string;
@@ -216,13 +217,29 @@ export async function requestPasswordReset(email: string) {
   });
 }
 
-// ================= CATÁLOGO MANUAL (Vídeos) =================
+// ================= CATÁLOGO MANUAL (Vídeos, Categorias, Gêneros) =================
+
+function slugify(value: string) {
+  return value
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
 
 export async function fetchCategorias(): Promise<Categoria[]> {
   return request<Categoria[]>('/rest/v1/categorias?select=*&order=ordem.asc');
 }
 export async function fetchGenerosList(): Promise<Genero[]> {
   return request<Genero[]>('/rest/v1/generos?select=*&order=ordem.asc');
+}
+export async function adminCreateCategoria(nome: string) {
+  const existentes = await fetchCategorias();
+  const proximaOrdem = existentes.length ? Math.max(...existentes.map((c) => c.ordem || 0)) + 1 : 1;
+  return request('/rest/v1/categorias', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ nome, slug: slugify(nome), ordem: proximaOrdem }) });
+}
+export async function adminCreateGenero(nome: string) {
+  const existentes = await fetchGenerosList();
+  const proximaOrdem = existentes.length ? Math.max(...existentes.map((g) => g.ordem || 0)) + 1 : 1;
+  return request('/rest/v1/generos', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ nome, ordem: proximaOrdem }) });
 }
 export async function adminCreateVideo(payload: Partial<Video>) {
   return request('/rest/v1/videos', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(payload) });
@@ -232,6 +249,61 @@ export async function adminUpdateVideo(id: string, payload: Partial<Video>) {
 }
 export async function adminDeleteVideo(id: string) {
   return request('/rest/v1/videos?id=eq.' + encodeURIComponent(id), { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+}
+
+// ================= COLEÇÕES (fileiras curadas manualmente, tipo "Top 10") =================
+
+export async function fetchColecoes(): Promise<Colecao[]> {
+  return request<Colecao[]>('/rest/v1/colecoes?select=*&order=ordem.asc');
+}
+export async function adminCreateColecao(payload: { titulo: string; descricao?: string; capa_url?: string }) {
+  const existentes = await fetchColecoes();
+  const proximaOrdem = existentes.length ? Math.max(...existentes.map((c) => c.ordem || 0)) + 1 : 1;
+  return request('/rest/v1/colecoes', {
+    method: 'POST',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      titulo: payload.titulo,
+      slug: slugify(payload.titulo) + '-' + Date.now().toString(36),
+      descricao: payload.descricao || null,
+      capa_url: payload.capa_url || null,
+      ordem: proximaOrdem,
+    }),
+  });
+}
+export async function adminDeleteColecao(id: string) {
+  await request('/rest/v1/colecao_videos?colecao_id=eq.' + encodeURIComponent(id), { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+  return request('/rest/v1/colecoes?id=eq.' + encodeURIComponent(id), { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+}
+export async function fetchColecaoVideos(colecaoId: string): Promise<Array<{ video_id: string; ordem: number; videos: Video }>> {
+  return request(`/rest/v1/colecao_videos?select=video_id,ordem,videos(*)&colecao_id=eq.${encodeURIComponent(colecaoId)}&order=ordem.asc`);
+}
+export async function adminAddVideoToColecao(colecaoId: string, videoId: string) {
+  const existentes = await request<Array<{ ordem: number }>>(`/rest/v1/colecao_videos?select=ordem&colecao_id=eq.${encodeURIComponent(colecaoId)}`);
+  const proximaOrdem = existentes.length ? Math.max(...existentes.map((c) => c.ordem || 0)) + 1 : 1;
+  return request('/rest/v1/colecao_videos', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ colecao_id: colecaoId, video_id: videoId, ordem: proximaOrdem }) });
+}
+export async function adminRemoveVideoFromColecao(colecaoId: string, videoId: string) {
+  return request(`/rest/v1/colecao_videos?colecao_id=eq.${encodeURIComponent(colecaoId)}&video_id=eq.${encodeURIComponent(videoId)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+}
+export async function adminReorderColecaoVideos(colecaoId: string, orderedVideoIds: string[]) {
+  await Promise.all(orderedVideoIds.map((videoId, index) =>
+    request(`/rest/v1/colecao_videos?colecao_id=eq.${encodeURIComponent(colecaoId)}&video_id=eq.${encodeURIComponent(videoId)}`, {
+      method: 'PATCH',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ ordem: index + 1 }),
+    }),
+  ));
+}
+export async function fetchColecoesParaCatalogo(): Promise<Array<{ colecao: Colecao; videos: Video[] }>> {
+  const colecoes = await fetchColecoes();
+  const resultados = await Promise.all(colecoes.map(async (colecao) => {
+    const linhas = await request<Array<{ video_id: string; ordem: number; videos: Video }>>(
+      `/rest/v1/colecao_videos?select=video_id,ordem,videos(*)&colecao_id=eq.${encodeURIComponent(colecao.id)}&order=ordem.asc`,
+    );
+    return { colecao, videos: linhas.map((linha) => linha.videos).filter(Boolean) };
+  }));
+  return resultados.filter((item) => item.videos.length > 0);
 }
 
 // ================= CRM: Clientes =================
