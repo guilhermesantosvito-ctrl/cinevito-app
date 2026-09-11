@@ -21,6 +21,7 @@ export type Video = {
 export type Categoria = { id: string; nome: string; slug?: string | null; ordem?: number | null };
 export type Genero = { id: string; nome: string; ordem?: number | null };
 export type Colecao = { id: string; titulo: string; slug?: string | null; descricao?: string | null; capa_url?: string | null; ordem?: number | null };
+export type Cupom = { codigo: string; percentual_desconto: number; ativo: boolean; valido_ate?: string | null };
 export type Plan = {
   id: string;
   nome: string;
@@ -188,11 +189,23 @@ export async function fetchProfile() {
   );
   return rows[0] || { nome: user.user_metadata?.nome || user.user_metadata?.name, email: user.email };
 }
-export async function submitSuggestion(payload: { titulo: string; mensagem: string }) {
+// Envia a sugestão de filme da pessoa. A tabela real do banco só tem
+// título sugerido, gênero e ano de lançamento (não tem campo de
+// mensagem livre), e exige que usuario_id venha preenchido com o ID
+// de quem está logado — sem isso a regra de segurança do banco recusa
+// o envio.
+export async function submitSuggestion(payload: { titulo: string; genero?: string; ano_lancamento?: number }) {
+  const user = getStoredUser();
+  if (!user) throw new Error('Entre na sua conta para enviar uma sugestão.');
   return request('/rest/v1/sugestoes_filmes', {
     method: 'POST',
     headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify({ titulo: payload.titulo, mensagem: payload.mensagem }),
+    body: JSON.stringify({
+      usuario_id: user.id,
+      titulo_sugerido: payload.titulo,
+      genero: payload.genero || null,
+      ano_lancamento: payload.ano_lancamento || null,
+    }),
   });
 }
 export async function updateProfile(payload: { nome: string }) {
@@ -304,6 +317,30 @@ export async function fetchColecoesParaCatalogo(): Promise<Array<{ colecao: Cole
     return { colecao, videos: linhas.map((linha) => linha.videos).filter(Boolean) };
   }));
   return resultados.filter((item) => item.videos.length > 0);
+}
+
+// ================= CUPONS DE DESCONTO =================
+
+export async function fetchAdminCupons(): Promise<Cupom[]> {
+  return request<Cupom[]>('/rest/v1/cupons?select=*&order=codigo.asc');
+}
+export async function adminCreateCupom(payload: { codigo: string; percentual_desconto: number; valido_ate?: string | null }) {
+  return request('/rest/v1/cupons', {
+    method: 'POST',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      codigo: payload.codigo.trim().toUpperCase(),
+      percentual_desconto: payload.percentual_desconto,
+      valido_ate: payload.valido_ate || null,
+      ativo: true,
+    }),
+  });
+}
+export async function adminToggleCupom(codigo: string, ativo: boolean) {
+  return request('/rest/v1/cupons?codigo=eq.' + encodeURIComponent(codigo), { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ ativo }) });
+}
+export async function adminDeleteCupom(codigo: string) {
+  return request('/rest/v1/cupons?codigo=eq.' + encodeURIComponent(codigo), { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
 }
 
 // ================= CRM: Clientes =================
