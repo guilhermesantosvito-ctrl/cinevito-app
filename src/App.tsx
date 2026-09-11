@@ -545,6 +545,15 @@ function AdminPage() {
   async function loadCategoriasEGeneros() {
     try { const [cats, gens] = await Promise.all([fetchCategorias(), fetchGenerosList()]); setCategorias(cats); setGeneros(gens); } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível carregar categorias/gêneros.'); }
   }
+  // Carrega os dados da primeira aba (Vídeos) assim que a permissão de
+  // admin é confirmada — sem isso, como a aba já vem selecionada por
+  // padrão, o clique que dispararia o carregamento nunca acontecia.
+  useEffect(() => {
+    if (!profile?.is_admin) return;
+    loadVideos();
+    loadCategoriasEGeneros();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.is_admin]);
   async function handleCreateCategoria() {
     if (!novaCategoria.trim()) return;
     try { await adminCreateCategoria(novaCategoria.trim()); setNovaCategoria(''); await loadCategoriasEGeneros(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível criar a categoria.'); }
