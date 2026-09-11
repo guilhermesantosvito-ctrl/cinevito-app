@@ -71,9 +71,6 @@ const SESSION_KEY = 'cinevito-auth-session';
 const SUPABASE_SESSION_KEY = 'sb-cefyzitdkvtynhwsxdvv-auth-token';
 const BACKGROUND_KEY = 'cinevito-background-since';
 const BACKGROUND_LIMIT_MS = 3 * 60 * 1000;
-// Guarda em cache local se a pessoa logada é admin — usado só pra
-// decidir se o logout automático por inatividade se aplica a ela.
-// Admin nunca é deslogado sozinho por ficar parado; cliente comum sim.
 const ADMIN_FLAG_KEY = 'cinevito-is-admin';
 export function isAdminCached(): boolean {
   return localStorage.getItem(ADMIN_FLAG_KEY) === 'true';
@@ -234,6 +231,15 @@ export async function processPayment(payload: { usuario_id: string; plano_id: st
 }
 export async function fetchAdminPlans(): Promise<Plan[]> { return request<Plan[]>('/rest/v1/planos?select=*&order=ordem.asc,preco.asc'); }
 export async function updatePlanActive(id: string, ativo: boolean) { return request('/rest/v1/planos?id=eq.' + encodeURIComponent(id), { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ ativo }) }); }
+export async function adminCreatePlano(payload: Partial<Plan>) {
+  return request('/rest/v1/planos', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(payload) });
+}
+export async function adminUpdatePlano(id: string, payload: Partial<Plan>) {
+  return request('/rest/v1/planos?id=eq.' + encodeURIComponent(id), { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(payload) });
+}
+export async function adminDeletePlano(id: string) {
+  return request('/rest/v1/planos?id=eq.' + encodeURIComponent(id), { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+}
 export async function fetchAdminVideos(): Promise<Video[]> { return request<Video[]>('/rest/v1/videos?select=*&order=criado_em.desc'); }
 export async function requestPasswordReset(email: string) {
   return request('/auth/v1/recover', {
@@ -258,11 +264,15 @@ export async function fetchGenerosList(): Promise<Genero[]> {
 }
 export async function adminCreateCategoria(nome: string) {
   const existentes = await fetchCategorias();
+  const jaExiste = existentes.some((c) => c.nome.trim().toLowerCase() === nome.trim().toLowerCase());
+  if (jaExiste) throw new Error('Essa categoria já existe.');
   const proximaOrdem = existentes.length ? Math.max(...existentes.map((c) => c.ordem || 0)) + 1 : 1;
   return request('/rest/v1/categorias', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ nome, slug: slugify(nome), ordem: proximaOrdem }) });
 }
 export async function adminCreateGenero(nome: string) {
   const existentes = await fetchGenerosList();
+  const jaExiste = existentes.some((g) => g.nome.trim().toLowerCase() === nome.trim().toLowerCase());
+  if (jaExiste) throw new Error('Esse gênero já existe.');
   const proximaOrdem = existentes.length ? Math.max(...existentes.map((g) => g.ordem || 0)) + 1 : 1;
   return request('/rest/v1/generos', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ nome, ordem: proximaOrdem }) });
 }
