@@ -27,6 +27,7 @@ export type Temporada = { id: string; serie_id: string; numero: number; titulo?:
 export type Episodio = { id: string; temporada_id: string; video_id: string; numero: number; titulo?: string | null; videos?: Video };
 export type Equipe = { id: string; nome?: string | null; email?: string | null; admin_master?: boolean | null };
 export type LayoutItem = { id: string; tipo: 'colecao' | 'series' | 'catalogo_geral'; colecao_id?: string | null; ordem: number; visivel: boolean; colecoes?: { titulo: string } | null };
+export type ContinuarAssistindoItem = { id: string; video_id: string; serie_id?: string | null; temporada_id?: string | null; numero_episodio?: number | null; atualizado_em: string; videos?: Video; series?: Serie };
 export type Plan = {
   id: string;
   nome: string;
@@ -277,9 +278,6 @@ export async function adminCreateGenero(nome: string) {
   const proximaOrdem = existentes.length ? Math.max(...existentes.map((g) => g.ordem || 0)) + 1 : 1;
   return request('/rest/v1/generos', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ nome, ordem: proximaOrdem }) });
 }
-// Retorna o vídeo criado (com o id dele) — necessário quando cadastramos
-// o vídeo de um episódio direto na aba Séries e precisamos vincular
-// o id na mesma operação.
 export async function adminCreateVideo(payload: Partial<Video>) {
   const criados = await request<Video[]>('/rest/v1/videos', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(payload) });
   return criados[0];
@@ -289,6 +287,13 @@ export async function adminUpdateVideo(id: string, payload: Partial<Video>) {
 }
 export async function adminDeleteVideo(id: string) {
   return request('/rest/v1/videos?id=eq.' + encodeURIComponent(id), { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+}
+// Ids de todos os vídeos que já são episódio de alguma série — usado
+// pra tirar esses vídeos da listagem geral do catálogo (eles só
+// aparecem dentro da própria série, sem duplicar).
+export async function fetchEpisodioVideoIds(): Promise<string[]> {
+  const rows = await request<Array<{ video_id: string }>>('/rest/v1/episodios?select=video_id');
+  return rows.map((row) => row.video_id);
 }
 
 // ================= COLEÇÕES (fileiras curadas manualmente, tipo "Top 10") =================
@@ -424,6 +429,54 @@ export async function fetchSerieCompleta(serieId: string): Promise<{ serie: Seri
   const temporadas = await fetchTemporadas(serieId);
   const temporadasComEpisodios = await Promise.all(temporadas.map(async (temporada) => ({ temporada, episodios: await fetchEpisodios(temporada.id) })));
   return { serie: series[0] || null, temporadas: temporadasComEpisodios };
+}
+// Dado o id de um vídeo, descobre se ele é episódio de alguma série e,
+// se for, qual é o próximo episódio da mesma temporada (pra tocar
+// automaticamente em seguida no player).
+export async function fetchEpisodioInfo(videoId: string): Promise<{ episodio: Episodio; serieId: string; proximo?: Episodio } | null> {
+  const rows = await request<Array<Episodio & { temporadas?: { serie_id: string } }>>(
+    `/rest/v1/episodios?select=*,videos(*),temporadas(serie_id)&video_id=eq.${encodeURIComponent(videoId)}&limit=1`,
+  );
+  const episodio = rows[0];
+  if (!episodio) return null;
+  const serieId = episodio.temporadas?.serie_id || '';
+  const doMesmaTemporada = await request<Episodio[]>(
+    `/rest/v1/episodios?select=*,videos(*)&temporada_id=eq.${encodeURIComponent(episodio.temporada_id)}&order=numero.asc`,
+  );
+  const index = doMesmaTemporada.findIndex((item) => item.id === episodio.id);
+  const proximo = index >= 0 ? doMesmaTemporada[index + 1] : undefined;
+  return { episodio, serieId, proximo };
+}
+
+// ================= CONTINUAR ASSISTINDO =================
+
+export async function salvarProgresso(payload: { video_id: string; serie_id?: string | null; temporada_id?: string | null; numero_episodio?: number | null }) {
+  const user = getStoredUser();
+  if (!user || !hasRuntimeConfig) return;
+  const filtro = payload.serie_id
+    ? `usuario_id=eq.${encodeURIComponent(user.id)}&serie_id=eq.${encodeURIComponent(payload.serie_id)}`
+    : `usuario_id=eq.${encodeURIComponent(user.id)}&video_id=eq.${encodeURIComponent(payload.video_id)}&serie_id=is.null`;
+  const existentes = await request<Array<{ id: string }>>(`/rest/v1/continuar_assistindo?select=id&${filtro}`);
+  const corpo = {
+    usuario_id: user.id,
+    video_id: payload.video_id,
+    serie_id: payload.serie_id || null,
+    temporada_id: payload.temporada_id || null,
+    numero_episodio: payload.numero_episodio ?? null,
+    atualizado_em: new Date().toISOString(),
+  };
+  if (existentes[0]) {
+    await request(`/rest/v1/continuar_assistindo?id=eq.${encodeURIComponent(existentes[0].id)}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(corpo) });
+  } else {
+    await request('/rest/v1/continuar_assistindo', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(corpo) });
+  }
+}
+export async function fetchContinuarAssistindo(): Promise<ContinuarAssistindoItem[]> {
+  const user = getStoredUser();
+  if (!user || !hasRuntimeConfig) return [];
+  return request<ContinuarAssistindoItem[]>(
+    `/rest/v1/continuar_assistindo?select=*,videos(*),series(*)&usuario_id=eq.${encodeURIComponent(user.id)}&order=atualizado_em.desc&limit=10`,
+  );
 }
 
 // ================= CUPONS DE DESCONTO =================
