@@ -82,6 +82,15 @@ function useColecoesDoCatalogo() {
   }, []);
   return colecoes;
 }
+// Aceita tanto uma URL simples quanto um código <iframe> completo colado
+// pelo admin — se for um iframe, extrai o "src" de dentro dele; senão,
+// usa o texto como veio (depois de tirar espaços nas pontas).
+function extractVideoUrl(input: string): string {
+  const trimmed = input.trim();
+  const iframeMatch = trimmed.match(/<iframe[^>]*\ssrc=["']([^"']+)["']/i);
+  if (iframeMatch) return iframeMatch[1];
+  return trimmed;
+}
 function getEmbedInfo(url?: string | null): { type: 'file' | 'embed' | 'none'; src: string } {
   if (!url) return { type: 'none', src: '' };
   const trimmed = url.trim();
@@ -545,9 +554,6 @@ function AdminPage() {
   async function loadCategoriasEGeneros() {
     try { const [cats, gens] = await Promise.all([fetchCategorias(), fetchGenerosList()]); setCategorias(cats); setGeneros(gens); } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível carregar categorias/gêneros.'); }
   }
-  // Carrega os dados da primeira aba (Vídeos) assim que a permissão de
-  // admin é confirmada — sem isso, como a aba já vem selecionada por
-  // padrão, o clique que dispararia o carregamento nunca acontecia.
   useEffect(() => {
     if (!profile?.is_admin) return;
     loadVideos();
@@ -582,12 +588,12 @@ function AdminPage() {
   async function saveVideo() {
     setMessage('');
     if (!videoForm.url_video.trim() || !videoForm.titulo.trim()) {
-      setMessage('Preencha ao menos o link do vídeo e o título.');
+      setMessage('Preencha ao menos o link/código do vídeo e o título.');
       return;
     }
     setSavingVideo(true);
     const payload: Partial<Video> = {
-      url_video: videoForm.url_video.trim(),
+      url_video: extractVideoUrl(videoForm.url_video),
       titulo: videoForm.titulo.trim(),
       descricao: videoForm.descricao.trim() || null,
       categoria_id: videoForm.categoria_id || null,
@@ -723,8 +729,8 @@ function AdminPage() {
   const tabs = ['videos', 'colecoes', 'clientes', 'planos'];
   return <div className="content-wrap page-main"><PageHeader eyebrow="Painel protegido" title="Administração" description={profile.admin_master ? 'Controle completo do catálogo e dos planos CineVito.' : 'Gerencie as ferramentas liberadas para sua equipe.'} /><div className="admin-tabs" role="tablist">{tabs.map((item) => <button key={item} className={'admin-tab focus-tv ' + (tab === item ? 'active' : '')} onClick={() => { setTab(item); if (item === 'videos') { loadVideos(); loadCategoriasEGeneros(); } if (item === 'colecoes') { loadColecoes(); loadVideos(); } if (item === 'planos') loadPlans(); if (item === 'clientes') loadClients(); }} role="tab" aria-selected={tab === item}>{item === 'colecoes' ? 'Coleções' : item[0].toUpperCase() + item.slice(1)}</button>)}</div>{message && <div className="notice notice-orange" role="status">{message}</div>}
 
-  {tab === 'videos' && <section className="panel panel-pad"><div className="eyebrow">Catálogo manual</div><h2 className="panel-title" style={{ marginTop: 8 }}>{editingVideoId ? 'Editar vídeo' : 'Adicionar vídeo'}</h2><p className="muted" style={{ fontSize: '.82rem', lineHeight: 1.6 }}>Cole o link do vídeo (YouTube, Vimeo, Internet Archive ou um arquivo .mp4 direto). Ele toca sempre dentro do CineVito, sem sair do app.</p>
-    <div className="field"><label htmlFor="v-url">Link do vídeo</label><input id="v-url" className="input focus-tv" value={videoForm.url_video} onChange={(e) => setVideoForm({ ...videoForm, url_video: e.target.value })} placeholder="https://..." /></div>
+  {tab === 'videos' && <section className="panel panel-pad"><div className="eyebrow">Catálogo manual</div><h2 className="panel-title" style={{ marginTop: 8 }}>{editingVideoId ? 'Editar vídeo' : 'Adicionar vídeo'}</h2><p className="muted" style={{ fontSize: '.82rem', lineHeight: 1.6 }}>Cole um link comum (YouTube, Vimeo, Internet Archive, arquivo .mp4) <strong>ou</strong> cole o código completo de um <code>&lt;iframe&gt;</code> de incorporação — o CineVito identifica sozinho qual é qual. Sempre toca dentro do app, sem sair dele.</p>
+    <div className="field"><label htmlFor="v-url">Link do vídeo ou código &lt;iframe&gt;</label><textarea id="v-url" className="input focus-tv" rows={3} value={videoForm.url_video} onChange={(e) => setVideoForm({ ...videoForm, url_video: e.target.value })} placeholder={'https://...\n\nou cole aqui: <iframe src="https://..." ...></iframe>'} /></div>
     <div className="field"><label htmlFor="v-titulo">Título</label><input id="v-titulo" className="input focus-tv" value={videoForm.titulo} onChange={(e) => setVideoForm({ ...videoForm, titulo: e.target.value })} placeholder="Nome do filme/vídeo" /></div>
     <div className="field"><label htmlFor="v-descricao">Sinopse</label><input id="v-descricao" className="input focus-tv" value={videoForm.descricao} onChange={(e) => setVideoForm({ ...videoForm, descricao: e.target.value })} placeholder="Uma linha sobre o vídeo" /></div>
     <div className="field"><label htmlFor="v-categoria">Categoria</label><select id="v-categoria" className="input focus-tv" value={videoForm.categoria_id} onChange={(e) => setVideoForm({ ...videoForm, categoria_id: e.target.value })}><option value="">Selecione...</option>{categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select><div style={{ display: 'flex', gap: 8, marginTop: 6 }}><input className="input focus-tv" value={novaCategoria} onChange={(e) => setNovaCategoria(e.target.value)} placeholder="Criar nova categoria..." /><button type="button" className="secondary-button focus-tv" onClick={handleCreateCategoria}>Criar</button></div></div>
