@@ -22,7 +22,7 @@ export type Categoria = { id: string; nome: string; slug?: string | null; ordem?
 export type Genero = { id: string; nome: string; ordem?: number | null };
 export type Colecao = { id: string; titulo: string; slug?: string | null; descricao?: string | null; capa_url?: string | null; ordem?: number | null };
 export type Cupom = { codigo: string; percentual_desconto: number; ativo: boolean; valido_ate?: string | null };
-export type Serie = { id: string; titulo: string; descricao?: string | null; capa_url?: string | null; categoria_id?: string | null };
+export type Serie = { id: string; titulo: string; descricao?: string | null; capa_url?: string | null; categoria_id?: string | null; genero?: string | null };
 export type Temporada = { id: string; serie_id: string; numero: number; titulo?: string | null };
 export type Episodio = { id: string; temporada_id: string; video_id: string; numero: number; titulo?: string | null; videos?: Video };
 export type Equipe = { id: string; nome?: string | null; email?: string | null; admin_master?: boolean | null };
@@ -346,11 +346,17 @@ export async function fetchColecoesParaCatalogo(): Promise<Array<{ colecao: Cole
 export async function fetchSeries(): Promise<Serie[]> {
   return request<Serie[]>('/rest/v1/series?select=*&order=titulo.asc');
 }
-export async function adminCreateSerie(payload: { titulo: string; descricao?: string; capa_url?: string; categoria_id?: string }) {
+export async function adminCreateSerie(payload: { titulo: string; descricao?: string; capa_url?: string; categoria_id?: string; genero?: string }) {
   return request('/rest/v1/series', {
     method: 'POST',
     headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify({ titulo: payload.titulo, descricao: payload.descricao || null, capa_url: payload.capa_url || null, categoria_id: payload.categoria_id || null }),
+    body: JSON.stringify({
+      titulo: payload.titulo,
+      descricao: payload.descricao || null,
+      capa_url: payload.capa_url || null,
+      categoria_id: payload.categoria_id || null,
+      genero: payload.genero || null,
+    }),
   });
 }
 export async function adminDeleteSerie(id: string) {
