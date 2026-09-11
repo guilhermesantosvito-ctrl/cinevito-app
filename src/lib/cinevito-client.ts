@@ -22,6 +22,10 @@ export type Categoria = { id: string; nome: string; slug?: string | null; ordem?
 export type Genero = { id: string; nome: string; ordem?: number | null };
 export type Colecao = { id: string; titulo: string; slug?: string | null; descricao?: string | null; capa_url?: string | null; ordem?: number | null };
 export type Cupom = { codigo: string; percentual_desconto: number; ativo: boolean; valido_ate?: string | null };
+export type Serie = { id: string; titulo: string; descricao?: string | null; capa_url?: string | null; categoria_id?: string | null };
+export type Temporada = { id: string; serie_id: string; numero: number; titulo?: string | null };
+export type Episodio = { id: string; temporada_id: string; video_id: string; numero: number; titulo?: string | null; videos?: Video };
+export type Equipe = { id: string; nome?: string | null; email?: string | null; admin_master?: boolean | null };
 export type Plan = {
   id: string;
   nome: string;
@@ -67,6 +71,13 @@ const SESSION_KEY = 'cinevito-auth-session';
 const SUPABASE_SESSION_KEY = 'sb-cefyzitdkvtynhwsxdvv-auth-token';
 const BACKGROUND_KEY = 'cinevito-background-since';
 const BACKGROUND_LIMIT_MS = 3 * 60 * 1000;
+// Guarda em cache local se a pessoa logada é admin — usado só pra
+// decidir se o logout automático por inatividade se aplica a ela.
+// Admin nunca é deslogado sozinho por ficar parado; cliente comum sim.
+const ADMIN_FLAG_KEY = 'cinevito-is-admin';
+export function isAdminCached(): boolean {
+  return localStorage.getItem(ADMIN_FLAG_KEY) === 'true';
+}
 export const MASTER_ADMIN_EMAIL = 'guilhermesantosvito@gmail.com';
 export const hasRuntimeConfig = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 function isExpiredSession() {
@@ -82,7 +93,7 @@ function storedSession(): { access_token: string; refresh_token?: string; expire
   }
 }
 export function getStoredUser(): SessionUser | null {
-  if (isExpiredSession()) { clearSession(); return null; }
+  if (isExpiredSession() && !isAdminCached()) { clearSession(); return null; }
   const sessionUser = storedSession()?.user;
   if (sessionUser) return sessionUser;
   const demoEmail = localStorage.getItem('cinevito-demo-user');
@@ -95,6 +106,7 @@ function saveSession(session: { access_token: string; refresh_token?: string; ex
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
   localStorage.setItem(SUPABASE_SESSION_KEY, JSON.stringify({ ...session, expires_at: session.expires_at || (session.expires_in ? Math.floor(Date.now() / 1000) + session.expires_in : undefined) }));
   localStorage.removeItem(BACKGROUND_KEY);
+  localStorage.removeItem(ADMIN_FLAG_KEY);
   window.dispatchEvent(new Event('cinevito-auth-change'));
 }
 function irParaEntrada() {
@@ -104,6 +116,7 @@ function irParaEntrada() {
   }
 }
 function checkBackgroundLogout() {
+  if (isAdminCached()) { window.dispatchEvent(new Event('cinevito-auth-change')); return; }
   if (isExpiredSession()) {
     clearSession();
     irParaEntrada();
@@ -123,6 +136,7 @@ if (typeof document !== 'undefined') {
     window.addEventListener(evento, registrarAtividade, { passive: true });
   });
   window.setInterval(() => {
+    if (isAdminCached()) return;
     if (isExpiredSession() && getStoredUser()) {
       clearSession();
       irParaEntrada();
@@ -133,6 +147,7 @@ export function clearSession() {
   localStorage.removeItem(SESSION_KEY);
   localStorage.removeItem(SUPABASE_SESSION_KEY);
   localStorage.removeItem(BACKGROUND_KEY);
+  localStorage.removeItem(ADMIN_FLAG_KEY);
   localStorage.removeItem('cinevito-demo-user');
   window.dispatchEvent(new Event('cinevito-auth-change'));
 }
@@ -187,13 +202,10 @@ export async function fetchProfile() {
   const rows = await request<Array<{ nome?: string; email?: string; is_admin?: boolean; admin_master?: boolean; codigo_indicacao?: string; nascimento?: string }>>(
     `/rest/v1/profiles?select=nome,email,is_admin,admin_master,codigo_indicacao&id=eq.${encodeURIComponent(user.id)}&limit=1`,
   );
-  return rows[0] || { nome: user.user_metadata?.nome || user.user_metadata?.name, email: user.email };
+  const result = rows[0] || { nome: user.user_metadata?.nome || user.user_metadata?.name, email: user.email };
+  try { localStorage.setItem(ADMIN_FLAG_KEY, String(Boolean((result as { is_admin?: boolean }).is_admin))); } catch { /* ignore */ }
+  return result;
 }
-// Envia a sugestão de filme da pessoa. A tabela real do banco só tem
-// título sugerido, gênero e ano de lançamento (não tem campo de
-// mensagem livre), e exige que usuario_id venha preenchido com o ID
-// de quem está logado — sem isso a regra de segurança do banco recusa
-// o envio.
 export async function submitSuggestion(payload: { titulo: string; genero?: string; ano_lancamento?: number }) {
   const user = getStoredUser();
   if (!user) throw new Error('Entre na sua conta para enviar uma sugestão.');
@@ -319,6 +331,46 @@ export async function fetchColecoesParaCatalogo(): Promise<Array<{ colecao: Cole
   return resultados.filter((item) => item.videos.length > 0);
 }
 
+// ================= SÉRIES E TEMPORADAS =================
+
+export async function fetchSeries(): Promise<Serie[]> {
+  return request<Serie[]>('/rest/v1/series?select=*&order=titulo.asc');
+}
+export async function adminCreateSerie(payload: { titulo: string; descricao?: string; capa_url?: string; categoria_id?: string }) {
+  return request('/rest/v1/series', {
+    method: 'POST',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ titulo: payload.titulo, descricao: payload.descricao || null, capa_url: payload.capa_url || null, categoria_id: payload.categoria_id || null }),
+  });
+}
+export async function adminDeleteSerie(id: string) {
+  return request('/rest/v1/series?id=eq.' + encodeURIComponent(id), { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+}
+export async function fetchTemporadas(serieId: string): Promise<Temporada[]> {
+  return request<Temporada[]>(`/rest/v1/temporadas?select=*&serie_id=eq.${encodeURIComponent(serieId)}&order=numero.asc`);
+}
+export async function adminCreateTemporada(serieId: string, numero: number, titulo?: string) {
+  return request('/rest/v1/temporadas', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ serie_id: serieId, numero, titulo: titulo || null }) });
+}
+export async function adminDeleteTemporada(id: string) {
+  return request('/rest/v1/temporadas?id=eq.' + encodeURIComponent(id), { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+}
+export async function fetchEpisodios(temporadaId: string): Promise<Episodio[]> {
+  return request<Episodio[]>(`/rest/v1/episodios?select=*,videos(*)&temporada_id=eq.${encodeURIComponent(temporadaId)}&order=numero.asc`);
+}
+export async function adminAddEpisodio(temporadaId: string, videoId: string, numero: number, titulo?: string) {
+  return request('/rest/v1/episodios', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ temporada_id: temporadaId, video_id: videoId, numero, titulo: titulo || null }) });
+}
+export async function adminRemoveEpisodio(id: string) {
+  return request('/rest/v1/episodios?id=eq.' + encodeURIComponent(id), { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+}
+export async function fetchSerieCompleta(serieId: string): Promise<{ serie: Serie | null; temporadas: Array<{ temporada: Temporada; episodios: Episodio[] }> }> {
+  const series = await request<Serie[]>(`/rest/v1/series?select=*&id=eq.${encodeURIComponent(serieId)}&limit=1`);
+  const temporadas = await fetchTemporadas(serieId);
+  const temporadasComEpisodios = await Promise.all(temporadas.map(async (temporada) => ({ temporada, episodios: await fetchEpisodios(temporada.id) })));
+  return { serie: series[0] || null, temporadas: temporadasComEpisodios };
+}
+
 // ================= CUPONS DE DESCONTO =================
 
 export async function fetchAdminCupons(): Promise<Cupom[]> {
@@ -341,6 +393,28 @@ export async function adminToggleCupom(codigo: string, ativo: boolean) {
 }
 export async function adminDeleteCupom(codigo: string) {
   return request('/rest/v1/cupons?codigo=eq.' + encodeURIComponent(codigo), { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+}
+
+// ================= EQUIPE (só admin master gerencia) =================
+
+export async function fetchEquipe(): Promise<Equipe[]> {
+  return request<Equipe[]>('/rest/v1/profiles?select=id,nome,email,admin_master&is_admin=eq.true&order=criado_em.asc');
+}
+export async function adminAddToEquipe(email: string) {
+  const rows = await request<Array<{ id: string; is_admin?: boolean }>>(`/rest/v1/profiles?select=id,is_admin&email=eq.${encodeURIComponent(email.trim().toLowerCase())}&limit=1`);
+  const perfil = rows[0];
+  if (!perfil) throw new Error('Não encontrei ninguém com esse e-mail. A pessoa precisa criar uma conta no CineVito primeiro.');
+  if (perfil.is_admin) throw new Error('Essa pessoa já tem acesso ao painel.');
+  return request('/rest/v1/profiles?id=eq.' + encodeURIComponent(perfil.id), { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ is_admin: true, admin_master: false }) });
+}
+export async function adminPromoverMaster(id: string) {
+  return request('/rest/v1/profiles?id=eq.' + encodeURIComponent(id), { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ admin_master: true }) });
+}
+export async function adminRebaixarMaster(id: string) {
+  return request('/rest/v1/profiles?id=eq.' + encodeURIComponent(id), { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ admin_master: false }) });
+}
+export async function adminRemoverDaEquipe(id: string) {
+  return request('/rest/v1/profiles?id=eq.' + encodeURIComponent(id), { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ is_admin: false, admin_master: false }) });
 }
 
 // ================= CRM: Clientes =================
