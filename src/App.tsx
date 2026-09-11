@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, DragEvent, FormEvent, ReactNode } from 'react';
 import { Link, Route, Switch, useLocation, useParams, Router as WouterRouter } from 'wouter';
 import {
-  ArrowLeft, Check, ChevronDown, CircleAlert, Clapperboard, Copy, Eye, EyeOff,
+  ArrowLeft, Check, ChevronDown, ChevronRight, CircleAlert, Clapperboard, Copy, Eye, EyeOff,
   Film, Heart, Info, KeyRound, Library, LogIn, LogOut, Play, RefreshCw, Search,
   Send, Settings, ShieldCheck, Sparkles, UserRound, X,
 } from 'lucide-react';
@@ -13,8 +13,8 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import {
   adminAddEpisodio, adminAddToEquipe, adminAddVideoToColecao, adminCreateCategoria, adminCreateColecao, adminCreateCupom, adminCreateGenero, adminCreatePlano, adminCreateSerie, adminCreateTemporada, adminCreateVideo,
   adminDeleteColecao, adminDeleteCupom, adminDeletePlano, adminDeleteSerie, adminDeleteTemporada, adminDeleteVideo, adminPromoverMaster, adminRebaixarMaster, adminRemoveEpisodio, adminRemoveVideoFromColecao, adminRemoverDaEquipe, adminReorderColecaoVideos, adminReorderLayout, adminToggleCupom, adminToggleLayoutVisible, adminUpdatePlano, adminUpdateVideo,
-  checkCatalogAccess, clearSession, fetchAdminClients, fetchAdminCupons, fetchAdminPlans, fetchAdminVideos, fetchCategorias, fetchCatalogoLayout, fetchCatalogoLayoutPublico, fetchColecaoVideos, fetchColecoes, fetchColecoesParaCatalogo, fetchEpisodios, fetchEquipe, fetchGenerosList, fetchMySubscription, fetchPlans, fetchProfile, fetchSerieCompleta, fetchSeries, fetchTemporadas, fetchVideos, getAccessToken, getStoredUser, grantAccess, hasRuntimeConfig,
-  processPayment, requestPasswordReset, revokeAccess, signIn, signUp, submitSuggestion, updatePlanActive, type Categoria, type Cliente, type Colecao, type Cupom, type Episodio, type Equipe, type Genero, type LayoutItem, type MinhaAssinatura, type Plan, type SessionUser, type Serie, type Temporada, type Video,
+  checkCatalogAccess, clearSession, fetchAdminClients, fetchAdminCupons, fetchAdminPlans, fetchAdminVideos, fetchCategorias, fetchCatalogoLayout, fetchCatalogoLayoutPublico, fetchColecaoVideos, fetchColecoes, fetchColecoesParaCatalogo, fetchContinuarAssistindo, fetchEpisodioInfo, fetchEpisodioVideoIds, fetchEpisodios, fetchEquipe, fetchGenerosList, fetchMySubscription, fetchPlans, fetchProfile, fetchSerieCompleta, fetchSeries, fetchTemporadas, fetchVideos, getAccessToken, getStoredUser, grantAccess, hasRuntimeConfig,
+  processPayment, requestPasswordReset, revokeAccess, salvarProgresso, signIn, signUp, submitSuggestion, updatePlanActive, type Categoria, type Cliente, type Colecao, type ContinuarAssistindoItem, type Cupom, type Episodio, type Equipe, type Genero, type LayoutItem, type MinhaAssinatura, type Plan, type SessionUser, type Serie, type Temporada, type Video,
 } from '@/lib/cinevito-client';
 import '@/index.css';
 const queryClient = new QueryClient();
@@ -110,6 +110,28 @@ function useCatalogLayoutPublico() {
     return () => { cancelled = true; window.clearInterval(intervalId); };
   }, []);
   return layout;
+}
+function useEpisodioVideoIds() {
+  const [ids, setIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!hasRuntimeConfig) return;
+    let cancelled = false;
+    const carregar = () => fetchEpisodioVideoIds().then((data) => { if (!cancelled) setIds(new Set(data)); }).catch(() => { if (!cancelled) setIds(new Set()); });
+    carregar();
+    const intervalId = window.setInterval(carregar, CATALOG_REFRESH_INTERVAL_MS);
+    return () => { cancelled = true; window.clearInterval(intervalId); };
+  }, []);
+  return ids;
+}
+function useContinuarAssistindo(user: SessionUser | null) {
+  const [items, setItems] = useState<ContinuarAssistindoItem[]>([]);
+  useEffect(() => {
+    if (!user || !hasRuntimeConfig) { setItems([]); return; }
+    let cancelled = false;
+    fetchContinuarAssistindo().then((data) => { if (!cancelled) setItems(data); }).catch(() => { if (!cancelled) setItems([]); });
+    return () => { cancelled = true; };
+  }, [user?.id]);
+  return items;
 }
 function extractVideoUrl(input: string): string {
   const trimmed = input.trim();
@@ -287,11 +309,11 @@ function AuthPage() {
 function PageHeader({ eyebrow, title, description, action }: { eyebrow: string; title: string; description?: string; action?: ReactNode }) {
   return <div className="page-head"><div className="page-head-copy"><div className="eyebrow">{eyebrow}</div><h1 className="page-title">{title}</h1>{description && <p>{description}</p>}</div>{action}</div>;
 }
-function Poster({ video, favorite, onFavorite, onOpen }: { video: Video; favorite: boolean; onFavorite: () => void; onOpen: () => void }) {
+function Poster({ video, favorite, onFavorite, onOpen, subtitle }: { video: Video; favorite: boolean; onFavorite: () => void; onOpen: () => void; subtitle?: string }) {
   const poster = video.url_capa ? undefined : ({
     '--poster': 'linear-gradient(145deg, #0d596c, #172532 50%, #e58d49)',
   } as CSSProperties);
-  return <article className="video-card reveal" data-testid={`card-video-${video.id}`}><div className="poster focus-tv" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen()} style={poster}><div className="poster-art" style={video.url_capa ? { backgroundImage: `url(${video.url_capa})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}><span className="poster-meta">{video.ano || 'CINEVITO'}</span><strong className="poster-word">{video.titulo}</strong></div>{video.premium && <span className="premium-badge">Premium</span>}<button className={`poster-favorite focus-tv ${favorite ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); onFavorite(); }} aria-label={favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'} data-testid={`button-favorite-${video.id}`}><Heart size={15} fill={favorite ? 'currentColor' : 'none'} /></button></div><div className="video-info"><div><h3 className="video-title" data-testid={`text-video-title-${video.id}`}>{video.titulo}</h3><p className="video-subtitle">{video.genero || video.categoria || 'Catálogo CineVito'}</p></div><Play size={14} color="#00c8ff" /></div></article>;
+  return <article className="video-card reveal" data-testid={`card-video-${video.id}`}><div className="poster focus-tv" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen()} style={poster}><div className="poster-art" style={video.url_capa ? { backgroundImage: `url(${video.url_capa})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}><span className="poster-meta">{video.ano || 'CINEVITO'}</span><strong className="poster-word">{video.titulo}</strong></div>{video.premium && <span className="premium-badge">Premium</span>}<button className={`poster-favorite focus-tv ${favorite ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); onFavorite(); }} aria-label={favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'} data-testid={`button-favorite-${video.id}`}><Heart size={15} fill={favorite ? 'currentColor' : 'none'} /></button></div><div className="video-info"><div><h3 className="video-title" data-testid={`text-video-title-${video.id}`}>{video.titulo}</h3><p className="video-subtitle">{subtitle || video.genero || video.categoria || 'Catálogo CineVito'}</p></div><Play size={14} color="#00c8ff" /></div></article>;
 }
 function SerieCard({ serie, onOpen }: { serie: Serie; onOpen: () => void }) {
   const style = serie.capa_url ? undefined : ({ '--poster': 'linear-gradient(145deg, #4a1942, #172532 50%, #e58d49)' } as CSSProperties);
@@ -318,6 +340,13 @@ function useVideos() {
   }, []);
   return { videos, loading, error };
 }
+function ContinueCard({ item, onOpen }: { item: ContinuarAssistindoItem; onOpen: () => void }) {
+  const video = item.videos;
+  if (!video) return null;
+  const subtitle = item.series ? `${item.series.titulo}${item.numero_episodio ? ` · Ep. ${item.numero_episodio}` : ''}` : undefined;
+  const style = video.url_capa ? undefined : ({ '--poster': 'linear-gradient(145deg, #0d596c, #172532 50%, #e58d49)' } as CSSProperties);
+  return <article className="video-card reveal"><div className="poster focus-tv" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen()} style={style}><div className="poster-art" style={video.url_capa ? { backgroundImage: `url(${video.url_capa})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}><span className="poster-meta">CONTINUAR</span><strong className="poster-word">{item.series?.titulo || video.titulo}</strong></div></div><div className="video-info"><div><h3 className="video-title">{item.series?.titulo || video.titulo}</h3><p className="video-subtitle">{subtitle || 'Continuar assistindo'}</p></div><Play size={14} color="#00c8ff" /></div></article>;
+}
 function CatalogPage() {
   const [, setLocation] = useLocation();
   const user = useAuth();
@@ -326,6 +355,8 @@ function CatalogPage() {
   const colecoes = useColecoesDoCatalogo();
   const series = useSeriesDoCatalogo();
   const layout = useCatalogLayoutPublico();
+  const episodioVideoIds = useEpisodioVideoIds();
+  const continuarAssistindo = useContinuarAssistindo(user);
   const [shelf, setShelf] = useState('Início');
   const [genre, setGenre] = useState('Todos os gêneros');
   const [query, setQuery] = useState('');
@@ -336,8 +367,9 @@ function CatalogPage() {
     const videoGenre = normalizeCatalogLabel(video.genero);
     return (!query || text.includes(query.toLowerCase()))
       && (genre === 'Todos os gêneros' || videoGenre === selectedGenre || videoGenre.includes(selectedGenre))
-      && videoBelongsToShelf(video, shelf);
-  }), [videos, query, genre, shelf]);
+      && videoBelongsToShelf(video, shelf)
+      && !episodioVideoIds.has(video.id);
+  }), [videos, query, genre, shelf, episodioVideoIds]);
   const filteredSeries = useMemo(() => series.filter((serie) => {
     const selectedGenre = normalizeCatalogLabel(genre);
     const serieGenre = normalizeCatalogLabel(serie.genero);
@@ -382,6 +414,10 @@ function CatalogPage() {
     <div className="chip-row" aria-label="Filtrar por gênero">{genres.map((item) => <button key={item} className={`chip focus-tv ${genre === item ? 'active' : ''}`} onClick={() => setGenre(item)} data-testid={`button-genre-${item.toLowerCase().replaceAll(' ', '-')}`}>{item}</button>)}</div>
     {loading && <div className="video-grid" data-testid="status-catalog-loading">{Array.from({ length: 5 }).map((_, index) => <div className="skeleton" style={{ aspectRatio: '2/3' }} key={index} />)}</div>}
     {error && <div className="notice notice-orange" role="alert" data-testid="status-catalog-error"><CircleAlert size={17} color="#ff8275" /><span>{error}</span><button className="quiet-button focus-tv" onClick={() => window.location.reload()} data-testid="button-retry-catalog"><RefreshCw size={15} />Tentar de novo</button></div>}
+    {!loading && !error && shelf === 'Início' && continuarAssistindo.length > 0 && <section className="shelf" style={{ marginTop: 22 }}>
+      <div className="shelf-heading"><h2 className="section-title">Continuar assistindo</h2><div className="section-rule" /></div>
+      <div className="video-grid">{continuarAssistindo.filter((item) => item.videos).map((item) => <ContinueCard key={item.id} item={item} onOpen={() => openVideo(item.video_id)} />)}</div>
+    </section>}
     {!loading && !error && shelf === 'Início' && layout.length > 0 && layout.map((item) => {
       if (item.tipo === 'series') return renderSeriesSection(item.id);
       if (item.tipo === 'colecao' && item.colecao_id) return renderColecaoSection(item.colecao_id, item.id);
@@ -410,6 +446,30 @@ function PlayerPage() {
   }, [access]);
   const video = findVideo(videos, params.id || new URLSearchParams(window.location.search).get('id') || '');
   const [saved, setSaved] = useState(() => JSON.parse(localStorage.getItem('cinevito-favorites') || '[]').includes(video?.id));
+  const [episodioInfo, setEpisodioInfo] = useState<{ episodio: Episodio; serieId: string; proximo?: Episodio } | null>(null);
+  const [episodiosDaTemporada, setEpisodiosDaTemporada] = useState<Episodio[]>([]);
+  useEffect(() => {
+    if (!video || access !== true) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const info = await fetchEpisodioInfo(video.id);
+        if (cancelled) return;
+        if (info) {
+          setEpisodioInfo(info);
+          const lista = await fetchEpisodios(info.episodio.temporada_id);
+          if (!cancelled) setEpisodiosDaTemporada(lista);
+          if (user) await salvarProgresso({ video_id: video.id, serie_id: info.serieId, temporada_id: info.episodio.temporada_id, numero_episodio: info.episodio.numero });
+        } else {
+          setEpisodioInfo(null);
+          setEpisodiosDaTemporada([]);
+          if (user) await salvarProgresso({ video_id: video.id });
+        }
+      } catch { /* salvar progresso é best-effort, nunca deve travar o player */ }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [video?.id, access, user?.id]);
   function toggle() {
     if (!video) return;
     const current: string[] = JSON.parse(localStorage.getItem('cinevito-favorites') || '[]');
@@ -424,7 +484,15 @@ function PlayerPage() {
     {embed.type === 'file' && <video src={embed.src} controls playsInline data-testid="video-player" style={{ width: '100%', height: '100%' }} />}
     {embed.type === 'embed' && <iframe src={embed.src} title={video.titulo} allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowFullScreen sandbox={VIDEO_IFRAME_SANDBOX} referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', border: 0 }} data-testid="video-player" />}
     {embed.type === 'none' && <div className="player-idle"><Play size={38} /><strong>Pronto para assistir</strong><span>Este título ainda não tem um link de vídeo cadastrado.</span></div>}
-  </div><div className="player-details"><div><div className="eyebrow">{video.genero || video.categoria || 'CineVito'} {video.ano ? ` / ${video.ano}` : ''}</div><h1 className="section-title" style={{ marginTop: 7 }} data-testid="text-player-title">{video.titulo}</h1><p>{video.descricao || 'Este título faz parte do catálogo CineVito.'}</p></div><div className="player-actions"><button className={`secondary-button focus-tv ${saved ? 'active' : ''}`} onClick={toggle} data-testid="button-player-favorite"><Heart size={15} fill={saved ? 'currentColor' : 'none'} />{saved ? 'Na coleção' : 'Salvar'}</button></div></div></div></div>;
+  </div><div className="player-details"><div><div className="eyebrow">{video.genero || video.categoria || 'CineVito'} {video.ano ? ` / ${video.ano}` : ''}{episodioInfo ? ` · Ep. ${episodioInfo.episodio.numero}` : ''}</div><h1 className="section-title" style={{ marginTop: 7 }} data-testid="text-player-title">{video.titulo}</h1><p>{video.descricao || 'Este título faz parte do catálogo CineVito.'}</p></div><div className="player-actions"><button className={`secondary-button focus-tv ${saved ? 'active' : ''}`} onClick={toggle} data-testid="button-player-favorite"><Heart size={15} fill={saved ? 'currentColor' : 'none'} />{saved ? 'Na coleção' : 'Salvar'}</button>{episodioInfo?.proximo && <button className="primary-button focus-tv" onClick={() => setLocation(`/player/${episodioInfo.proximo!.video_id}`)}>Próximo episódio<ChevronRight size={16} /></button>}</div></div>
+  {episodiosDaTemporada.length > 1 && <div style={{ marginTop: 20 }}>
+    <h3 className="section-title" style={{ fontSize: '1rem' }}>Episódios desta temporada</h3>
+    <div className="admin-list" style={{ marginTop: 10 }}>{episodiosDaTemporada.map((ep) => <div key={ep.id} role="button" tabIndex={0} onClick={() => setLocation(`/player/${ep.video_id}`)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setLocation(`/player/${ep.video_id}`)} className="result-row" style={{ cursor: 'pointer', border: ep.video_id === video.id ? '1px solid var(--accent-teal, #2ec4b6)' : undefined }}>
+      <span><strong>Ep. {ep.numero}</strong> — {ep.titulo || ep.videos?.titulo}</span>
+      {ep.video_id === video.id ? <span className="muted" style={{ fontSize: '.78rem' }}>Assistindo</span> : <Play size={15} color="#00c8ff" />}
+    </div>)}</div>
+  </div>}
+  </div></div>;
 }
 function SeriePage() {
   const params = useParams<{ id: string }>();
@@ -1157,7 +1225,7 @@ function AdminPage() {
     </div>}
   </section>}
 
-  {tab === 'series' && <section className="panel panel-pad"><div className="eyebrow">Catálogo · Séries</div><h2 className="panel-title" style={{ marginTop: 8 }}>Séries e temporadas</h2><p className="muted" style={{ fontSize: '.82rem', lineHeight: 1.6 }}>Crie a série (com categoria/gênero, igual um vídeo), depois as temporadas dentro dela, e por fim os episódios — cole o link do episódio direto ali, igual na aba Vídeos.</p>
+  {tab === 'series' && <section className="panel panel-pad"><div className="eyebrow">Catálogo · Séries</div><h2 className="panel-title" style={{ marginTop: 8 }}>Séries e temporadas</h2><p className="muted" style={{ fontSize: '.82rem', lineHeight: 1.6 }}>Crie a série (com categoria/gênero, igual um vídeo), depois as temporadas dentro dela, e por fim os episódios — cole o link do episódio direto ali, igual na aba Vídeos. Vídeos que já são episódio somem da listagem geral do catálogo, sem duplicar.</p>
     <div className="field"><label htmlFor="serie-titulo">Título da série</label><input id="serie-titulo" className="input focus-tv" value={novaSerieTitulo} onChange={(e) => setNovaSerieTitulo(e.target.value)} placeholder="Ex.: Viagem ao Panamá" /></div>
     <div className="field"><label htmlFor="serie-descricao">Descrição (opcional)</label><input id="serie-descricao" className="input focus-tv" value={novaSerieDescricao} onChange={(e) => setNovaSerieDescricao(e.target.value)} placeholder="Uma linha sobre a série" /></div>
     <div className="field"><label htmlFor="serie-categoria">Categoria</label><select id="serie-categoria" className="input focus-tv" value={novaSerieCategoriaId} onChange={(e) => setNovaSerieCategoriaId(e.target.value)}><option value="">Selecione...</option>{categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select></div>
