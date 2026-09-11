@@ -11,8 +11,8 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import {
-  adminAddEpisodio, adminAddToEquipe, adminAddVideoToColecao, adminCreateCategoria, adminCreateColecao, adminCreateCupom, adminCreateGenero, adminCreateSerie, adminCreateTemporada, adminCreateVideo,
-  adminDeleteColecao, adminDeleteCupom, adminDeleteSerie, adminDeleteTemporada, adminDeleteVideo, adminPromoverMaster, adminRebaixarMaster, adminRemoveEpisodio, adminRemoveVideoFromColecao, adminRemoverDaEquipe, adminReorderColecaoVideos, adminToggleCupom, adminUpdateVideo,
+  adminAddEpisodio, adminAddToEquipe, adminAddVideoToColecao, adminCreateCategoria, adminCreateColecao, adminCreateCupom, adminCreateGenero, adminCreatePlano, adminCreateSerie, adminCreateTemporada, adminCreateVideo,
+  adminDeleteColecao, adminDeleteCupom, adminDeletePlano, adminDeleteSerie, adminDeleteTemporada, adminDeleteVideo, adminPromoverMaster, adminRebaixarMaster, adminRemoveEpisodio, adminRemoveVideoFromColecao, adminRemoverDaEquipe, adminReorderColecaoVideos, adminToggleCupom, adminUpdatePlano, adminUpdateVideo,
   checkCatalogAccess, clearSession, fetchAdminClients, fetchAdminCupons, fetchAdminPlans, fetchAdminVideos, fetchCategorias, fetchColecaoVideos, fetchColecoes, fetchColecoesParaCatalogo, fetchEpisodios, fetchEquipe, fetchGenerosList, fetchMySubscription, fetchPlans, fetchProfile, fetchSerieCompleta, fetchSeries, fetchTemporadas, fetchVideos, getAccessToken, getStoredUser, grantAccess, hasRuntimeConfig,
   processPayment, requestPasswordReset, revokeAccess, signIn, signUp, submitSuggestion, updatePlanActive, type Categoria, type Cliente, type Colecao, type Cupom, type Episodio, type Equipe, type Genero, type MinhaAssinatura, type Plan, type SessionUser, type Serie, type Temporada, type Video,
 } from '@/lib/cinevito-client';
@@ -278,7 +278,7 @@ function Poster({ video, favorite, onFavorite, onOpen }: { video: Video; favorit
 }
 function SerieCard({ serie, onOpen }: { serie: Serie; onOpen: () => void }) {
   const style = serie.capa_url ? undefined : ({ '--poster': 'linear-gradient(145deg, #4a1942, #172532 50%, #e58d49)' } as CSSProperties);
-  return <article className="video-card reveal"><div className="poster focus-tv" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen()} style={style}><div className="poster-art" style={serie.capa_url ? { backgroundImage: `url(${serie.capa_url})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}><span className="poster-meta">SÉRIE</span><strong className="poster-word">{serie.titulo}</strong></div></div><div className="video-info"><div><h3 className="video-title">{serie.titulo}</h3><p className="video-subtitle">Série · Temporadas</p></div><Play size={14} color="#00c8ff" /></div></article>;
+  return <article className="video-card reveal"><div className="poster focus-tv" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen()} style={style}><div className="poster-art" style={serie.capa_url ? { backgroundImage: `url(${serie.capa_url})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}><span className="poster-meta">SÉRIE</span><strong className="poster-word">{serie.titulo}</strong></div></div><div className="video-info"><div><h3 className="video-title">{serie.titulo}</h3><p className="video-subtitle">{serie.genero || 'Série · Temporadas'}</p></div><Play size={14} color="#00c8ff" /></div></article>;
 }
 function useVideos() {
   const [videos, setVideos] = useState<Video[]>([]); const [loading, setLoading] = useState(hasRuntimeConfig); const [error, setError] = useState('');
@@ -304,6 +304,11 @@ function CatalogPage() {
       && (genre === 'Todos os gêneros' || videoGenre === selectedGenre || videoGenre.includes(selectedGenre))
       && videoBelongsToShelf(video, shelf);
   }), [videos, query, genre, shelf]);
+  const filteredSeries = useMemo(() => series.filter((serie) => {
+    const selectedGenre = normalizeCatalogLabel(genre);
+    const serieGenre = normalizeCatalogLabel(serie.genero);
+    return genre === 'Todos os gêneros' || serieGenre === selectedGenre || serieGenre.includes(selectedGenre);
+  }), [series, genre]);
   function toggleFavorite(id: string) {
     const next = favorites.includes(id) ? favorites.filter((value) => value !== id) : [...favorites, id];
     setFavorites(next);
@@ -322,7 +327,7 @@ function CatalogPage() {
     <div className="chip-row" aria-label="Filtrar por gênero">{genres.map((item) => <button key={item} className={`chip focus-tv ${genre === item ? 'active' : ''}`} onClick={() => setGenre(item)} data-testid={`button-genre-${item.toLowerCase().replaceAll(' ', '-')}`}>{item}</button>)}</div>
     {loading && <div className="video-grid" data-testid="status-catalog-loading">{Array.from({ length: 5 }).map((_, index) => <div className="skeleton" style={{ aspectRatio: '2/3' }} key={index} />)}</div>}
     {error && <div className="notice notice-orange" role="alert" data-testid="status-catalog-error"><CircleAlert size={17} color="#ff8275" /><span>{error}</span><button className="quiet-button focus-tv" onClick={() => window.location.reload()} data-testid="button-retry-catalog"><RefreshCw size={15} />Tentar de novo</button></div>}
-    {!loading && !error && shelf === 'Início' && series.length > 0 && <section className="shelf" style={{ marginTop: 22 }}><div className="shelf-heading"><h2 className="section-title">Séries</h2><div className="section-rule" /></div><div className="video-grid">{series.map((serie) => <SerieCard key={serie.id} serie={serie} onOpen={() => setLocation(`/serie/${serie.id}`)} />)}</div></section>}
+    {!loading && !error && shelf === 'Início' && filteredSeries.length > 0 && <section className="shelf" style={{ marginTop: 22 }}><div className="shelf-heading"><h2 className="section-title">Séries</h2><div className="section-rule" /></div><div className="video-grid">{filteredSeries.map((serie) => <SerieCard key={serie.id} serie={serie} onOpen={() => setLocation(`/serie/${serie.id}`)} />)}</div></section>}
     {!loading && !error && shelf === 'Início' && colecoes.map(({ colecao, videos: colecaoVideos }) => (
       <section className="shelf" key={colecao.id} style={{ marginTop: 22 }}>
         <div className="shelf-heading"><h2 className="section-title">{colecao.titulo}</h2><div className="section-rule" /></div>
@@ -574,6 +579,9 @@ function FaqPage() {
 function AdminPage() {
   const user = useAuth(); const [profile, setProfile] = useState<{ is_admin?: boolean; admin_master?: boolean } | null>(null); const [tab, setTab] = useState('videos'); const [loading, setLoading] = useState(Boolean(user && hasRuntimeConfig)); const [message, setMessage] = useState('');
   const [plans, setPlans] = useState<Plan[]>([]);
+  const [planoForm, setPlanoForm] = useState({ nome: '', categoria: '', descricao: '', preco: '', dispositivos: '1', duracaoQtd: '1', duracaoUnidade: 'meses' as 'dias' | 'meses' });
+  const [editingPlanoId, setEditingPlanoId] = useState<string | null>(null);
+  const [savingPlano, setSavingPlano] = useState(false);
   const [videos, setVideos] = useState<Video[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [generos, setGeneros] = useState<Genero[]>([]);
@@ -593,6 +601,9 @@ function AdminPage() {
   const [series, setSeries] = useState<Serie[]>([]);
   const [novaSerieTitulo, setNovaSerieTitulo] = useState('');
   const [novaSerieDescricao, setNovaSerieDescricao] = useState('');
+  const [novaSerieCategoriaId, setNovaSerieCategoriaId] = useState('');
+  const [novaSerieGenero, setNovaSerieGenero] = useState('');
+  const [novaSerieCapa, setNovaSerieCapa] = useState('');
   const [criandoSerie, setCriandoSerie] = useState(false);
   const [selectedSerie, setSelectedSerie] = useState<Serie | null>(null);
   const [temporadas, setTemporadas] = useState<Temporada[]>([]);
@@ -762,9 +773,18 @@ function AdminPage() {
     if (!novaSerieTitulo.trim()) { setMessage('Dê um título para a série.'); return; }
     setCriandoSerie(true);
     try {
-      await adminCreateSerie({ titulo: novaSerieTitulo.trim(), descricao: novaSerieDescricao.trim() || undefined });
+      await adminCreateSerie({
+        titulo: novaSerieTitulo.trim(),
+        descricao: novaSerieDescricao.trim() || undefined,
+        categoria_id: novaSerieCategoriaId || undefined,
+        genero: novaSerieGenero || undefined,
+        capa_url: novaSerieCapa.trim() || undefined,
+      });
       setNovaSerieTitulo('');
       setNovaSerieDescricao('');
+      setNovaSerieCategoriaId('');
+      setNovaSerieGenero('');
+      setNovaSerieCapa('');
       await loadSeries();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Não foi possível criar a série.');
@@ -884,6 +904,59 @@ function AdminPage() {
   }
 
   async function loadPlans() { try { setPlans(await fetchAdminPlans()); } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível carregar os planos.'); } }
+  function resetPlanoForm() {
+    setPlanoForm({ nome: '', categoria: '', descricao: '', preco: '', dispositivos: '1', duracaoQtd: '1', duracaoUnidade: 'meses' });
+    setEditingPlanoId(null);
+  }
+  function editPlano(plan: Plan) {
+    setEditingPlanoId(plan.id);
+    setPlanoForm({
+      nome: plan.nome || '',
+      categoria: plan.categoria || '',
+      descricao: plan.descricao || '',
+      preco: plan.preco != null ? String(plan.preco) : '',
+      dispositivos: String(plan.dispositivos || 1),
+      duracaoQtd: String(plan.duracao_dias || plan.duracao_meses || 1),
+      duracaoUnidade: plan.duracao_dias ? 'dias' : 'meses',
+    });
+  }
+  async function savePlano() {
+    setMessage('');
+    const preco = Number(planoForm.preco);
+    if (!planoForm.nome.trim() || !preco || preco <= 0) {
+      setMessage('Preencha ao menos o nome e um preço válido (maior que zero — o Mercado Pago não aceita cobrança de R$ 0,00; pra dar acesso grátis, use "Conceder acesso" na aba Clientes).');
+      return;
+    }
+    setSavingPlano(true);
+    const qtd = Number(planoForm.duracaoQtd) || 1;
+    const payload: Partial<Plan> = {
+      nome: planoForm.nome.trim(),
+      categoria: planoForm.categoria.trim() || planoForm.nome.trim(),
+      descricao: planoForm.descricao.trim() || null,
+      preco,
+      dispositivos: Number(planoForm.dispositivos) || 1,
+      duracao_meses: planoForm.duracaoUnidade === 'meses' ? qtd : 0,
+      duracao_dias: planoForm.duracaoUnidade === 'dias' ? qtd : null,
+    };
+    try {
+      if (editingPlanoId) {
+        await adminUpdatePlano(editingPlanoId, payload);
+      } else {
+        const proximaOrdem = plans.length ? Math.max(...plans.map((p) => p.ordem || 0)) + 1 : 1;
+        await adminCreatePlano({ ...payload, ordem: proximaOrdem, ativo: true });
+      }
+      resetPlanoForm();
+      await loadPlans();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Não foi possível salvar o plano.');
+    } finally {
+      setSavingPlano(false);
+    }
+  }
+  async function deletePlanoHandler(id: string) {
+    if (!window.confirm('Apagar este plano? Assinaturas antigas que já usaram ele continuam registradas, só some da lista de opções pra novos clientes.')) return;
+    try { await adminDeletePlano(id); await loadPlans(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível apagar o plano.'); }
+  }
   async function loadClients() { try { setClients(await fetchAdminClients()); } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível carregar os clientes.'); } }
   function openGrant(client: Cliente) { setGrantTarget(client); setGrantForm({ quantidade: 30, unidade: 'dias', motivo: '' }); }
   function closeGrant() { setGrantTarget(null); }
@@ -927,7 +1000,7 @@ function AdminPage() {
     setTab(item);
     if (item === 'videos') { loadVideos(); loadCategoriasEGeneros(); }
     if (item === 'colecoes') { loadColecoes(); loadVideos(); }
-    if (item === 'series') { loadSeries(); loadVideos(); }
+    if (item === 'series') { loadSeries(); loadVideos(); loadCategoriasEGeneros(); }
     if (item === 'cupons') loadCupons();
     if (item === 'planos') loadPlans();
     if (item === 'clientes') loadClients();
@@ -970,12 +1043,15 @@ function AdminPage() {
     </div>}
   </section>}
 
-  {tab === 'series' && <section className="panel panel-pad"><div className="eyebrow">Catálogo · Séries</div><h2 className="panel-title" style={{ marginTop: 8 }}>Séries e temporadas</h2><p className="muted" style={{ fontSize: '.82rem', lineHeight: 1.6 }}>Crie a série, depois as temporadas dentro dela, e por fim os episódios (cada episódio usa um vídeo que você já cadastrou na aba Vídeos), na ordem certa.</p>
+  {tab === 'series' && <section className="panel panel-pad"><div className="eyebrow">Catálogo · Séries</div><h2 className="panel-title" style={{ marginTop: 8 }}>Séries e temporadas</h2><p className="muted" style={{ fontSize: '.82rem', lineHeight: 1.6 }}>Crie a série (com categoria/gênero, igual um vídeo), depois as temporadas dentro dela, e por fim os episódios (cada episódio usa um vídeo que você já cadastrou na aba Vídeos), na ordem certa.</p>
     <div className="field"><label htmlFor="serie-titulo">Título da série</label><input id="serie-titulo" className="input focus-tv" value={novaSerieTitulo} onChange={(e) => setNovaSerieTitulo(e.target.value)} placeholder="Ex.: Viagem ao Panamá" /></div>
     <div className="field"><label htmlFor="serie-descricao">Descrição (opcional)</label><input id="serie-descricao" className="input focus-tv" value={novaSerieDescricao} onChange={(e) => setNovaSerieDescricao(e.target.value)} placeholder="Uma linha sobre a série" /></div>
+    <div className="field"><label htmlFor="serie-categoria">Categoria</label><select id="serie-categoria" className="input focus-tv" value={novaSerieCategoriaId} onChange={(e) => setNovaSerieCategoriaId(e.target.value)}><option value="">Selecione...</option>{categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select></div>
+    <div className="field"><label htmlFor="serie-genero">Gênero</label><select id="serie-genero" className="input focus-tv" value={novaSerieGenero} onChange={(e) => setNovaSerieGenero(e.target.value)}><option value="">Selecione...</option>{generos.map((g) => <option key={g.id} value={g.nome}>{g.nome}</option>)}</select></div>
+    <div className="field"><label htmlFor="serie-capa">URL da capa (opcional)</label><input id="serie-capa" className="input focus-tv" value={novaSerieCapa} onChange={(e) => setNovaSerieCapa(e.target.value)} placeholder="https://..." /></div>
     <button className="primary-button focus-tv" onClick={createSerie} disabled={criandoSerie}>{criandoSerie ? 'Criando...' : 'Criar série'}</button>
     <h3 style={{ marginTop: 26 }}>Séries existentes</h3>
-    <div className="admin-list" style={{ marginTop: 10 }}>{series.length ? series.map((serie) => <div className="result-row" key={serie.id}><span><strong>{serie.titulo}</strong></span><span style={{ display: 'flex', gap: 8 }}><button className="secondary-button focus-tv" onClick={() => selectSerie(serie)}>Gerenciar temporadas</button><button className="quiet-button focus-tv" onClick={() => deleteSerieHandler(serie.id)}>Apagar</button></span></div>) : <p className="muted">Nenhuma série criada ainda.</p>}</div>
+    <div className="admin-list" style={{ marginTop: 10 }}>{series.length ? series.map((serie) => <div className="result-row" key={serie.id}><span><strong>{serie.titulo}</strong><small style={{ display: 'block', color: '#96a0af', marginTop: 3 }}>{serie.genero || 'sem gênero'}</small></span><span style={{ display: 'flex', gap: 8 }}><button className="secondary-button focus-tv" onClick={() => selectSerie(serie)}>Gerenciar temporadas</button><button className="quiet-button focus-tv" onClick={() => deleteSerieHandler(serie.id)}>Apagar</button></span></div>) : <p className="muted">Nenhuma série criada ainda.</p>}</div>
 
     {selectedSerie && <div style={{ marginTop: 24 }}>
       <h3>Temporadas de "{selectedSerie.titulo}"</h3>
@@ -1006,7 +1082,19 @@ function AdminPage() {
 
   {tab === 'clientes' && <section className="panel panel-pad"><div className="eyebrow">CRM</div><h2 className="panel-title" style={{ marginTop: 8 }}>Clientes</h2><p className="muted" style={{ fontSize: '.82rem', lineHeight: 1.6 }}>Lista de clientes cadastrados. "Conceder acesso" soma tempo sem passar pelo Mercado Pago. "Cancelar acesso" desativa a assinatura imediatamente.</p>{grantTarget && <div className="notice notice-cyan" style={{ marginTop: 14, display: 'block' }}><strong>Conceder acesso para: {grantTarget.nome || grantTarget.email}</strong><div className="field" style={{ marginTop: 10 }}><label htmlFor="grant-quantidade">Quantidade</label><input id="grant-quantidade" type="number" min={1} className="input focus-tv" value={grantForm.quantidade} onChange={(event) => setGrantForm({ ...grantForm, quantidade: Number(event.target.value) || 1 })} /></div><div className="field"><label htmlFor="grant-unidade">Unidade</label><select id="grant-unidade" className="input focus-tv" value={grantForm.unidade} onChange={(event) => setGrantForm({ ...grantForm, unidade: event.target.value as 'dias' | 'meses' })}><option value="dias">Dias</option><option value="meses">Meses</option></select></div><div className="field"><label htmlFor="grant-motivo">Motivo (fica registrado)</label><input id="grant-motivo" className="input focus-tv" value={grantForm.motivo} onChange={(event) => setGrantForm({ ...grantForm, motivo: event.target.value })} placeholder="Ex.: cortesia, indicação premiada..." /></div><button className="primary-button focus-tv" onClick={confirmGrant} disabled={grantBusy}>{grantBusy ? 'Concedendo...' : 'Conceder acesso'}</button><button className="quiet-button focus-tv" style={{ marginLeft: 10 }} onClick={closeGrant}>Cancelar</button></div>}<div className="admin-list" style={{ marginTop: 18 }}>{clients.length ? clients.map((client) => { const status = client.assinatura?.status === 'ativa' ? 'Assinante' : client.assinatura?.status === 'trial' ? 'Teste grátis' : client.assinatura?.status ? 'Inativo' : 'Sem plano'; const validade = client.assinatura?.data_expiracao ? new Date(client.assinatura.data_expiracao).toLocaleDateString('pt-BR') : '-'; const podeCancelar = client.assinatura?.status === 'ativa' || client.assinatura?.status === 'trial'; return <div className="result-row" key={client.id}><span><strong>{client.nome || 'Sem nome'}</strong><small style={{ display: 'block', color: '#96a0af', marginTop: 3 }}>{client.email} · {status} · {client.assinatura?.plano || 'sem plano'} · até {validade}</small></span><span style={{ display: 'flex', gap: 8 }}>{podeCancelar && <button className="quiet-button focus-tv" onClick={() => handleRevoke(client)} disabled={revokeBusyId === client.id}>{revokeBusyId === client.id ? 'Cancelando...' : 'Cancelar acesso'}</button>}<button className="secondary-button focus-tv" onClick={() => openGrant(client)}>Conceder acesso</button></span></div>; }) : <button className="secondary-button focus-tv" onClick={loadClients}>Carregar clientes</button>}</div></section>}
 
-  {tab === 'planos' && <section className="panel panel-pad"><div className="eyebrow">Admin master</div><h2 className="panel-title" style={{ marginTop: 8 }}>Planos publicados</h2>{plans.length ? <div className="plan-list">{plans.map((plan) => <div className="plan-card" key={plan.id}><div><h3>{plan.nome}</h3><p>{plan.categoria || 'Sem categoria'} · R$ {Number(plan.preco || 0).toFixed(2).replace('.', ',')} · {plan.dispositivos || 1} dispositivo(s)</p></div><button className="secondary-button focus-tv" onClick={() => togglePlan(plan)}>{plan.ativo ? 'Desativar' : 'Ativar'}</button></div>)}</div> : <button className="secondary-button focus-tv" onClick={loadPlans}>Carregar planos</button>}</section>}
+  {tab === 'planos' && <section className="panel panel-pad"><div className="eyebrow">Admin master</div><h2 className="panel-title" style={{ marginTop: 8 }}>{editingPlanoId ? 'Editar plano' : 'Criar plano'}</h2>
+    <div className="field"><label htmlFor="p-nome">Nome do plano</label><input id="p-nome" className="input focus-tv" value={planoForm.nome} onChange={(e) => setPlanoForm({ ...planoForm, nome: e.target.value })} placeholder="Ex.: Padrão Mensal" /></div>
+    <div className="field"><label htmlFor="p-categoria">Categoria (agrupamento mostrado pro cliente)</label><input id="p-categoria" className="input focus-tv" value={planoForm.categoria} onChange={(e) => setPlanoForm({ ...planoForm, categoria: e.target.value })} placeholder="Ex.: Básico, Padrão, Premium..." /></div>
+    <div className="field"><label htmlFor="p-descricao">Descrição (opcional)</label><input id="p-descricao" className="input focus-tv" value={planoForm.descricao} onChange={(e) => setPlanoForm({ ...planoForm, descricao: e.target.value })} placeholder="Ex.: 2 dispositivos, sem anúncios" /></div>
+    <div className="field"><label htmlFor="p-preco">Preço (R$)</label><input id="p-preco" type="number" step="0.01" className="input focus-tv" value={planoForm.preco} onChange={(e) => setPlanoForm({ ...planoForm, preco: e.target.value })} placeholder="Ex.: 19.90" /></div>
+    <div className="field"><label htmlFor="p-dispositivos">Dispositivos simultâneos</label><input id="p-dispositivos" type="number" className="input focus-tv" value={planoForm.dispositivos} onChange={(e) => setPlanoForm({ ...planoForm, dispositivos: e.target.value })} /></div>
+    <div className="field"><label htmlFor="p-duracao">Duração</label><input id="p-duracao" type="number" className="input focus-tv" value={planoForm.duracaoQtd} onChange={(e) => setPlanoForm({ ...planoForm, duracaoQtd: e.target.value })} /></div>
+    <div className="field"><label htmlFor="p-duracao-unidade">Unidade da duração</label><select id="p-duracao-unidade" className="input focus-tv" value={planoForm.duracaoUnidade} onChange={(e) => setPlanoForm({ ...planoForm, duracaoUnidade: e.target.value as 'dias' | 'meses' })}><option value="meses">Meses</option><option value="dias">Dias</option></select></div>
+    <button className="primary-button focus-tv" onClick={savePlano} disabled={savingPlano}>{savingPlano ? 'Salvando...' : editingPlanoId ? 'Salvar alterações' : 'Criar plano'}</button>
+    {editingPlanoId && <button className="quiet-button focus-tv" style={{ marginLeft: 10 }} onClick={resetPlanoForm}>Cancelar edição</button>}
+    <h3 style={{ marginTop: 26 }}>Planos cadastrados</h3>
+    <div className="admin-list" style={{ marginTop: 10 }}>{plans.length ? plans.map((plan) => <div className="result-row" key={plan.id}><span><strong>{plan.nome}</strong><small style={{ display: 'block', color: '#96a0af', marginTop: 3 }}>{plan.categoria || 'sem categoria'} · R$ {Number(plan.preco || 0).toFixed(2).replace('.', ',')} · {plan.dispositivos || 1} disp. · {plan.ativo ? 'Ativo' : 'Desativado'}</small></span><span style={{ display: 'flex', gap: 8 }}><button className="quiet-button focus-tv" onClick={() => editPlano(plan)}>Editar</button><button className="secondary-button focus-tv" onClick={() => togglePlan(plan)}>{plan.ativo ? 'Desativar' : 'Ativar'}</button><button className="quiet-button focus-tv" onClick={() => deletePlanoHandler(plan.id)}>Apagar</button></span></div>) : <button className="secondary-button focus-tv" onClick={loadPlans}>Carregar planos</button>}</div>
+  </section>}
 
   {tab === 'equipe' && <section className="panel panel-pad"><div className="eyebrow">Admin master</div><h2 className="panel-title" style={{ marginTop: 8 }}>Equipe</h2><p className="muted" style={{ fontSize: '.82rem', lineHeight: 1.6 }}>Dê acesso ao painel pra outra pessoa (ela precisa já ter uma conta criada no CineVito). Quem entra assim só vê Vídeos, Coleções e Séries — sem acesso a pagamentos, clientes, cupons, planos ou à própria equipe, a menos que você promova a pessoa a admin master.</p>
     <div className="field"><label htmlFor="eq-email">E-mail da pessoa</label><div style={{ display: 'flex', gap: 8 }}><input id="eq-email" className="input focus-tv" value={novoEquipeEmail} onChange={(e) => setNovoEquipeEmail(e.target.value)} placeholder="email@exemplo.com" /><button className="primary-button focus-tv" onClick={addToEquipeHandler}>Adicionar</button></div></div>
