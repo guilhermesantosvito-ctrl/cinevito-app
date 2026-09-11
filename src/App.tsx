@@ -20,6 +20,13 @@ const queryClient = new QueryClient();
 const MP_PUBLIC_KEY = 'APP_USR-471c3a9b-ff0f-4743-a417-e54b9f13e902';
 const fallbackShelves = ['Início', 'Filmes Clássicos', 'Documentários', 'Curtas-Metragens'];
 const genres = ['Todos os gêneros', 'Ação', 'Aventura', 'Comédia', 'Documentário', 'Drama', 'Natureza', 'Terror'];
+// Restringe o que o vídeo embutido (iframe) pode fazer no navegador.
+// Libera só o necessário pra tocar (scripts, tela cheia, cast) e NÃO
+// libera "navegar a página toda" nem "abrir popup" — são exatamente
+// essas duas permissões que anúncios abusam pra redirecionar a pessoa
+// pra fora do CineVito. Sem elas, o vídeo continua tocando normal, mas
+// o redirecionamento forçado simplesmente é bloqueado pelo navegador.
+const VIDEO_IFRAME_SANDBOX = 'allow-scripts allow-same-origin allow-presentation allow-forms';
 function normalizeCatalogLabel(value: string | null | undefined) {
   return (value || '')
     .normalize('NFD')
@@ -82,9 +89,6 @@ function useColecoesDoCatalogo() {
   }, []);
   return colecoes;
 }
-// Aceita tanto uma URL simples quanto um código <iframe> completo colado
-// pelo admin — se for um iframe, extrai o "src" de dentro dele; senão,
-// usa o texto como veio (depois de tirar espaços nas pontas).
 function extractVideoUrl(input: string): string {
   const trimmed = input.trim();
   const iframeMatch = trimmed.match(/<iframe[^>]*\ssrc=["']([^"']+)["']/i);
@@ -343,7 +347,7 @@ function PlayerPage() {
   const embed = getEmbedInfo(video.url_video);
   return <div className="content-wrap page-main"><button className="quiet-button focus-tv" onClick={() => setLocation('/catalogo')} data-testid="button-back-catalog"><ArrowLeft size={16} />Voltar ao catálogo</button><div className="player-stage" style={{ marginTop: 17 }}><div className="player-box">
     {embed.type === 'file' && <video src={embed.src} controls playsInline data-testid="video-player" style={{ width: '100%', height: '100%' }} />}
-    {embed.type === 'embed' && <iframe src={embed.src} title={video.titulo} allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowFullScreen style={{ width: '100%', height: '100%', border: 0 }} data-testid="video-player" />}
+    {embed.type === 'embed' && <iframe src={embed.src} title={video.titulo} allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowFullScreen sandbox={VIDEO_IFRAME_SANDBOX} referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', border: 0 }} data-testid="video-player" />}
     {embed.type === 'none' && <div className="player-idle"><Play size={38} /><strong>Pronto para assistir</strong><span>Este título ainda não tem um link de vídeo cadastrado.</span></div>}
   </div><div className="player-details"><div><div className="eyebrow">{video.genero || video.categoria || 'CineVito'} {video.ano ? ` / ${video.ano}` : ''}</div><h1 className="section-title" style={{ marginTop: 7 }} data-testid="text-player-title">{video.titulo}</h1><p>{video.descricao || 'Este título faz parte do catálogo CineVito.'}</p></div><div className="player-actions"><button className={`secondary-button focus-tv ${saved ? 'active' : ''}`} onClick={toggle} data-testid="button-player-favorite"><Heart size={15} fill={saved ? 'currentColor' : 'none'} />{saved ? 'Na coleção' : 'Salvar'}</button></div></div></div></div>;
 }
