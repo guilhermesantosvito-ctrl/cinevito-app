@@ -22,8 +22,6 @@ const MP_PUBLIC_KEY = 'APP_USR-471c3a9b-ff0f-4743-a417-e54b9f13e902';
 const fallbackShelves = ['Início', 'Filmes Clássicos', 'Documentários', 'Curtas-Metragens'];
 const genres = ['Todos os gêneros', 'Ação', 'Aventura', 'Comédia', 'Documentário', 'Drama', 'Natureza', 'Terror'];
 const VIDEO_IFRAME_SANDBOX = 'allow-scripts allow-same-origin allow-presentation allow-forms';
-// A cada 3 minutos, o catálogo (vídeos, coleções, séries e o layout)
-// se atualiza sozinho — sem precisar sair da tela e voltar.
 const CATALOG_REFRESH_INTERVAL_MS = 3 * 60 * 1000;
 function normalizeCatalogLabel(value: string | null | undefined) {
   return (value || '')
@@ -673,8 +671,10 @@ function AdminPage() {
   const [selectedTemporada, setSelectedTemporada] = useState<Temporada | null>(null);
   const [episodios, setEpisodios] = useState<Episodio[]>([]);
   const [novoEpisodioVideoId, setNovoEpisodioVideoId] = useState('');
+  const [novoEpisodioLink, setNovoEpisodioLink] = useState('');
   const [novoEpisodioNumero, setNovoEpisodioNumero] = useState('1');
   const [novoEpisodioTitulo, setNovoEpisodioTitulo] = useState('');
+  const [novoEpisodioDescricao, setNovoEpisodioDescricao] = useState('');
   const [layoutItems, setLayoutItems] = useState<LayoutItem[]>([]);
   const [dragLayoutIndex, setDragLayoutIndex] = useState<number | null>(null);
   const [cupons, setCupons] = useState<Cupom[]>([]);
@@ -899,13 +899,33 @@ function AdminPage() {
     try { setEpisodios(await fetchEpisodios(temporada.id)); } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível carregar os episódios.'); }
   }
   async function addEpisodio() {
-    if (!selectedTemporada || !novoEpisodioVideoId) return;
+    if (!selectedTemporada) return;
+    setMessage('');
     const numero = Number(novoEpisodioNumero) || 1;
     try {
-      await adminAddEpisodio(selectedTemporada.id, novoEpisodioVideoId, numero, novoEpisodioTitulo.trim() || undefined);
+      let videoId = novoEpisodioVideoId;
+      if (!videoId) {
+        if (!novoEpisodioLink.trim() || !novoEpisodioTitulo.trim()) {
+          setMessage('Cole o link do episódio e dê um título, ou selecione um vídeo já cadastrado.');
+          return;
+        }
+        const novoVideo = await adminCreateVideo({
+          url_video: extractVideoUrl(novoEpisodioLink),
+          titulo: novoEpisodioTitulo.trim(),
+          descricao: novoEpisodioDescricao.trim() || null,
+          categoria_id: selectedSerie?.categoria_id || null,
+          genero: selectedSerie?.genero || null,
+          fonte: 'Episódio de série',
+        });
+        videoId = novoVideo.id;
+        await loadVideos();
+      }
+      await adminAddEpisodio(selectedTemporada.id, videoId, numero, novoEpisodioTitulo.trim() || undefined);
       setNovoEpisodioVideoId('');
-      setNovoEpisodioNumero(String(numero + 1));
+      setNovoEpisodioLink('');
       setNovoEpisodioTitulo('');
+      setNovoEpisodioDescricao('');
+      setNovoEpisodioNumero(String(numero + 1));
       setEpisodios(await fetchEpisodios(selectedTemporada.id));
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Não foi possível adicionar o episódio.');
@@ -1137,7 +1157,7 @@ function AdminPage() {
     </div>}
   </section>}
 
-  {tab === 'series' && <section className="panel panel-pad"><div className="eyebrow">Catálogo · Séries</div><h2 className="panel-title" style={{ marginTop: 8 }}>Séries e temporadas</h2><p className="muted" style={{ fontSize: '.82rem', lineHeight: 1.6 }}>Crie a série (com categoria/gênero, igual um vídeo), depois as temporadas dentro dela, e por fim os episódios (cada episódio usa um vídeo que você já cadastrou na aba Vídeos), na ordem certa.</p>
+  {tab === 'series' && <section className="panel panel-pad"><div className="eyebrow">Catálogo · Séries</div><h2 className="panel-title" style={{ marginTop: 8 }}>Séries e temporadas</h2><p className="muted" style={{ fontSize: '.82rem', lineHeight: 1.6 }}>Crie a série (com categoria/gênero, igual um vídeo), depois as temporadas dentro dela, e por fim os episódios — cole o link do episódio direto ali, igual na aba Vídeos.</p>
     <div className="field"><label htmlFor="serie-titulo">Título da série</label><input id="serie-titulo" className="input focus-tv" value={novaSerieTitulo} onChange={(e) => setNovaSerieTitulo(e.target.value)} placeholder="Ex.: Viagem ao Panamá" /></div>
     <div className="field"><label htmlFor="serie-descricao">Descrição (opcional)</label><input id="serie-descricao" className="input focus-tv" value={novaSerieDescricao} onChange={(e) => setNovaSerieDescricao(e.target.value)} placeholder="Uma linha sobre a série" /></div>
     <div className="field"><label htmlFor="serie-categoria">Categoria</label><select id="serie-categoria" className="input focus-tv" value={novaSerieCategoriaId} onChange={(e) => setNovaSerieCategoriaId(e.target.value)}><option value="">Selecione...</option>{categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select></div>
@@ -1156,9 +1176,12 @@ function AdminPage() {
 
       {selectedTemporada && <div style={{ marginTop: 22 }}>
         <h3>Episódios de "{selectedTemporada.titulo || `Temporada ${selectedTemporada.numero}`}"</h3>
-        <div className="field"><label htmlFor="ep-video">Vídeo do episódio</label><select id="ep-video" className="input focus-tv" value={novoEpisodioVideoId} onChange={(e) => setNovoEpisodioVideoId(e.target.value)}><option value="">Selecione um vídeo já cadastrado...</option>{videos.map((v) => <option key={v.id} value={v.id}>{v.titulo}</option>)}</select></div>
+        <p className="muted" style={{ fontSize: '.8rem' }}>Cole o link/iframe do episódio, igual na aba Vídeos — o vídeo é criado e já vira episódio de uma vez só.</p>
+        <div className="field"><label htmlFor="ep-link">Link do episódio ou código &lt;iframe&gt;</label><textarea id="ep-link" className="input focus-tv" rows={3} value={novoEpisodioLink} onChange={(e) => setNovoEpisodioLink(e.target.value)} placeholder="https://..." /></div>
+        <div className="field"><label htmlFor="ep-titulo">Título do episódio</label><input id="ep-titulo" className="input focus-tv" value={novoEpisodioTitulo} onChange={(e) => setNovoEpisodioTitulo(e.target.value)} placeholder="Ex.: Chegada à cidade" /></div>
+        <div className="field"><label htmlFor="ep-descricao">Sinopse (opcional)</label><input id="ep-descricao" className="input focus-tv" value={novoEpisodioDescricao} onChange={(e) => setNovoEpisodioDescricao(e.target.value)} placeholder="Uma linha sobre o episódio" /></div>
         <div className="field"><label htmlFor="ep-numero">Número do episódio</label><input id="ep-numero" type="number" className="input focus-tv" value={novoEpisodioNumero} onChange={(e) => setNovoEpisodioNumero(e.target.value)} /></div>
-        <div className="field"><label htmlFor="ep-titulo">Título do episódio (opcional)</label><input id="ep-titulo" className="input focus-tv" value={novoEpisodioTitulo} onChange={(e) => setNovoEpisodioTitulo(e.target.value)} placeholder="Ex.: Chegada à cidade" /></div>
+        <div className="field"><label htmlFor="ep-video">Ou selecione um vídeo já cadastrado (em vez de colar link)</label><select id="ep-video" className="input focus-tv" value={novoEpisodioVideoId} onChange={(e) => setNovoEpisodioVideoId(e.target.value)}><option value="">Nenhum — vou colar o link acima</option>{videos.map((v) => <option key={v.id} value={v.id}>{v.titulo}</option>)}</select></div>
         <button className="secondary-button focus-tv" onClick={addEpisodio}>Adicionar episódio</button>
         <div className="admin-list" style={{ marginTop: 14 }}>{episodios.length ? episodios.map((ep) => <div className="result-row" key={ep.id}><span><strong>Ep. {ep.numero}</strong> — {ep.titulo || ep.videos?.titulo}</span><button className="quiet-button focus-tv" onClick={() => removeEpisodioHandler(ep.id)}>Remover</button></div>) : <p className="muted">Nenhum episódio cadastrado ainda.</p>}</div>
       </div>}
