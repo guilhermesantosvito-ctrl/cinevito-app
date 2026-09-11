@@ -22,6 +22,9 @@ const MP_PUBLIC_KEY = 'APP_USR-471c3a9b-ff0f-4743-a417-e54b9f13e902';
 const fallbackShelves = ['Início', 'Filmes Clássicos', 'Documentários', 'Curtas-Metragens'];
 const genres = ['Todos os gêneros', 'Ação', 'Aventura', 'Comédia', 'Documentário', 'Drama', 'Natureza', 'Terror'];
 const VIDEO_IFRAME_SANDBOX = 'allow-scripts allow-same-origin allow-presentation allow-forms';
+// A cada 3 minutos, o catálogo (vídeos, coleções, séries e o layout)
+// se atualiza sozinho — sem precisar sair da tela e voltar.
+const CATALOG_REFRESH_INTERVAL_MS = 3 * 60 * 1000;
 function normalizeCatalogLabel(value: string | null | undefined) {
   return (value || '')
     .normalize('NFD')
@@ -79,8 +82,10 @@ function useColecoesDoCatalogo() {
   useEffect(() => {
     if (!hasRuntimeConfig) return;
     let cancelled = false;
-    fetchColecoesParaCatalogo().then((data) => { if (!cancelled) setColecoes(data); }).catch(() => { if (!cancelled) setColecoes([]); });
-    return () => { cancelled = true; };
+    const carregar = () => fetchColecoesParaCatalogo().then((data) => { if (!cancelled) setColecoes(data); }).catch(() => { if (!cancelled) setColecoes([]); });
+    carregar();
+    const intervalId = window.setInterval(carregar, CATALOG_REFRESH_INTERVAL_MS);
+    return () => { cancelled = true; window.clearInterval(intervalId); };
   }, []);
   return colecoes;
 }
@@ -89,8 +94,10 @@ function useSeriesDoCatalogo() {
   useEffect(() => {
     if (!hasRuntimeConfig) return;
     let cancelled = false;
-    fetchSeries().then((data) => { if (!cancelled) setSeries(data); }).catch(() => { if (!cancelled) setSeries([]); });
-    return () => { cancelled = true; };
+    const carregar = () => fetchSeries().then((data) => { if (!cancelled) setSeries(data); }).catch(() => { if (!cancelled) setSeries([]); });
+    carregar();
+    const intervalId = window.setInterval(carregar, CATALOG_REFRESH_INTERVAL_MS);
+    return () => { cancelled = true; window.clearInterval(intervalId); };
   }, []);
   return series;
 }
@@ -99,8 +106,10 @@ function useCatalogLayoutPublico() {
   useEffect(() => {
     if (!hasRuntimeConfig) return;
     let cancelled = false;
-    fetchCatalogoLayoutPublico().then((data) => { if (!cancelled) setLayout(data); }).catch(() => { if (!cancelled) setLayout([]); });
-    return () => { cancelled = true; };
+    const carregar = () => fetchCatalogoLayoutPublico().then((data) => { if (!cancelled) setLayout(data); }).catch(() => { if (!cancelled) setLayout([]); });
+    carregar();
+    const intervalId = window.setInterval(carregar, CATALOG_REFRESH_INTERVAL_MS);
+    return () => { cancelled = true; window.clearInterval(intervalId); };
   }, []);
   return layout;
 }
@@ -292,7 +301,23 @@ function SerieCard({ serie, onOpen }: { serie: Serie; onOpen: () => void }) {
 }
 function useVideos() {
   const [videos, setVideos] = useState<Video[]>([]); const [loading, setLoading] = useState(hasRuntimeConfig); const [error, setError] = useState('');
-  useEffect(() => { if (!hasRuntimeConfig) { setLoading(false); return; } let cancelled = false; (async () => { try { const items = await fetchVideos(); if (!cancelled) setVideos(items); } catch (fetchError) { if (!cancelled) setError(fetchError instanceof Error ? fetchError.message : 'Não foi possível carregar o catálogo.'); } finally { if (!cancelled) setLoading(false); } })(); return () => { cancelled = true; }; }, []);
+  useEffect(() => {
+    if (!hasRuntimeConfig) { setLoading(false); return; }
+    let cancelled = false;
+    const carregar = async (primeiraVez: boolean) => {
+      try {
+        const items = await fetchVideos();
+        if (!cancelled) setVideos(items);
+      } catch (fetchError) {
+        if (!cancelled && primeiraVez) setError(fetchError instanceof Error ? fetchError.message : 'Não foi possível carregar o catálogo.');
+      } finally {
+        if (!cancelled && primeiraVez) setLoading(false);
+      }
+    };
+    carregar(true);
+    const intervalId = window.setInterval(() => carregar(false), CATALOG_REFRESH_INTERVAL_MS);
+    return () => { cancelled = true; window.clearInterval(intervalId); };
+  }, []);
   return { videos, loading, error };
 }
 function CatalogPage() {
