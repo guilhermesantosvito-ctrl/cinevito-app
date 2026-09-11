@@ -277,8 +277,12 @@ export async function adminCreateGenero(nome: string) {
   const proximaOrdem = existentes.length ? Math.max(...existentes.map((g) => g.ordem || 0)) + 1 : 1;
   return request('/rest/v1/generos', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ nome, ordem: proximaOrdem }) });
 }
+// Retorna o vídeo criado (com o id dele) — necessário quando cadastramos
+// o vídeo de um episódio direto na aba Séries e precisamos vincular
+// o id na mesma operação.
 export async function adminCreateVideo(payload: Partial<Video>) {
-  return request('/rest/v1/videos', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(payload) });
+  const criados = await request<Video[]>('/rest/v1/videos', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(payload) });
+  return criados[0];
 }
 export async function adminUpdateVideo(id: string, payload: Partial<Video>) {
   return request('/rest/v1/videos?id=eq.' + encodeURIComponent(id), { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(payload) });
@@ -307,8 +311,6 @@ export async function adminCreateColecao(payload: { titulo: string; descricao?: 
     }),
   });
   const nova = criadas[0];
-  // Toda coleção nova já entra automaticamente na lista de fileiras
-  // do Layout, no fim da fila — o admin pode reordenar/esconder depois.
   if (nova) {
     try {
       const layoutAtual = await fetchCatalogoLayout();
