@@ -26,6 +26,7 @@ export type Serie = { id: string; titulo: string; descricao?: string | null; cap
 export type Temporada = { id: string; serie_id: string; numero: number; titulo?: string | null };
 export type Episodio = { id: string; temporada_id: string; video_id: string; numero: number; titulo?: string | null; videos?: Video };
 export type Equipe = { id: string; nome?: string | null; email?: string | null; admin_master?: boolean | null };
+export type LayoutItem = { id: string; tipo: 'colecao' | 'series' | 'catalogo_geral'; colecao_id?: string | null; ordem: number; visivel: boolean; colecoes?: { titulo: string } | null };
 export type Plan = {
   id: string;
   nome: string;
@@ -294,9 +295,9 @@ export async function fetchColecoes(): Promise<Colecao[]> {
 export async function adminCreateColecao(payload: { titulo: string; descricao?: string; capa_url?: string }) {
   const existentes = await fetchColecoes();
   const proximaOrdem = existentes.length ? Math.max(...existentes.map((c) => c.ordem || 0)) + 1 : 1;
-  return request('/rest/v1/colecoes', {
+  const criadas = await request<Colecao[]>('/rest/v1/colecoes', {
     method: 'POST',
-    headers: { Prefer: 'return=minimal' },
+    headers: { Prefer: 'return=representation' },
     body: JSON.stringify({
       titulo: payload.titulo,
       slug: slugify(payload.titulo) + '-' + Date.now().toString(36),
@@ -305,6 +306,21 @@ export async function adminCreateColecao(payload: { titulo: string; descricao?: 
       ordem: proximaOrdem,
     }),
   });
+  const nova = criadas[0];
+  // Toda coleção nova já entra automaticamente na lista de fileiras
+  // do Layout, no fim da fila — o admin pode reordenar/esconder depois.
+  if (nova) {
+    try {
+      const layoutAtual = await fetchCatalogoLayout();
+      const proximaOrdemLayout = layoutAtual.length ? Math.max(...layoutAtual.map((l) => l.ordem || 0)) + 1 : 1;
+      await request('/rest/v1/catalogo_layout', {
+        method: 'POST',
+        headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ tipo: 'colecao', colecao_id: nova.id, ordem: proximaOrdemLayout, visivel: true }),
+      });
+    } catch { /* se falhar, a coleção continua criada; o admin pode adicionar ela ao layout manualmente depois */ }
+  }
+  return nova;
 }
 export async function adminDeleteColecao(id: string) {
   await request('/rest/v1/colecao_videos?colecao_id=eq.' + encodeURIComponent(id), { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
@@ -338,7 +354,28 @@ export async function fetchColecoesParaCatalogo(): Promise<Array<{ colecao: Cole
     );
     return { colecao, videos: linhas.map((linha) => linha.videos).filter(Boolean) };
   }));
-  return resultados.filter((item) => item.videos.length > 0);
+  return resultados;
+}
+
+// ================= LAYOUT DO CATÁLOGO (fileiras arrastáveis) =================
+
+export async function fetchCatalogoLayout(): Promise<LayoutItem[]> {
+  return request<LayoutItem[]>('/rest/v1/catalogo_layout?select=*,colecoes(titulo)&order=ordem.asc');
+}
+export async function fetchCatalogoLayoutPublico(): Promise<LayoutItem[]> {
+  return request<LayoutItem[]>('/rest/v1/catalogo_layout?select=*&visivel=eq.true&order=ordem.asc');
+}
+export async function adminReorderLayout(orderedIds: string[]) {
+  await Promise.all(orderedIds.map((id, index) =>
+    request(`/rest/v1/catalogo_layout?id=eq.${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ ordem: index + 1 }),
+    }),
+  ));
+}
+export async function adminToggleLayoutVisible(id: string, visivel: boolean) {
+  return request(`/rest/v1/catalogo_layout?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ visivel }) });
 }
 
 // ================= SÉRIES E TEMPORADAS =================
