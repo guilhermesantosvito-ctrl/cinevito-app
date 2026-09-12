@@ -158,7 +158,11 @@ function detectarPlataformaInstalacao(): PlataformaInstalacao {
   const ua = navigator.userAgent.toLowerCase();
   const ehTV = /smarttv|smart-tv|googletv|appletv|hbbtv|netcast|viera|aquos|bravia|tizen|web0s|webos|crkey|roku|firetv|aft\b/i.test(ua);
   if (ehTV) return 'tv';
-  if (/iphone|ipad|ipod/i.test(ua)) return 'ios';
+  // iPads recentes às vezes mandam um user-agent "de computador" pro Safari.
+  // Detectamos isso pelo toque múltiplo + plataforma Mac, pra não confundir
+  // um iPad com um notebook de verdade.
+  const ehIpadDisfarcadoDeMac = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+  if (/iphone|ipad|ipod/i.test(ua) || ehIpadDisfarcadoDeMac) return 'ios';
   if (/android/i.test(ua)) return 'android';
   return 'desktop';
 }
@@ -212,16 +216,21 @@ function useInstallPrompt(user: SessionUser | null) {
 function InstallBanner({ user }: { user: SessionUser | null }) {
   const { visible, platform, canInstallDirectly, install, dismiss } = useInstallPrompt(user);
   if (!visible) return null;
-  if (platform !== 'ios' && !canInstallDirectly) return null;
+  // Antes, a faixa só aparecia no iOS ou quando o navegador disparava o
+  // evento de instalação direta (o que só acontece em alguns casos no
+  // Chrome/Android e no computador). Agora a faixa sempre aparece pra quem
+  // ainda não instalou — com botão quando dá pra instalar direto, ou com
+  // instrução manual quando não dá.
+  const mensagem = platform === 'ios'
+    ? 'Instale o CineVito: toque em Compartilhar e depois em "Adicionar à Tela de Início".'
+    : canInstallDirectly
+      ? 'Instale o CineVito na sua tela inicial'
+      : 'Instale o CineVito: toque no menu (⋮) do navegador e escolha "Instalar app" ou "Adicionar à tela inicial".';
   return (
     <div style={{ width: '100%', background: 'linear-gradient(90deg, #ff8228, #2ec4b6 55%, #00c8ff)', color: '#0b0e14', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
       <span style={{ fontSize: '1.3rem', flexShrink: 0 }}>📲</span>
-      <strong style={{ flex: 1, fontSize: '.9rem', minWidth: 200 }}>
-        {platform === 'ios'
-          ? 'Instale o CineVito: toque em Compartilhar e depois em "Adicionar à Tela de Início".'
-          : 'Instale o CineVito na sua tela inicial'}
-      </strong>
-      {platform !== 'ios' && <button onClick={install} style={{ background: '#0b0e14', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>Instalar agora</button>}
+      <strong style={{ flex: 1, fontSize: '.9rem', minWidth: 200 }}>{mensagem}</strong>
+      {canInstallDirectly && <button onClick={install} style={{ background: '#0b0e14', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>Instalar agora</button>}
       <button onClick={dismiss} aria-label="Fechar aviso de instalação" style={{ background: 'transparent', border: 'none', color: '#0b0e14', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center' }}><X size={20} /></button>
     </div>
   );
