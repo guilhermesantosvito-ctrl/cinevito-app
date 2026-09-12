@@ -38,7 +38,7 @@ export const handler: Handler = async (event) => {
 
     const response = await fetch(`${SUPABASE_URL}/rest/v1/videos?id=eq.${encodeURIComponent(video_id)}`, {
       headers: {
-        apikey: ***
+        apikey: SERVICE_ROLE_KEY,
         Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
         Prefer: 'return=minimal',
       },
