@@ -3,8 +3,8 @@ import type { CSSProperties, DragEvent, FormEvent, ReactNode } from 'react';
 import { Link, Route, Switch, useLocation, useParams, Router as WouterRouter } from 'wouter';
 import {
   ArrowLeft, Check, ChevronDown, ChevronRight, CircleAlert, Clapperboard, Copy, Download, Eye, EyeOff,
-  Film, Heart, Info, KeyRound, Library, LogIn, LogOut, Play, RefreshCw, Search,
-  Send, Settings, ShieldCheck, Sparkles, UserRound, X,
+  Film, Heart, Info, KeyRound, Library, LogIn, LogOut, MoreVertical, Play, Plus, RefreshCw, Search,
+  Send, Settings, ShieldCheck, Share2, Smartphone, Sparkles, UserRound, X,
 } from 'lucide-react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -213,26 +213,72 @@ function useInstallPrompt(user: SessionUser | null) {
   }
   return { visible, platform, alreadyInstalled, canInstallDirectly: Boolean(deferredEvent), install, dismiss };
 }
+type InstallStep = { icon: typeof Share2; title: string; description: string };
+function stepsForPlatform(platform: PlataformaInstalacao): InstallStep[] {
+  if (platform === 'ios') {
+    return [
+      { icon: Share2, title: 'Toque em Compartilhar', description: 'Na barra do Safari (ou no menu "aA" / "..." dependendo da versão), toque no ícone de compartilhar — o quadrado com a seta pra cima.' },
+      { icon: Plus, title: 'Toque em "Adicionar à Tela de Início"', description: 'Role a lista de opções que abrir até encontrar essa opção, e toque nela.' },
+      { icon: Smartphone, title: 'Toque em "Adicionar"', description: 'Confirme no canto superior direito. O ícone do CineVito aparece na sua tela inicial, pronto pra abrir quando quiser — igual um app baixado.' },
+    ];
+  }
+  return [
+    { icon: MoreVertical, title: 'Toque no menu do navegador', description: 'Geralmente é o ícone de três pontinhos (⋮), no canto superior ou inferior da tela.' },
+    { icon: Plus, title: 'Toque em "Instalar app" ou "Adicionar à tela inicial"', description: 'O nome exato pode variar um pouco dependendo do navegador do seu aparelho.' },
+  ];
+}
+function InstallInstructionsModal({ platform, onClose }: { platform: PlataformaInstalacao; onClose: () => void }) {
+  const steps = stepsForPlatform(platform);
+  return (
+    <div role="dialog" aria-modal="true" aria-label="Como instalar o CineVito" onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(6,9,14,.72)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 0 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: '#0f141c', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, padding: '22px 20px 26px', boxShadow: '0 -8px 40px rgba(0,0,0,.5)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Clapperboard size={20} />
+            <strong style={{ fontSize: '1.05rem' }}>Como instalar o CineVito</strong>
+          </div>
+          <button onClick={onClose} className="icon-button focus-tv" aria-label="Fechar instruções"><X size={18} /></button>
+        </div>
+        <p className="muted" style={{ fontSize: '.83rem', marginTop: 6, marginBottom: 20 }}>
+          {platform === 'ios' ? 'Leva só alguns segundos — depois é sempre um toque no ícone, igual um app baixado.' : 'Alguns passos rápidos e o CineVito fica salvo na sua tela inicial.'}
+        </p>
+        <div style={{ display: 'grid', gap: 16 }}>
+          {steps.map((step, index) => (
+            <div key={step.title} style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+              <div style={{ width: 38, height: 38, borderRadius: 12, background: 'linear-gradient(145deg, #ff8228, #2ec4b6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#0b0e14' }}>
+                <step.icon size={19} />
+              </div>
+              <div>
+                <strong style={{ fontSize: '.92rem', display: 'block' }}>{index + 1}. {step.title}</strong>
+                <span className="muted" style={{ fontSize: '.82rem', lineHeight: 1.5 }}>{step.description}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <button className="primary-button button-wide focus-tv" style={{ marginTop: 24 }} onClick={onClose}>Entendi</button>
+      </div>
+    </div>
+  );
+}
 function InstallBanner({ user }: { user: SessionUser | null }) {
   const { visible, platform, canInstallDirectly, install, dismiss } = useInstallPrompt(user);
+  const [showInstructions, setShowInstructions] = useState(false);
   if (!visible) return null;
-  // Antes, a faixa só aparecia no iOS ou quando o navegador disparava o
-  // evento de instalação direta (o que só acontece em alguns casos no
-  // Chrome/Android e no computador). Agora a faixa sempre aparece pra quem
-  // ainda não instalou — com botão quando dá pra instalar direto, ou com
-  // instrução manual quando não dá.
-  const mensagem = platform === 'ios'
-    ? 'Instale o CineVito: toque em Compartilhar e depois em "Adicionar à Tela de Início".'
-    : canInstallDirectly
-      ? 'Instale o CineVito na sua tela inicial'
-      : 'Instale o CineVito: toque no menu (⋮) do navegador e escolha "Instalar app" ou "Adicionar à tela inicial".';
   return (
-    <div style={{ width: '100%', background: 'linear-gradient(90deg, #ff8228, #2ec4b6 55%, #00c8ff)', color: '#0b0e14', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-      <span style={{ fontSize: '1.3rem', flexShrink: 0 }}>📲</span>
-      <strong style={{ flex: 1, fontSize: '.9rem', minWidth: 200 }}>{mensagem}</strong>
-      {canInstallDirectly && <button onClick={install} style={{ background: '#0b0e14', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>Instalar agora</button>}
-      <button onClick={dismiss} aria-label="Fechar aviso de instalação" style={{ background: 'transparent', border: 'none', color: '#0b0e14', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center' }}><X size={20} /></button>
-    </div>
+    <>
+      <div style={{ width: '100%', background: 'linear-gradient(90deg, #ff8228, #2ec4b6 55%, #00c8ff)', color: '#0b0e14', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: '1.3rem', flexShrink: 0 }}>📲</span>
+        <strong style={{ flex: 1, fontSize: '.9rem', minWidth: 200 }}>Instale o CineVito na sua tela inicial</strong>
+        <button
+          onClick={canInstallDirectly ? install : () => setShowInstructions(true)}
+          style={{ background: '#0b0e14', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+        >
+          {canInstallDirectly ? 'Instalar agora' : 'Como instalar'}
+        </button>
+        <button onClick={dismiss} aria-label="Fechar aviso de instalação" style={{ background: 'transparent', border: 'none', color: '#0b0e14', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center' }}><X size={20} /></button>
+      </div>
+      {showInstructions && <InstallInstructionsModal platform={platform} onClose={() => setShowInstructions(false)} />}
+    </>
   );
 }
 function ToastMessage({ message, onClose }: { message: string; onClose: () => void }) {
@@ -638,6 +684,7 @@ function ProfilePage() {
   const [subscription, setSubscription] = useState<MinhaAssinatura | null>(null);
   const [copied, setCopied] = useState(false);
   const installState = useInstallPrompt(user);
+  const [showInstallInstructions, setShowInstallInstructions] = useState(false);
   useEffect(() => { if (hasRuntimeConfig && user) { fetchProfile().then(setProfile).catch(() => setProfile(null)); fetchMySubscription().then(setSubscription).catch(() => setSubscription(null)); } }, [user]);
   const name = profile?.nome || titleCaseName(user);
   const { status, origem } = subscriptionLabel(subscription);
@@ -651,10 +698,12 @@ function ProfilePage() {
   return <div className="content-wrap page-main"><PageHeader eyebrow="Sua conta" title="Perfil" description="Gerencie seus dados, sua assinatura e o acesso do CineVito." /><div className="two-col"><section className="panel panel-pad"><div className="profile-hero"><div className="profile-avatar">{initials(user)}</div><div><h1>{name}</h1><p data-testid="text-profile-email">{profile?.email || user?.email || 'Sessão local'}</p></div></div><div className="status-card" data-testid="status-profile-subscription"><h3>Acesso ao CineVito</h3>{subscription ? <><p><strong>{subscription.plano || 'Plano'}</strong> · {status}</p><p className="muted" style={{ fontSize: '.8rem' }}>{origem}</p>{subscription.data_expiracao && <p className="muted" style={{ fontSize: '.8rem' }}>Válido até {new Date(subscription.data_expiracao).toLocaleDateString('pt-BR')}</p>}</> : <p>{user ? 'Você ainda não tem nenhuma assinatura registrada.' : 'Entre para consultar sua assinatura.'}</p>}<Link href="/assinatura" className="primary-button focus-tv" style={{ width: 'fit-content', marginTop: 7 }} data-testid="link-profile-subscription">Ver assinatura</Link></div>
     {installState.platform !== 'tv' && !installState.alreadyInstalled && <div className="status-card" style={{ marginTop: 14 }}>
       <h3>Instalar o app</h3>
-      {installState.canInstallDirectly && <><p className="muted" style={{ fontSize: '.8rem' }}>Adicione o CineVito à tela do seu aparelho pra abrir direto, como um app.</p><button className="primary-button focus-tv" style={{ width: 'fit-content', marginTop: 7 }} onClick={installState.install}><Download size={15} />Instalar CineVito</button></>}
-      {!installState.canInstallDirectly && installState.platform === 'ios' && <p className="muted" style={{ fontSize: '.8rem' }}>Toque no botão de Compartilhar do Safari e depois em "Adicionar à Tela de Início".</p>}
-      {!installState.canInstallDirectly && installState.platform !== 'ios' && <p className="muted" style={{ fontSize: '.8rem' }}>Ainda não deu pra instalar direto por aqui. Tenta pelo menu do navegador (⋮) → "Instalar app" ou "Adicionar à tela inicial".</p>}
+      <p className="muted" style={{ fontSize: '.8rem' }}>Adicione o CineVito à tela do seu aparelho pra abrir direto, como um app.</p>
+      <button className="primary-button focus-tv" style={{ width: 'fit-content', marginTop: 7 }} onClick={installState.canInstallDirectly ? installState.install : () => setShowInstallInstructions(true)}>
+        <Download size={15} />{installState.canInstallDirectly ? 'Instalar CineVito' : 'Como instalar'}
+      </button>
     </div>}
+    {showInstallInstructions && <InstallInstructionsModal platform={installState.platform} onClose={() => setShowInstallInstructions(false)} />}
   </section><section className="panel panel-pad"><h2 className="panel-title">Seu código de indicação</h2>{profile?.codigo_indicacao ? <><p className="muted" style={{ fontSize: '.8rem', lineHeight: 1.5 }}>Compartilhe o link. A indicação só é confirmada depois que a pessoa fizer um pagamento.</p><div className="code-box"><code data-testid="text-referral-code">{profile.codigo_indicacao}</code><button className="icon-button focus-tv" onClick={copyReferral} aria-label="Copiar link de indicação" data-testid="button-copy-referral">{copied ? <Check size={16} /> : <Copy size={16} />}</button></div><p className="muted" style={{ fontSize: '.72rem', marginBottom: 0 }}>{copied ? 'Link copiado.' : 'Não há campanha ativa no momento? Seu código continua válido.'}</p></> : <div className="notice notice-cyan"><Info size={16} /><span>Seu código aparece aqui depois do primeiro pagamento aprovado (acesso de cortesia não gera código).</span></div>}</section></div></div>;
 }
 function loadMercadoPagoSdk(): Promise<void> {
