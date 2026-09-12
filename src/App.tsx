@@ -266,16 +266,16 @@ function InstallBanner({ user }: { user: SessionUser | null }) {
   if (!visible) return null;
   return (
     <>
-      <div style={{ width: '100%', background: 'linear-gradient(90deg, #ff8228, #2ec4b6 55%, #00c8ff)', color: '#0b0e14', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: '1.3rem', flexShrink: 0 }}>📲</span>
-        <strong style={{ flex: 1, fontSize: '.9rem', minWidth: 200 }}>Instale o CineVito na sua tela inicial</strong>
+      <div style={{ width: '100%', background: 'linear-gradient(90deg, #ff8228, #2ec4b6 55%, #00c8ff)', color: '#0b0e14', padding: '7px 12px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'nowrap', overflow: 'hidden' }}>
+        <span style={{ fontSize: '1rem', flexShrink: 0, lineHeight: 1 }}>📲</span>
+        <strong style={{ flex: 1, minWidth: 0, fontSize: '.8rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Instale o CineVito na sua tela inicial</strong>
         <button
           onClick={canInstallDirectly ? install : () => setShowInstructions(true)}
-          style={{ background: '#0b0e14', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+          style={{ background: '#0b0e14', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 12px', fontSize: '.78rem', fontWeight: 600, cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}
         >
           {canInstallDirectly ? 'Instalar agora' : 'Como instalar'}
         </button>
-        <button onClick={dismiss} aria-label="Fechar aviso de instalação" style={{ background: 'transparent', border: 'none', color: '#0b0e14', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center' }}><X size={20} /></button>
+        <button onClick={dismiss} aria-label="Fechar aviso de instalação" style={{ background: 'transparent', border: 'none', color: '#0b0e14', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', padding: 0 }}><X size={16} /></button>
       </div>
       {showInstructions && <InstallInstructionsModal platform={platform} onClose={() => setShowInstructions(false)} />}
     </>
