@@ -178,18 +178,26 @@ function useInstallPrompt(user: SessionUser | null) {
   useEffect(() => {
     const jaInstalado = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as unknown as { standalone?: boolean }).standalone === true;
     setAlreadyInstalled(jaInstalado);
-    setPlatform(detectarPlataformaInstalacao());
-    if (!user || jaInstalado) { setVisible(false); return; }
     const plataforma = detectarPlataformaInstalacao();
-    if (plataforma === 'tv') { setVisible(false); return; }
-    const chave = `cinevito-install-dismissed-${plataforma}`;
-    const dispensadoEm = Number(localStorage.getItem(chave) || 0);
-    const janelaEspera = plataforma === 'desktop' ? 14 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
-    if (dispensadoEm && Date.now() - dispensadoEm < janelaEspera) { setVisible(false); return; }
+    setPlatform(plataforma);
+    if (!user || jaInstalado || plataforma === 'tv') { setVisible(false); return; }
+    if (plataforma === 'desktop') {
+      // No computador, aparece bem mais raro (a cada 14 dias) pra não
+      // incomodar quem só usa o navegador normal.
+      const dispensadoEm = Number(localStorage.getItem('cinevito-install-dismissed-desktop') || 0);
+      const janela = 14 * 24 * 60 * 60 * 1000;
+      if (dispensadoEm && Date.now() - dispensadoEm < janela) { setVisible(false); return; }
+    } else {
+      // No celular, some quando a pessoa fecha o aviso, mas volta a
+      // aparecer na próxima vez que ela abrir/logar no app (sessão
+      // nova do navegador) — até ela instalar de verdade.
+      if (sessionStorage.getItem('cinevito-install-dismissed-session')) { setVisible(false); return; }
+    }
     setVisible(true);
   }, [user?.id]);
   function dismiss() {
-    localStorage.setItem(`cinevito-install-dismissed-${platform}`, String(Date.now()));
+    if (platform === 'desktop') localStorage.setItem('cinevito-install-dismissed-desktop', String(Date.now()));
+    else sessionStorage.setItem('cinevito-install-dismissed-session', '1');
     setVisible(false);
   }
   async function install() {
@@ -197,7 +205,6 @@ function useInstallPrompt(user: SessionUser | null) {
     deferredEvent.prompt();
     try { await deferredEvent.userChoice; } catch { /* ignore */ }
     setDeferredEvent(null);
-    localStorage.setItem(`cinevito-install-dismissed-${platform}`, String(Date.now()));
     setVisible(false);
   }
   return { visible, platform, alreadyInstalled, canInstallDirectly: Boolean(deferredEvent), install, dismiss };
@@ -207,18 +214,15 @@ function InstallBanner({ user }: { user: SessionUser | null }) {
   if (!visible) return null;
   if (platform !== 'ios' && !canInstallDirectly) return null;
   return (
-    <div style={{ position: 'fixed', left: 12, right: 12, bottom: 78, zIndex: 40, background: 'var(--bg-card, #11151f)', border: '1px solid #2ec4b6', borderRadius: 12, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 6px 24px rgba(0,0,0,0.35)' }}>
-      <Download size={20} color="#00c8ff" style={{ flexShrink: 0 }} />
-      <div style={{ flex: 1, fontSize: '.84rem', lineHeight: 1.4 }}>
-        <strong>Instale o CineVito</strong>
-        <p className="muted" style={{ margin: '2px 0 0' }}>
-          {platform === 'ios'
-            ? 'Toque em Compartilhar e depois em "Adicionar à Tela de Início" pra abrir como um app.'
-            : 'Adicione o CineVito à tela do seu aparelho pra abrir direto, como um app.'}
-        </p>
-      </div>
-      {platform !== 'ios' && <button className="primary-button focus-tv" onClick={install} style={{ flexShrink: 0 }}>Instalar</button>}
-      <button className="icon-button focus-tv" onClick={dismiss} aria-label="Agora não" style={{ flexShrink: 0 }}><X size={16} /></button>
+    <div style={{ width: '100%', background: 'linear-gradient(90deg, #ff8228, #2ec4b6 55%, #00c8ff)', color: '#0b0e14', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+      <span style={{ fontSize: '1.3rem', flexShrink: 0 }}>📲</span>
+      <strong style={{ flex: 1, fontSize: '.9rem', minWidth: 200 }}>
+        {platform === 'ios'
+          ? 'Instale o CineVito: toque em Compartilhar e depois em "Adicionar à Tela de Início".'
+          : 'Instale o CineVito na sua tela inicial'}
+      </strong>
+      {platform !== 'ios' && <button onClick={install} style={{ background: '#0b0e14', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>Instalar agora</button>}
+      <button onClick={dismiss} aria-label="Fechar aviso de instalação" style={{ background: 'transparent', border: 'none', color: '#0b0e14', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center' }}><X size={20} /></button>
     </div>
   );
 }
@@ -261,6 +265,7 @@ function AppShell({ children }: { children: ReactNode }) {
   if (isHome) return <>{children}</>;
   return (
     <div className="app-frame">
+      <InstallBanner user={user} />
       <div className="sprocket-strip" />
       <header className="topbar">
         <div className="content-wrap topbar-inner">
@@ -274,7 +279,6 @@ function AppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
       <main>{children}</main>
-      <InstallBanner user={user} />
       <nav className="mobile-nav" aria-label="Navegação mobile">
         {navigation.slice(0, 3).map(({ href, label, icon: Icon }) => <Link key={href} href={href} className="mobile-nav-link focus-tv" aria-current={active(href) ? 'page' : undefined} data-testid={`link-mobile-${label.toLowerCase().replaceAll(' ', '-')}`}><Icon size={17} /><span>{label}</span></Link>)}
         <Link href={user ? '/perfil' : '/'} className="mobile-nav-link focus-tv" aria-current={location === '/perfil' ? 'page' : undefined} data-testid="link-mobile-profile"><UserRound size={17} /><span>{user ? 'Perfil' : 'Entrar'}</span></Link>
