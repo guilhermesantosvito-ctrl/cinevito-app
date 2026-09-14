@@ -17,6 +17,8 @@ export type Video = {
   categoria_id?: string | null;
   fonte?: string | null;
   licenca?: string | null;
+  elenco?: string | null;
+  ao_vivo?: boolean | null;
 };
 export type Categoria = { id: string; nome: string; slug?: string | null; ordem?: number | null };
 export type Genero = { id: string; nome: string; ordem?: number | null };
@@ -26,7 +28,17 @@ export type Serie = { id: string; titulo: string; descricao?: string | null; cap
 export type Temporada = { id: string; serie_id: string; numero: number; titulo?: string | null };
 export type Episodio = { id: string; temporada_id: string; video_id: string; numero: number; titulo?: string | null; videos?: Video };
 export type Equipe = { id: string; nome?: string | null; email?: string | null; admin_master?: boolean | null };
-export type LayoutItem = { id: string; tipo: 'colecao' | 'series' | 'catalogo_geral'; colecao_id?: string | null; ordem: number; visivel: boolean; colecoes?: { titulo: string } | null };
+export type LayoutSectionConfig = { video_ids?: string[]; nome?: string; valor?: string };
+export type LayoutItem = {
+  id: string;
+  tipo: 'colecao' | 'series' | 'catalogo_geral' | 'hero' | 'carrossel' | 'top10' | 'elenco' | 'categoria' | 'ao_vivo';
+  colecao_id?: string | null;
+  ordem: number;
+  visivel: boolean;
+  titulo?: string | null;
+  config?: LayoutSectionConfig | null;
+  colecoes?: { titulo: string } | null;
+};
 export type ContinuarAssistindoItem = { id: string; video_id: string; serie_id?: string | null; temporada_id?: string | null; numero_episodio?: number | null; atualizado_em: string; videos?: Video; series?: Serie };
 export type Plan = {
   id: string;
@@ -288,9 +300,6 @@ export async function adminUpdateVideo(id: string, payload: Partial<Video>) {
 export async function adminDeleteVideo(id: string) {
   return request('/rest/v1/videos?id=eq.' + encodeURIComponent(id), { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
 }
-// Ids de todos os vídeos que já são episódio de alguma série — usado
-// pra tirar esses vídeos da listagem geral do catálogo (eles só
-// aparecem dentro da própria série, sem duplicar).
 export async function fetchEpisodioVideoIds(): Promise<string[]> {
   const rows = await request<Array<{ video_id: string }>>('/rest/v1/episodios?select=video_id');
   return rows.map((row) => row.video_id);
@@ -364,7 +373,7 @@ export async function fetchColecoesParaCatalogo(): Promise<Array<{ colecao: Cole
   return resultados;
 }
 
-// ================= LAYOUT DO CATÁLOGO (fileiras arrastáveis) =================
+// ================= LAYOUT DO CATÁLOGO (Construtor de Layout / CMS) =================
 
 export async function fetchCatalogoLayout(): Promise<LayoutItem[]> {
   return request<LayoutItem[]>('/rest/v1/catalogo_layout?select=*,colecoes(titulo)&order=ordem.asc');
@@ -383,6 +392,28 @@ export async function adminReorderLayout(orderedIds: string[]) {
 }
 export async function adminToggleLayoutVisible(id: string, visivel: boolean) {
   return request(`/rest/v1/catalogo_layout?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ visivel }) });
+}
+// Cria uma nova seção dinâmica (Hero, Carrossel, Top 10, Elenco, Categoria
+// ou Ao vivo) no fim da fila do layout. As seções estruturais (Séries,
+// Catálogo geral, Coleção) não passam por aqui — continuam do jeito que
+// já funcionavam.
+export async function adminCreateLayoutSection(payload: { tipo: LayoutItem['tipo']; titulo?: string; config?: LayoutSectionConfig }) {
+  const existentes = await fetchCatalogoLayout();
+  const proximaOrdem = existentes.length ? Math.max(...existentes.map((l) => l.ordem || 0)) + 1 : 1;
+  return request('/rest/v1/catalogo_layout', {
+    method: 'POST',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ tipo: payload.tipo, titulo: payload.titulo || null, config: payload.config || {}, ordem: proximaOrdem, visivel: true }),
+  });
+}
+export async function adminUpdateLayoutSection(id: string, payload: { titulo?: string | null; config?: LayoutSectionConfig }) {
+  const corpo: Record<string, unknown> = {};
+  if (payload.titulo !== undefined) corpo.titulo = payload.titulo;
+  if (payload.config !== undefined) corpo.config = payload.config;
+  return request(`/rest/v1/catalogo_layout?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(corpo) });
+}
+export async function adminDeleteLayoutSection(id: string) {
+  return request(`/rest/v1/catalogo_layout?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
 }
 
 // ================= SÉRIES E TEMPORADAS =================
@@ -430,9 +461,6 @@ export async function fetchSerieCompleta(serieId: string): Promise<{ serie: Seri
   const temporadasComEpisodios = await Promise.all(temporadas.map(async (temporada) => ({ temporada, episodios: await fetchEpisodios(temporada.id) })));
   return { serie: series[0] || null, temporadas: temporadasComEpisodios };
 }
-// Dado o id de um vídeo, descobre se ele é episódio de alguma série e,
-// se for, qual é o próximo episódio da mesma temporada (pra tocar
-// automaticamente em seguida no player).
 export async function fetchEpisodioInfo(videoId: string): Promise<{ episodio: Episodio; serieId: string; proximo?: Episodio } | null> {
   const rows = await request<Array<Episodio & { temporadas?: { serie_id: string } }>>(
     `/rest/v1/episodios?select=*,videos(*),temporadas(serie_id)&video_id=eq.${encodeURIComponent(videoId)}&limit=1`,
