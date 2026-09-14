@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>CineVito — Administração</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .abas { display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap; }
+  .aba { flex:1; min-width:100px; text-align:center; padding:10px; border-radius:8px; background:var(--bg-card); cursor:pointer; font-size:13px; }
+  .aba.ativa { background:var(--accent-gold); color:#14100a; font-weight:700; }
+  .lista-item { display:flex; justify-content:space-between; align-items:center; background:var(--bg-card); padding:10px 12px; border-radius:8px; margin-bottom:8px; font-size:14px; }
+  .lista-item button { background:none; border:none; color:var(--danger); font-size:13px; cursor:pointer; }
+  label { font-size:13px; color:var(--text-muted); display:block; margin:10px 0 4px; }
+  .checkbox-linha { display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid #2b3151; font-size:14px; }
+  .linha-genero-add { display:flex; gap:8px; margin-bottom:14px; }
+  .linha-genero-add input { flex:1; margin-bottom:0; }
+  .linha-genero-add button { width:auto; padding:0 16px; }
+  .form-estreito { max-width: 480px; }
+  table.tabela-crm { width:100%; border-collapse:collapse; font-size:13px; }
+  table.tabela-crm th { text-align:left; color:var(--text-muted); font-weight:600; padding:8px 6px; border-bottom:1px solid #232a3a; }
+  table.tabela-crm td { padding:8px 6px; border-bottom:1px solid #1a1f2c; vertical-align:top; }
+  table.tabela-crm a { color:var(--accent-teal); text-decoration:none; }
+  .selo-status { padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; }
+  .selo-ativa { background:rgba(46,196,182,0.15); color:var(--accent-teal); }
+  .selo-trial { background:rgba(255,130,40,0.15); color:var(--accent-gold); }
+  .selo-inativa { background:rgba(232,93,77,0.15); color:var(--danger); }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <a href="catalogo.html" class="botao-voltar-topo">←</a>
+  <h1 class="brand-title" style="font-size:20px; margin:0 0 16px;">Administração</h1>
+
+  <div class="abas">
+    <div class="aba ativa" data-aba="videos" onclick="mostrarAba('videos')">Vídeos</div>
+    <div class="aba" data-aba="colecoes" onclick="mostrarAba('colecoes')">Coleções</div>
+    <div class="aba" data-aba="clientes" onclick="mostrarAba('clientes')">Clientes (CRM)</div>
+    <div class="aba" data-aba="planos" onclick="mostrarAba('planos')" id="aba-btn-planos" style="display:none;">Planos</div>
+    <div class="aba" data-aba="indicacoes" onclick="mostrarAba('indicacoes')" id="aba-btn-indicacoes" style="display:none;">Indicações</div>
+    <div class="aba" data-aba="equipe" onclick="mostrarAba('equipe')" id="aba-btn-equipe" style="display:none;">Equipe</div>
+  </div>
+
+  <div id="aba-videos" class="form-estreito">
+    <h3 style="margin-bottom:4px;">Adicionar vídeo</h3>
+    <p class="texto-muted" style="margin-top:0;">Cole o link do Internet Archive, YouTube ou de um arquivo de vídeo direto (.mp4). Só o link fica salvo — o app continua leve.</p>
+
+    <label>Link do vídeo</label>
+    <input type="text" id="v-url" class="input" placeholder="https://archive.org/details/... ou YouTube">
+
+    <label>Título</label>
+    <input type="text" id="v-titulo" class="input" placeholder="Nome do filme/vídeo">
+
+    <label>Sinopse</label>
+    <input type="text" id="v-descricao" class="input" placeholder="Uma linha sobre o vídeo">
+
+    <label>Categoria (prateleira onde aparece)</label>
+    <select id="v-categoria" class="input"></select>
+
+    <label>Gênero (usado no filtro do catálogo)</label>
+    <select id="v-genero" class="input"></select>
+
+    <label>URL da capa (opcional — auto-preenchido se for Internet Archive)</label>
+    <input type="text" id="v-capa" class="input" placeholder="https://...">
+
+    <label>Licença</label>
+    <input type="text" id="v-licenca" class="input" placeholder="Ex: Domínio Público" value="Domínio Público">
+
+    <label>Ano</label>
+    <input type="number" id="v-ano" class="input" placeholder="Ex: 1968">
+
+    <p class="msg-erro" id="v-erro" style="display:none;"></p>
+    <button class="btn btn-primary" id="botao-salvar-video" onclick="salvarVideo()">Adicionar ao catálogo</button>
+    <a href="#" id="link-cancelar-edicao" onclick="cancelarEdicaoVideo(); return false;" style="display:none; text-align:center; margin-top:10px; color:var(--accent-teal); font-size:13px;">Cancelar edição</a>
+
+    <h3 style="margin:28px 0 10px;">Vídeos cadastrados</h3>
+    <div id="lista-videos">Carregando...</div>
+  </div>
+
+  <div id="aba-colecoes" class="form-estreito" style="display:none;">
+    <h3 style="margin-bottom:4px;">Criar coleção</h3>
+    <p class="texto-muted" style="margin-top:0;">Ex: "Sessão de Sexta", "Coletânea Terror". Aparece como uma prateleira especial no catálogo.</p>
+
+    <label>Título da coleção</label>
+    <input type="text" id="c-titulo" class="input" placeholder="Ex: Sessão de Sexta">
+
+    <label>Descrição (opcional)</label>
+    <input type="text" id="c-descricao" class="input" placeholder="Uma linha sobre a coleção">
+
+    <label>URL da capa (opcional)</label>
+    <input type="text" id="c-capa" class="input" placeholder="https://...">
+
+    <p class="msg-erro" id="c-erro" style="display:none;"></p>
+    <button class="btn btn-teal" onclick="salvarColecao()">Criar coleção</button>
+
+    <h3 style="margin:28px 0 10px;">Coleções existentes</h3>
+    <div id="lista-colecoes">Carregando...</div>
+
+    <h3 style="margin:28px 0 10px;">Gêneros do catálogo</h3>
+    <p class="texto-muted" style="margin-top:0;">Esses são os gêneros que aparecem no filtro e na hora de cadastrar um vídeo.</p>
+    <div class="linha-genero-add">
+      <input type="text" id="g-nome" class="input" placeholder="Ex: Suspense Policial">
+      <button class="btn btn-primary" onclick="adicionarGenero()">Adicionar</button>
+    </div>
+    <p class="msg-erro" id="g-erro" style="display:none;"></p>
+    <div id="lista-generos">Carregando...</div>
+  </div>
+
+  <div id="aba-clientes" style="display:none;">
+    <h3 style="margin-bottom:4px;">Clientes</h3>
+    <p class="texto-muted" style="margin-top:0;">Lista de todos os clientes cadastrados. Use o e-mail pra manter contato — nunca WhatsApp.</p>
+
+    <button class="btn btn-secondary" style="margin-bottom:14px;" onclick="sortearCliente()">🎲 Sortear cliente aleatório</button>
+
+    <div id="painel-conceder-acesso" style="display:none; background:var(--bg-card); border:1px solid var(--accent-gold); border-radius:10px; padding:16px; margin-bottom:16px;">
+      <strong style="color:var(--accent-gold);">Conceder acesso pra: <span id="ca-cliente-nome"></span></strong>
+      <p class="texto-muted" style="margin:6px 0 12px;">O tempo é somado ao que a pessoa já tem (se ela já for assinante, não perde nada). Isso não passa pelo Mercado Pago.</p>
+
+      <label>Quantidade</label>
+      <input type="number" id="ca-quantidade" class="input" value="30" min="1">
+
+      <label>Unidade</label>
+      <select id="ca-unidade" class="input">
+        <option value="dias">Dias</option>
+        <option value="meses">Meses</option>
+      </select>
+
+      <label>Motivo (fica registrado no histórico do cliente)</label>
+      <input type="text" id="ca-motivo" class="input" placeholder="Ex: Sorteio de aniversário, indicou 5 amigos...">
+
+      <p class="msg-erro" id="ca-erro" style="display:none;"></p>
+      <button class="btn btn-primary" onclick="confirmarConcederAcesso()">Conceder acesso</button>
+      <a href="#" onclick="fecharPainelConceder(); return false;" style="display:block; text-align:center; margin-top:10px; color:var(--accent-teal); font-size:13px;">Cancelar</a>
+    </div>
+
+    <div style="overflow-x:auto;">
+      <table class="tabela-crm" id="tabela-clientes">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>E-mail</th>
+            <th>Status</th>
+            <th>Plano</th>
+            <th>Validade</th>
+            <th>Aniversário</th>
+            <th></th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="corpo-tabela-clientes">
+          <tr><td colspan="8" class="texto-muted">Carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="aba-planos" class="form-estreito" style="display:none;">
+    <h3 style="margin-bottom:4px;">Criar tipo de assinatura</h3>
+    <p class="texto-muted" style="margin-top:0;">Só admin master vê e mexe nessa aba. A "Categoria" define em qual aba o plano aparece pro cliente (ex: todos os planos com categoria "Básico" ficam juntos numa aba "Básico").</p>
+
+    <label>Nome do plano</label>
+    <input type="text" id="p-nome" class="input" placeholder="Ex: Padrão Mensal">
+
+    <label>Categoria (agrupamento mostrado como aba pro cliente)</label>
+    <input type="text" id="p-categoria" class="input" placeholder="Ex: Básico, Padrão, Premium...">
+
+    <label>Descrição (opcional)</label>
+    <input type="text" id="p-descricao" class="input" placeholder="Ex: 2 dispositivos, sem anúncios">
+
+    <label>Preço (R$) — use ponto para os centavos, não vírgula</label>
+    <input type="number" step="0.01" id="p-preco" class="input" placeholder="Ex: 19.90">
+
+    <label>Dispositivos simultâneos</label>
+    <input type="number" id="p-dispositivos" class="input" value="1">
+
+    <label>Duração</label>
+    <input type="number" id="p-duracao" class="input" placeholder="Ex: 1" value="1" min="1">
+
+    <label>Unidade da duração</label>
+    <select id="p-duracao-unidade" class="input">
+      <option value="meses">Meses</option>
+      <option value="dias">Dias</option>
+    </select>
+
+    <p class="msg-erro" id="p-erro" style="display:none;"></p>
+    <button class="btn btn-primary" id="botao-salvar-plano" onclick="salvarPlano()">Criar plano</button>
+    <a href="#" id="link-cancelar-edicao-plano" onclick="cancelarEdicaoPlano(); return false;" style="display:none; text-align:center; margin-top:10px; color:var(--accent-teal); font-size:13px;">Cancelar edição</a>
+
+    <h3 style="margin:28px 0 10px;">Planos cadastrados</h3>
+    <div id="lista-planos-admin">Carregando...</div>
+  </div>
+
+  <div id="aba-equipe" class="form-estreito" style="display:none;">
+    <h3 style="margin-bottom:4px;">Equipe</h3>
+    <p class="texto-muted" style="margin-top:0;">Dê acesso ao painel para outra pessoa. Ela vai poder gerenciar vídeos, coleções e clientes, mas não vai poder adicionar/remover administradores nem mexer nos planos de assinatura — só você, como admin master, pode fazer isso.</p>
+
+    <label>E-mail da pessoa (ela precisa já ter uma conta criada no CineVito)</label>
+    <div class="linha-genero-add">
+      <input type="text" id="eq-email" class="input" placeholder="email@exemplo.com">
+      <button class="btn btn-primary" onclick="adicionarNaEquipe()">Adicionar à equipe</button>
+    </div>
+    <p class="msg-erro" id="eq-erro" style="display:none;"></p>
+
+    <h3 style="margin:28px 0 10px;">Quem tem acesso ao painel</h3>
+    <div id="lista-equipe">Carregando...</div>
+  </div>
+
+  <div id="aba-indicacoes" class="form-estreito" style="display:none;">
+    <h3 style="margin-bottom:4px;">Campanhas de indicação</h3>
+    <p class="texto-muted" style="margin-top:0;">Só admin master vê essa aba. Só uma campanha fica ativa por vez — ativar uma nova desativa a anterior automaticamente. Os clientes só veem números (quantos indicaram/confirmaram), nunca a lista de quem foi indicado.</p>
+
+    <label>Título (aparece pro cliente)</label>
+    <input type="text" id="ind-titulo" class="input" placeholder="Ex: Indique 5 amigos e ganhe 1 mês grátis">
+
+    <label>Meta de indicações confirmadas</label>
+    <input type="number" id="ind-meta" class="input" value="5" min="1">
+
+    <label>Recompensa — quantidade</label>
+    <input type="number" id="ind-recompensa-qtd" class="input" value="1" min="1">
+
+    <label>Recompensa — unidade</label>
+    <select id="ind-recompensa-unidade" class="input">
+      <option value="meses">Meses</option>
+      <option value="dias">Dias</option>
+    </select>
+
+    <p class="msg-erro" id="ind-erro" style="display:none;"></p>
+    <button class="btn btn-primary" onclick="salvarCampanhaIndicacao()">Criar campanha</button>
+
+    <h3 style="margin:28px 0 10px;">Campanhas cadastradas</h3>
+    <div id="lista-campanhas-indicacao">Carregando...</div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/video-utils.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>

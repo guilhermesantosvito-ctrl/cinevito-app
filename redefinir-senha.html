@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>CineVito — Nova senha</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="screen-center">
+  <h1 class="brand-title" style="font-size:22px; margin-bottom:20px;">Criar nova senha</h1>
+
+  <div style="width:100%; max-width:340px;">
+    <input type="password" id="nova-senha" class="input" placeholder="Nova senha (mín. 6 caracteres)">
+    <input type="password" id="confirmar-senha" class="input" placeholder="Confirme a nova senha">
+    <p class="msg-erro" id="erro" style="display:none;"></p>
+    <button class="btn btn-primary" onclick="salvarNovaSenha()">Salvar nova senha</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script>
+async function salvarNovaSenha() {
+  const senha1 = document.getElementById("nova-senha").value;
+  const senha2 = document.getElementById("confirmar-senha").value;
+  const erroEl = document.getElementById("erro");
+  erroEl.style.display = "none";
+
+  if (senha1.length < 6) {
+    erroEl.textContent = "A senha precisa ter pelo menos 6 caracteres.";
+    erroEl.style.display = "block";
+    return;
+  }
+  if (senha1 !== senha2) {
+    erroEl.textContent = "As senhas não coincidem.";
+    erroEl.style.display = "block";
+    return;
+  }
+
+  const { error } = await supabaseClient.auth.updateUser({ password: senha1 });
+
+  if (error) {
+    erroEl.textContent = "Não foi possível salvar: " + error.message;
+    erroEl.style.display = "block";
+    return;
+  }
+
+  alert("Senha alterada com sucesso! Agora entre com sua nova senha.");
+  window.location.href = "index.html";
+}
+</script>
+</body>
+</html>

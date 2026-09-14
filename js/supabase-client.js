@@ -1,0 +1,182 @@
+// =========================================================
+// CONFIGURAÇÃO DO SUPABASE
+// =========================================================
+const SUPABASE_URL = "https://cefyzitdkvtynhwsxdvv.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_AorMLpxhH9CHLdgKLigQoA_eVDgvJEv";
+
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ---------------------------------------------------------
+// Funções auxiliares reutilizadas em várias telas
+// ---------------------------------------------------------
+
+// Usa getSession() (lê a sessão local, sem precisar esperar rede) em vez
+// de getUser() (que faz uma chamada de rede toda vez) — evita "deslogar"
+// só porque a internet demorou um instante pra responder.
+async function getUsuarioLogado() {
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  return session?.user || null;
+}
+
+async function exigirLogin() {
+  const user = await getUsuarioLogado();
+  if (!user) {
+    window.location.href = "index.html";
+    return null;
+  }
+  return user;
+}
+
+// Administradores e equipe sempre têm acesso total, sem precisar de
+// teste grátis nem assinatura — isso é só para clientes.
+async function usuarioEhAdmin(usuarioId) {
+  const { data } = await supabaseClient
+    .from("profiles")
+    .select("is_admin")
+    .eq("id", usuarioId)
+    .maybeSingle();
+  return !!data?.is_admin;
+}
+
+async function usuarioEhAssinante(usuarioId) {
+  if (await usuarioEhAdmin(usuarioId)) return true;
+
+  const { data, error } = await supabaseClient
+    .from("assinaturas")
+    .select("status, data_expiracao")
+    .eq("usuario_id", usuarioId)
+    .in("status", ["ativa", "trial"])
+    .order("criado_em", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!error && data) {
+    if (!data.data_expiracao) return true;
+    if (new Date(data.data_expiracao) > new Date()) return true;
+  }
+
+  // Rede de segurança: mesmo sem registro de assinatura (ou se o
+  // teste grátis não foi concedido por algum motivo), ninguém é
+  // cobrado antes de completar 3 dias desde a criação da conta.
+  return await aindaDentroDoPrazoDeContaNova(usuarioId);
+}
+
+// Diferente de usuarioEhAssinante(): essa função só retorna true se
+// a pessoa tem uma assinatura PAGA de verdade (status "ativa").
+// Teste grátis não conta aqui — usada na tela de planos, pra sempre
+// deixar quem está em teste grátis assinar antes do prazo acabar.
+async function usuarioTemAssinaturaPaga(usuarioId) {
+  const { data, error } = await supabaseClient
+    .from("assinaturas")
+    .select("status, data_expiracao")
+    .eq("usuario_id", usuarioId)
+    .eq("status", "ativa")
+    .order("criado_em", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!error && data) {
+    if (!data.data_expiracao) return true;
+    if (new Date(data.data_expiracao) > new Date()) return true;
+  }
+
+  return false;
+}
+
+async function aindaDentroDoPrazoDeContaNova(usuarioId) {
+  const { data: perfil } = await supabaseClient
+    .from("profiles")
+    .select("criado_em")
+    .eq("id", usuarioId)
+    .maybeSingle();
+
+  if (!perfil?.criado_em) return false;
+
+  const tresDiasDepois = new Date(perfil.criado_em);
+  tresDiasDepois.setDate(tresDiasDepois.getDate() + 3);
+  return new Date() < tresDiasDepois;
+}
+
+// Retorna os detalhes da assinatura/teste atual, para mostrar avisos
+// de quantos dias faltam (usado no aviso fechável do catálogo)
+async function obterStatusAssinatura(usuarioId) {
+  const { data } = await supabaseClient
+    .from("assinaturas")
+    .select("status, data_expiracao")
+    .eq("usuario_id", usuarioId)
+    .order("criado_em", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (data) return data;
+
+  // Sem nenhum registro de assinatura — mostra o teste grátis baseado
+  // na data de criação da conta, como rede de segurança.
+  const { data: perfil } = await supabaseClient
+    .from("profiles")
+    .select("criado_em")
+    .eq("id", usuarioId)
+    .maybeSingle();
+
+  if (!perfil?.criado_em) return null;
+
+  const expiracao = new Date(perfil.criado_em);
+  expiracao.setDate(expiracao.getDate() + 3);
+
+  return { status: "trial", data_expiracao: expiracao.toISOString() };
+}
+
+// ---------------------------------------------------------
+// Logout automático após ficar muito tempo em segundo plano
+// (evita que o cliente fique "preso" numa versão antiga do app
+// quando ele nunca fecha, só minimiza ou troca de tela)
+// ---------------------------------------------------------
+const CHAVE_ULTIMO_SEGUNDO_PLANO = "cinevito_em_segundo_plano_desde";
+const LIMITE_SEGUNDO_PLANO_MS = 3 * 60 * 1000; // 3 minutos
+
+async function verificarLogoutPorInatividade() {
+  const desde = localStorage.getItem(CHAVE_ULTIMO_SEGUNDO_PLANO);
+  if (!desde) return;
+
+  const passou = Date.now() - Number(desde);
+  localStorage.removeItem(CHAVE_ULTIMO_SEGUNDO_PLANO);
+
+  if (passou >= LIMITE_SEGUNDO_PLANO_MS) {
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    if (user) {
+      await supabaseClient.auth.signOut();
+      window.location.href = "index.html";
+    }
+  }
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    localStorage.setItem(CHAVE_ULTIMO_SEGUNDO_PLANO, String(Date.now()));
+  } else {
+    verificarLogoutPorInatividade();
+  }
+});
+
+// Confere também assim que a página carrega, pra pegar o caso em que
+// o navegador "matou" a aba enquanto ela estava em segundo plano
+verificarLogoutPorInatividade();
+
+// ---------------------------------------------------------
+// Corrige o "voltar do navegador mostra tela logada depois do logout":
+// quando o navegador restaura a página de um cache interno (bfcache)
+// em vez de recarregar de verdade, o código não roda de novo sozinho.
+// Isso força uma checagem de sessão sempre que isso acontecer.
+// ---------------------------------------------------------
+window.addEventListener("pageshow", (evento) => {
+  if (evento.persisted) {
+    verificarSessaoAoVoltarDoCache();
+  }
+});
+
+async function verificarSessaoAoVoltarDoCache() {
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (!session) {
+    window.location.href = "index.html";
+  }
+}

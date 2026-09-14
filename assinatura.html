@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>CineVito — Assinatura</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .abas-plano { display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap; }
+  .aba-plano {
+    flex:1; min-width:90px; text-align:center; padding:12px 6px; border-radius:10px;
+    background:var(--bg-card); border:1px solid #232a3a; cursor:pointer;
+  }
+  .aba-plano.ativa { background:var(--accent-gold); border-color:var(--accent-gold); }
+  .aba-plano.ativa .aba-titulo, .aba-plano.ativa .aba-sub { color:#14100a; }
+  .aba-titulo { font-weight:700; font-size:14px; }
+  .aba-sub { font-size:11px; color:var(--text-muted); margin-top:2px; }
+  .pix-caixa {
+    background:var(--bg-card); border:1px solid var(--accent-gold); border-radius:10px;
+    padding:16px; text-align:center; margin-top:14px;
+  }
+  .pix-caixa img { width:180px; height:180px; margin:10px auto; display:block; }
+  .pix-codigo {
+    background:var(--bg-elevated); border:1px solid #232a3a; border-radius:8px;
+    padding:10px; font-size:11px; word-break:break-all; color:var(--text-muted); margin-top:10px;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <a href="catalogo.html" class="botao-voltar-topo">←</a>
+
+  <h1 class="brand-title" style="font-size:22px; margin:0 0 4px;">Assine o CineVito</h1>
+  <p class="texto-muted" style="margin-bottom:22px;">Escolha o plano ideal pra você.</p>
+
+  <div id="status-assinatura" style="display:none; background:var(--bg-card); border:1px solid var(--accent-teal); border-radius:10px; padding:14px; margin-bottom:18px;">
+    <strong style="color:var(--accent-teal);">Assinatura ativa</strong>
+    <p class="texto-muted" style="margin:6px 0 0;">Você já tem acesso ao catálogo. Aproveite!</p>
+    <button class="btn btn-secondary" style="margin-top:12px;" onclick="mostrarTrocaDePlano()">Trocar de plano</button>
+  </div>
+
+  <div id="planos-area">
+
+    <div id="abas-planos" class="abas-plano"></div>
+
+    <div id="lista-planos">Carregando planos...</div>
+
+    <label style="font-size:13px; color:var(--text-muted); display:block; margin:10px 0 4px;">Cupom de desconto (opcional)</label>
+    <input type="text" id="campo-cupom" class="input" placeholder="Ex: ANIVERSARIO10" style="text-transform:uppercase;">
+
+    <button class="btn btn-primary" id="botao-continuar" style="margin-top:8px;" onclick="continuarParaPagamento()">Continuar</button>
+    <p class="texto-muted" style="text-align:center; margin-top:10px;">
+      Pagamento seguro via cartão de crédito ou Pix.
+    </p>
+    <p class="msg-erro" id="assinatura-erro" style="display:none; text-align:center;"></p>
+  </div>
+
+  <div id="area-pagamento" style="display:none;">
+    <a href="#" onclick="voltarParaPlanos(); return false;" class="texto-muted" style="color:var(--accent-teal); font-size:13px;">&larr; Trocar plano</a>
+    <div id="brick-pagamento" style="margin-top:14px;"></div>
+    <div id="area-pix" style="display:none;"></div>
+    <p id="mensagem-pagamento" style="text-align:center; margin-top:14px;"></p>
+  </div>
+</div>
+
+<script src="https://sdk.mercadopago.com/js/v2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/checkout.js"></script>
+</body>
+</html>
