@@ -29,5 +29,5 @@ jobs:
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           YOUCINE_EMAIL: ${{ secrets.YOUCINE_EMAIL }}
           YOUCINE_PASSWORD: ${{ secrets.YOUCINE_PASSWORD }}
-          YOUCINE_BASE_URL: "https://voccine.tv"
+          YOUCINE_BASE_URL: "https://youcineweb.yuurw.com"
         run: python botyoucine.py
