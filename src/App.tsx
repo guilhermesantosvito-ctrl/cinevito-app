@@ -3,18 +3,18 @@ import type { CSSProperties, DragEvent, FormEvent, ReactNode } from 'react';
 import { Link, Route, Switch, useLocation, useParams, Router as WouterRouter } from 'wouter';
 import {
   ArrowLeft, Check, ChevronDown, ChevronRight, CircleAlert, Clapperboard, Copy, Download, Eye, EyeOff,
-  Film, Heart, Info, KeyRound, Library, LogIn, LogOut, MoreVertical, Play, Plus, RefreshCw, Search,
-  Send, Settings, ShieldCheck, Share2, Smartphone, Sparkles, UserRound, X,
+  Film, Heart, Info, KeyRound, Library, LogIn, LogOut, Play, Plus, Radio, RefreshCw, Search,
+  Send, Settings, ShieldCheck, Sparkles, Trash2, UserRound, Users, X,
 } from 'lucide-react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import {
-  adminAddEpisodio, adminAddToEquipe, adminAddVideoToColecao, adminCreateCategoria, adminCreateColecao, adminCreateCupom, adminCreateGenero, adminCreatePlano, adminCreateSerie, adminCreateTemporada, adminCreateVideo,
-  adminDeleteColecao, adminDeleteCupom, adminDeletePlano, adminDeleteSerie, adminDeleteTemporada, adminDeleteVideo, adminPromoverMaster, adminRebaixarMaster, adminRemoveEpisodio, adminRemoveVideoFromColecao, adminRemoverDaEquipe, adminReorderColecaoVideos, adminReorderLayout, adminToggleCupom, adminToggleLayoutVisible, adminUpdatePlano, adminUpdateVideo,
+  adminAddEpisodio, adminAddToEquipe, adminAddVideoToColecao, adminCreateCategoria, adminCreateColecao, adminCreateCupom, adminCreateGenero, adminCreateLayoutSection, adminCreatePlano, adminCreateSerie, adminCreateTemporada, adminCreateVideo,
+  adminDeleteColecao, adminDeleteCupom, adminDeleteLayoutSection, adminDeletePlano, adminDeleteSerie, adminDeleteTemporada, adminDeleteVideo, adminPromoverMaster, adminRebaixarMaster, adminRemoveEpisodio, adminRemoveVideoFromColecao, adminRemoverDaEquipe, adminReorderColecaoVideos, adminReorderLayout, adminToggleCupom, adminToggleLayoutVisible, adminUpdateLayoutSection, adminUpdatePlano, adminUpdateVideo,
   checkCatalogAccess, clearSession, fetchAdminClients, fetchAdminCupons, fetchAdminPlans, fetchAdminVideos, fetchCategorias, fetchCatalogoLayout, fetchCatalogoLayoutPublico, fetchColecaoVideos, fetchColecoes, fetchColecoesParaCatalogo, fetchContinuarAssistindo, fetchEpisodioInfo, fetchEpisodioVideoIds, fetchEpisodios, fetchEquipe, fetchGenerosList, fetchMySubscription, fetchPlans, fetchProfile, fetchSerieCompleta, fetchSeries, fetchTemporadas, fetchVideos, getAccessToken, getStoredUser, grantAccess, hasRuntimeConfig,
-  processPayment, requestPasswordReset, revokeAccess, salvarProgresso, signIn, signUp, submitSuggestion, updatePlanActive, type Categoria, type Cliente, type Colecao, type ContinuarAssistindoItem, type Cupom, type Episodio, type Equipe, type Genero, type LayoutItem, type MinhaAssinatura, type Plan, type SessionUser, type Serie, type Temporada, type Video,
+  processPayment, requestPasswordReset, revokeAccess, salvarProgresso, signIn, signUp, submitSuggestion, updatePlanActive, type Categoria, type Cliente, type Colecao, type ContinuarAssistindoItem, type Cupom, type Episodio, type Equipe, type Genero, type LayoutItem, type LayoutSectionConfig, type MinhaAssinatura, type Plan, type SessionUser, type Serie, type Temporada, type Video,
 } from '@/lib/cinevito-client';
 import '@/index.css';
 const queryClient = new QueryClient();
@@ -23,6 +23,14 @@ const fallbackShelves = ['Início', 'Filmes Clássicos', 'Documentários', 'Curt
 const genres = ['Todos os gêneros', 'Ação', 'Aventura', 'Comédia', 'Documentário', 'Drama', 'Natureza', 'Terror'];
 const VIDEO_IFRAME_SANDBOX = 'allow-scripts allow-same-origin allow-presentation allow-forms';
 const CATALOG_REFRESH_INTERVAL_MS = 3 * 60 * 1000;
+const LAYOUT_SECTION_TYPES: Array<{ value: LayoutItem['tipo']; label: string }> = [
+  { value: 'hero', label: 'Banner Hero (destaque rotativo no topo)' },
+  { value: 'carrossel', label: 'Carrossel horizontal padrão' },
+  { value: 'top10', label: 'Top 10 com numeração em destaque' },
+  { value: 'elenco', label: 'Grade por Ator/Diretor' },
+  { value: 'categoria', label: 'Categoria específica' },
+  { value: 'ao_vivo', label: 'Ao vivo / Esportes' },
+];
 function normalizeCatalogLabel(value: string | null | undefined) {
   return (value || '')
     .normalize('NFD')
@@ -48,6 +56,11 @@ function initials(user: SessionUser | null) {
 }
 function titleCaseName(user: SessionUser | null) {
   return user?.user_metadata?.nome || user?.user_metadata?.name || user?.email?.split('@')[0] || 'visitante';
+}
+function resolveVideosByIds(all: Video[], ids: string[] | undefined): Video[] {
+  if (!ids || !ids.length) return [];
+  const map = new Map(all.map((v) => [v.id, v]));
+  return ids.map((id) => map.get(id)).filter((v): v is Video => Boolean(v));
 }
 function useAuth() {
   const [user, setUser] = useState<SessionUser | null>(() => getStoredUser());
@@ -158,11 +171,7 @@ function detectarPlataformaInstalacao(): PlataformaInstalacao {
   const ua = navigator.userAgent.toLowerCase();
   const ehTV = /smarttv|smart-tv|googletv|appletv|hbbtv|netcast|viera|aquos|bravia|tizen|web0s|webos|crkey|roku|firetv|aft\b/i.test(ua);
   if (ehTV) return 'tv';
-  // iPads recentes às vezes mandam um user-agent "de computador" pro Safari.
-  // Detectamos isso pelo toque múltiplo + plataforma Mac, pra não confundir
-  // um iPad com um notebook de verdade.
-  const ehIpadDisfarcadoDeMac = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
-  if (/iphone|ipad|ipod/i.test(ua) || ehIpadDisfarcadoDeMac) return 'ios';
+  if (/iphone|ipad|ipod/i.test(ua)) return 'ios';
   if (/android/i.test(ua)) return 'android';
   return 'desktop';
 }
@@ -186,15 +195,10 @@ function useInstallPrompt(user: SessionUser | null) {
     setPlatform(plataforma);
     if (!user || jaInstalado || plataforma === 'tv') { setVisible(false); return; }
     if (plataforma === 'desktop') {
-      // No computador, aparece bem mais raro (a cada 14 dias) pra não
-      // incomodar quem só usa o navegador normal.
       const dispensadoEm = Number(localStorage.getItem('cinevito-install-dismissed-desktop') || 0);
       const janela = 14 * 24 * 60 * 60 * 1000;
       if (dispensadoEm && Date.now() - dispensadoEm < janela) { setVisible(false); return; }
     } else {
-      // No celular, some quando a pessoa fecha o aviso, mas volta a
-      // aparecer na próxima vez que ela abrir/logar no app (sessão
-      // nova do navegador) — até ela instalar de verdade.
       if (sessionStorage.getItem('cinevito-install-dismissed-session')) { setVisible(false); return; }
     }
     setVisible(true);
@@ -213,72 +217,21 @@ function useInstallPrompt(user: SessionUser | null) {
   }
   return { visible, platform, alreadyInstalled, canInstallDirectly: Boolean(deferredEvent), install, dismiss };
 }
-type InstallStep = { icon: typeof Share2; title: string; description: string };
-function stepsForPlatform(platform: PlataformaInstalacao): InstallStep[] {
-  if (platform === 'ios') {
-    return [
-      { icon: Share2, title: 'Toque em Compartilhar', description: 'Na barra do Safari (ou no menu "aA" / "..." dependendo da versão), toque no ícone de compartilhar — o quadrado com a seta pra cima.' },
-      { icon: Plus, title: 'Toque em "Adicionar à Tela de Início"', description: 'Role a lista de opções que abrir até encontrar essa opção, e toque nela.' },
-      { icon: Smartphone, title: 'Toque em "Adicionar"', description: 'Confirme no canto superior direito. O ícone do CineVito aparece na sua tela inicial, pronto pra abrir quando quiser — igual um app baixado.' },
-    ];
-  }
-  return [
-    { icon: MoreVertical, title: 'Toque no menu do navegador', description: 'Geralmente é o ícone de três pontinhos (⋮), no canto superior ou inferior da tela.' },
-    { icon: Plus, title: 'Toque em "Instalar app" ou "Adicionar à tela inicial"', description: 'O nome exato pode variar um pouco dependendo do navegador do seu aparelho.' },
-  ];
-}
-function InstallInstructionsModal({ platform, onClose }: { platform: PlataformaInstalacao; onClose: () => void }) {
-  const steps = stepsForPlatform(platform);
-  return (
-    <div role="dialog" aria-modal="true" aria-label="Como instalar o CineVito" onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(6,9,14,.72)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 0 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: '#0f141c', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, padding: '22px 20px 26px', boxShadow: '0 -8px 40px rgba(0,0,0,.5)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Clapperboard size={20} />
-            <strong style={{ fontSize: '1.05rem' }}>Como instalar o CineVito</strong>
-          </div>
-          <button onClick={onClose} className="icon-button focus-tv" aria-label="Fechar instruções"><X size={18} /></button>
-        </div>
-        <p className="muted" style={{ fontSize: '.83rem', marginTop: 6, marginBottom: 20 }}>
-          {platform === 'ios' ? 'Leva só alguns segundos — depois é sempre um toque no ícone, igual um app baixado.' : 'Alguns passos rápidos e o CineVito fica salvo na sua tela inicial.'}
-        </p>
-        <div style={{ display: 'grid', gap: 16 }}>
-          {steps.map((step, index) => (
-            <div key={step.title} style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-              <div style={{ width: 38, height: 38, borderRadius: 12, background: 'linear-gradient(145deg, #ff8228, #2ec4b6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#0b0e14' }}>
-                <step.icon size={19} />
-              </div>
-              <div>
-                <strong style={{ fontSize: '.92rem', display: 'block' }}>{index + 1}. {step.title}</strong>
-                <span className="muted" style={{ fontSize: '.82rem', lineHeight: 1.5 }}>{step.description}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-        <button className="primary-button button-wide focus-tv" style={{ marginTop: 24 }} onClick={onClose}>Entendi</button>
-      </div>
-    </div>
-  );
-}
 function InstallBanner({ user }: { user: SessionUser | null }) {
   const { visible, platform, canInstallDirectly, install, dismiss } = useInstallPrompt(user);
-  const [showInstructions, setShowInstructions] = useState(false);
   if (!visible) return null;
+  if (platform !== 'ios' && !canInstallDirectly) return null;
   return (
-    <>
-      <div style={{ width: '100%', background: 'linear-gradient(90deg, #ff8228, #2ec4b6 55%, #00c8ff)', color: '#0b0e14', padding: '7px 12px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'nowrap', overflow: 'hidden' }}>
-        <span style={{ fontSize: '1rem', flexShrink: 0, lineHeight: 1 }}>📲</span>
-        <strong style={{ flex: 1, minWidth: 0, fontSize: '.8rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Instale o CineVito na sua tela inicial</strong>
-        <button
-          onClick={canInstallDirectly ? install : () => setShowInstructions(true)}
-          style={{ background: '#0b0e14', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 12px', fontSize: '.78rem', fontWeight: 600, cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}
-        >
-          {canInstallDirectly ? 'Instalar agora' : 'Como instalar'}
-        </button>
-        <button onClick={dismiss} aria-label="Fechar aviso de instalação" style={{ background: 'transparent', border: 'none', color: '#0b0e14', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', padding: 0 }}><X size={16} /></button>
-      </div>
-      {showInstructions && <InstallInstructionsModal platform={platform} onClose={() => setShowInstructions(false)} />}
-    </>
+    <div style={{ width: '100%', background: 'linear-gradient(90deg, #ff8228, #2ec4b6 55%, #00c8ff)', color: '#0b0e14', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+      <span style={{ fontSize: '1.3rem', flexShrink: 0 }}>📲</span>
+      <strong style={{ flex: 1, fontSize: '.9rem', minWidth: 200 }}>
+        {platform === 'ios'
+          ? 'Instale o CineVito: toque em Compartilhar e depois em "Adicionar à Tela de Início".'
+          : 'Instale o CineVito na sua tela inicial'}
+      </strong>
+      {platform !== 'ios' && <button onClick={install} style={{ background: '#0b0e14', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>Instalar agora</button>}
+      <button onClick={dismiss} aria-label="Fechar aviso de instalação" style={{ background: 'transparent', border: 'none', color: '#0b0e14', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center' }}><X size={20} /></button>
+    </div>
   );
 }
 function ToastMessage({ message, onClose }: { message: string; onClose: () => void }) {
@@ -443,11 +396,40 @@ function Poster({ video, favorite, onFavorite, onOpen, subtitle }: { video: Vide
   const poster = video.url_capa ? undefined : ({
     '--poster': 'linear-gradient(145deg, #0d596c, #172532 50%, #e58d49)',
   } as CSSProperties);
-  return <article className="video-card reveal" data-testid={`card-video-${video.id}`}><div className="poster focus-tv" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen()} style={poster}><div className="poster-art" style={video.url_capa ? { backgroundImage: `url(${video.url_capa})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}><span className="poster-meta">{video.ano || 'CINEVITO'}</span><strong className="poster-word">{video.titulo}</strong></div>{video.premium && <span className="premium-badge">Premium</span>}<button className={`poster-favorite focus-tv ${favorite ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); onFavorite(); }} aria-label={favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'} data-testid={`button-favorite-${video.id}`}><Heart size={15} fill={favorite ? 'currentColor' : 'none'} /></button></div><div className="video-info"><div><h3 className="video-title" data-testid={`text-video-title-${video.id}`}>{video.titulo}</h3><p className="video-subtitle">{subtitle || video.genero || video.categoria || 'Catálogo CineVito'}</p></div><Play size={14} color="#00c8ff" /></div></article>;
+  return <article className="video-card reveal" data-testid={`card-video-${video.id}`}><div className="poster focus-tv" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen()} style={poster}><div className="poster-art" style={video.url_capa ? { backgroundImage: `url(${video.url_capa})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}><span className="poster-meta">{video.ao_vivo ? 'AO VIVO' : (video.ano || 'CINEVITO')}</span><strong className="poster-word">{video.titulo}</strong></div>{video.premium && <span className="premium-badge">Premium</span>}<button className={`poster-favorite focus-tv ${favorite ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); onFavorite(); }} aria-label={favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'} data-testid={`button-favorite-${video.id}`}><Heart size={15} fill={favorite ? 'currentColor' : 'none'} /></button></div><div className="video-info"><div><h3 className="video-title" data-testid={`text-video-title-${video.id}`}>{video.titulo}</h3><p className="video-subtitle">{subtitle || video.genero || video.categoria || 'Catálogo CineVito'}</p></div><Play size={14} color="#00c8ff" /></div></article>;
+}
+function RankedPoster({ video, rank, favorite, onFavorite, onOpen }: { video: Video; rank: number; favorite: boolean; onFavorite: () => void; onOpen: () => void }) {
+  return <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end' }}>
+    <span style={{ fontSize: '3.4rem', fontWeight: 900, color: 'transparent', WebkitTextStroke: '2px #00c8ff', lineHeight: 1, marginRight: -16, marginBottom: -4, zIndex: 1, userSelect: 'none' }}>{rank}</span>
+    <div style={{ position: 'relative', zIndex: 2, flex: 1 }}><Poster video={video} favorite={favorite} onFavorite={onFavorite} onOpen={onOpen} /></div>
+  </div>;
 }
 function SerieCard({ serie, onOpen }: { serie: Serie; onOpen: () => void }) {
   const style = serie.capa_url ? undefined : ({ '--poster': 'linear-gradient(145deg, #4a1942, #172532 50%, #e58d49)' } as CSSProperties);
   return <article className="video-card reveal"><div className="poster focus-tv" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen()} style={style}><div className="poster-art" style={serie.capa_url ? { backgroundImage: `url(${serie.capa_url})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}><span className="poster-meta">SÉRIE</span><strong className="poster-word">{serie.titulo}</strong></div></div><div className="video-info"><div><h3 className="video-title">{serie.titulo}</h3><p className="video-subtitle">{serie.genero || 'Série · Temporadas'}</p></div><Play size={14} color="#00c8ff" /></div></article>;
+}
+function HeroBanner({ videos, onOpen }: { videos: Video[]; onOpen: (id: string) => void }) {
+  const [index, setIndex] = useState(0);
+  useEffect(() => {
+    if (videos.length < 2) return;
+    const id = window.setInterval(() => setIndex((current) => (current + 1) % videos.length), 6000);
+    return () => window.clearInterval(id);
+  }, [videos.length]);
+  if (!videos.length) return null;
+  const video = videos[index % videos.length];
+  return <section className="shelf" style={{ marginTop: 22 }}>
+    <div role="button" tabIndex={0} onClick={() => onOpen(video.id)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen(video.id)} className="focus-tv" style={{ aspectRatio: '16/7', borderRadius: 14, overflow: 'hidden', position: 'relative', cursor: 'pointer', background: video.url_capa ? undefined : 'linear-gradient(145deg, #0d596c, #172532 50%, #e58d49)' }}>
+      {video.url_capa && <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${video.url_capa})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />}
+      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(0deg, rgba(0,0,0,.8), rgba(0,0,0,.05) 65%)' }} />
+      <div style={{ position: 'absolute', left: 20, bottom: 20, right: 20 }}>
+        <div className="eyebrow" style={{ color: '#00c8ff' }}>Em destaque</div>
+        <h2 style={{ fontSize: '1.6rem', margin: '6px 0' }}>{video.titulo}</h2>
+        <p className="muted" style={{ maxWidth: 520, fontSize: '.86rem' }}>{video.descricao}</p>
+        <button className="primary-button focus-tv" style={{ marginTop: 8 }} onClick={(e) => { e.stopPropagation(); onOpen(video.id); }}><Play size={15} />Assistir agora</button>
+      </div>
+      {videos.length > 1 && <div style={{ position: 'absolute', right: 16, top: 16, display: 'flex', gap: 6 }}>{videos.map((_, i) => <span key={i} style={{ width: 7, height: 7, borderRadius: '50%', background: i === index ? '#fff' : 'rgba(255,255,255,.35)' }} />)}</div>}
+    </div>
+  </section>;
 }
 function useVideos() {
   const [videos, setVideos] = useState<Video[]>([]); const [loading, setLoading] = useState(hasRuntimeConfig); const [error, setError] = useState('');
@@ -534,6 +516,55 @@ function CatalogPage() {
       {filtered.length ? <div className="video-grid">{filtered.map((video) => <Poster key={video.id} video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} />)}</div> : <div className="empty-state" data-testid="status-catalog-empty"><Search size={25} /><h3>{videos.length ? 'Nenhum título encontrado' : 'Catálogo ainda vazio'}</h3><p>{videos.length ? 'Tente outro termo ou limpe os filtros para voltar ao catálogo.' : 'Os títulos aparecem aqui assim que forem cadastrados no painel administrativo.'}</p>{videos.length > 0 && <button className="quiet-button focus-tv" onClick={() => { setQuery(''); setGenre('Todos os gêneros'); setShelf('Início'); }} data-testid="button-clear-catalog-filters">Limpar filtros</button>}</div>}
     </section>;
   }
+  function renderHeroSection(item: LayoutItem, key: string) {
+    const heroVideos = resolveVideosByIds(videos, item.config?.video_ids);
+    if (!heroVideos.length) return null;
+    return <HeroBanner key={key} videos={heroVideos} onOpen={openVideo} />;
+  }
+  function renderCarrosselSection(item: LayoutItem, key: string) {
+    const secaoVideos = resolveVideosByIds(videos, item.config?.video_ids);
+    if (!secaoVideos.length) return null;
+    return <section className="shelf" key={key} style={{ marginTop: 22 }}>
+      <div className="shelf-heading"><h2 className="section-title">{item.titulo || 'Carrossel'}</h2><div className="section-rule" /></div>
+      <div className="video-grid">{secaoVideos.map((video) => <Poster key={video.id} video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} />)}</div>
+    </section>;
+  }
+  function renderTop10Section(item: LayoutItem, key: string) {
+    const secaoVideos = resolveVideosByIds(videos, item.config?.video_ids).slice(0, 10);
+    if (!secaoVideos.length) return null;
+    return <section className="shelf" key={key} style={{ marginTop: 22 }}>
+      <div className="shelf-heading"><h2 className="section-title">{item.titulo || 'Top 10'}</h2><div className="section-rule" /></div>
+      <div className="video-grid">{secaoVideos.map((video, index) => <RankedPoster key={video.id} video={video} rank={index + 1} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} />)}</div>
+    </section>;
+  }
+  function renderElencoSection(item: LayoutItem, key: string) {
+    const nomeAlvo = normalizeCatalogLabel(item.config?.nome);
+    if (!nomeAlvo) return null;
+    const secaoVideos = videos.filter((video) => normalizeCatalogLabel(video.elenco).includes(nomeAlvo));
+    if (!secaoVideos.length) return null;
+    return <section className="shelf" key={key} style={{ marginTop: 22 }}>
+      <div className="shelf-heading"><h2 className="section-title">{item.titulo || `Coleção ${item.config?.nome}`}</h2><div className="section-rule" /></div>
+      <div className="video-grid">{secaoVideos.map((video) => <Poster key={video.id} video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} />)}</div>
+    </section>;
+  }
+  function renderCategoriaSection(item: LayoutItem, key: string) {
+    const valorAlvo = normalizeCatalogLabel(item.config?.valor);
+    if (!valorAlvo) return null;
+    const secaoVideos = videos.filter((video) => !episodioVideoIds.has(video.id) && (normalizeCatalogLabel(video.categoria).includes(valorAlvo) || normalizeCatalogLabel(video.genero).includes(valorAlvo)));
+    if (!secaoVideos.length) return null;
+    return <section className="shelf" key={key} style={{ marginTop: 22 }}>
+      <div className="shelf-heading"><h2 className="section-title">{item.titulo || item.config?.valor}</h2><div className="section-rule" /></div>
+      <div className="video-grid">{secaoVideos.map((video) => <Poster key={video.id} video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} />)}</div>
+    </section>;
+  }
+  function renderAoVivoSection(item: LayoutItem, key: string) {
+    const secaoVideos = videos.filter((video) => video.ao_vivo);
+    if (!secaoVideos.length) return null;
+    return <section className="shelf" key={key} style={{ marginTop: 22 }}>
+      <div className="shelf-heading"><h2 className="section-title">{item.titulo || 'Ao vivo / Esportes'}</h2><div className="section-rule" /></div>
+      <div className="video-grid">{secaoVideos.map((video) => <Poster key={video.id} video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} subtitle="Transmissão ao vivo" />)}</div>
+    </section>;
+  }
   return <div className="content-wrap page-main">
     <PageHeader eyebrow="A sua sala de cinema" title={`Olá, ${titleCaseName(user)}.`} description="Escolha algo para assistir. O catálogo se adapta à sua tela, do celular à Smart TV." action={<Link href="/assinatura" className="primary-button focus-tv" data-testid="link-subscription"><Sparkles size={16} />Ver planos</Link>} />
     {!hasRuntimeConfig && <div className="notice notice-cyan" data-testid="status-runtime-demo"><Info size={17} color="#00c8ff" /><span><strong>Modo de demonstração.</strong> O ambiente ainda não está conectado ao Supabase; os dados desta sessão ficam apenas neste aparelho.</span></div>}
@@ -552,6 +583,12 @@ function CatalogPage() {
       if (item.tipo === 'series') return renderSeriesSection(item.id);
       if (item.tipo === 'colecao' && item.colecao_id) return renderColecaoSection(item.colecao_id, item.id);
       if (item.tipo === 'catalogo_geral') return renderCatalogoGeralSection(item.id);
+      if (item.tipo === 'hero') return renderHeroSection(item, item.id);
+      if (item.tipo === 'carrossel') return renderCarrosselSection(item, item.id);
+      if (item.tipo === 'top10') return renderTop10Section(item, item.id);
+      if (item.tipo === 'elenco') return renderElencoSection(item, item.id);
+      if (item.tipo === 'categoria') return renderCategoriaSection(item, item.id);
+      if (item.tipo === 'ao_vivo') return renderAoVivoSection(item, item.id);
       return null;
     })}
     {!loading && !error && shelf === 'Início' && layout.length === 0 && <>
@@ -610,11 +647,9 @@ function PlayerPage() {
   if (loading || access === null || access === false) return <div className="content-wrap page-main"><div className="skeleton" style={{ aspectRatio: '16/9' }} /></div>;
   if (!video) return <div className="content-wrap page-main"><div className="empty-state"><CircleAlert size={26} /><h3>Vídeo não encontrado</h3><p>Esse título não está mais disponível no catálogo.</p><Link href="/catalogo" className="primary-button focus-tv">Voltar ao catálogo</Link></div></div>;
   const embed = getEmbedInfo(video.url_video);
-  // TUDO passa pelo proxy para esconder a origem — YouTube, Vimeo, Archive, mixdrop, etc.
-  const playerSrc = `/api/proxy-video?video_id=${encodeURIComponent(video.id)}`;
   return <div className="content-wrap page-main"><button className="quiet-button focus-tv" onClick={() => setLocation('/catalogo')} data-testid="button-back-catalog"><ArrowLeft size={16} />Voltar ao catálogo</button><div className="player-stage" style={{ marginTop: 17 }}><div className="player-box">
-    {embed.type === 'file' && <video src={playerSrc} controls playsInline data-testid="video-player" style={{ width: '100%', height: '100%' }} />}
-    {embed.type === 'embed' && <iframe src={playerSrc} title={video.titulo} allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowFullScreen sandbox={VIDEO_IFRAME_SANDBOX} referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', border: 0 }} data-testid="video-player" />}
+    {embed.type === 'file' && <video src={embed.src} controls playsInline data-testid="video-player" style={{ width: '100%', height: '100%' }} />}
+    {embed.type === 'embed' && <iframe src={embed.src} title={video.titulo} allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowFullScreen sandbox={VIDEO_IFRAME_SANDBOX} referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', border: 0 }} data-testid="video-player" />}
     {embed.type === 'none' && <div className="player-idle"><Play size={38} /><strong>Pronto para assistir</strong><span>Este título ainda não tem um link de vídeo cadastrado.</span></div>}
   </div><div className="player-details"><div><div className="eyebrow">{video.genero || video.categoria || 'CineVito'} {video.ano ? ` / ${video.ano}` : ''}{episodioInfo ? ` · Ep. ${episodioInfo.episodio.numero}` : ''}</div><h1 className="section-title" style={{ marginTop: 7 }} data-testid="text-player-title">{video.titulo}</h1><p>{video.descricao || 'Este título faz parte do catálogo CineVito.'}</p></div><div className="player-actions"><button className={`secondary-button focus-tv ${saved ? 'active' : ''}`} onClick={toggle} data-testid="button-player-favorite"><Heart size={15} fill={saved ? 'currentColor' : 'none'} />{saved ? 'Na coleção' : 'Salvar'}</button>{episodioInfo?.proximo && <button className="primary-button focus-tv" onClick={() => setLocation(`/player/${episodioInfo.proximo!.video_id}`)}>Próximo episódio<ChevronRight size={16} /></button>}</div></div>
   {episodiosDaTemporada.length > 1 && <div style={{ marginTop: 20 }}>
@@ -686,7 +721,6 @@ function ProfilePage() {
   const [subscription, setSubscription] = useState<MinhaAssinatura | null>(null);
   const [copied, setCopied] = useState(false);
   const installState = useInstallPrompt(user);
-  const [showInstallInstructions, setShowInstallInstructions] = useState(false);
   useEffect(() => { if (hasRuntimeConfig && user) { fetchProfile().then(setProfile).catch(() => setProfile(null)); fetchMySubscription().then(setSubscription).catch(() => setSubscription(null)); } }, [user]);
   const name = profile?.nome || titleCaseName(user);
   const { status, origem } = subscriptionLabel(subscription);
@@ -700,12 +734,10 @@ function ProfilePage() {
   return <div className="content-wrap page-main"><PageHeader eyebrow="Sua conta" title="Perfil" description="Gerencie seus dados, sua assinatura e o acesso do CineVito." /><div className="two-col"><section className="panel panel-pad"><div className="profile-hero"><div className="profile-avatar">{initials(user)}</div><div><h1>{name}</h1><p data-testid="text-profile-email">{profile?.email || user?.email || 'Sessão local'}</p></div></div><div className="status-card" data-testid="status-profile-subscription"><h3>Acesso ao CineVito</h3>{subscription ? <><p><strong>{subscription.plano || 'Plano'}</strong> · {status}</p><p className="muted" style={{ fontSize: '.8rem' }}>{origem}</p>{subscription.data_expiracao && <p className="muted" style={{ fontSize: '.8rem' }}>Válido até {new Date(subscription.data_expiracao).toLocaleDateString('pt-BR')}</p>}</> : <p>{user ? 'Você ainda não tem nenhuma assinatura registrada.' : 'Entre para consultar sua assinatura.'}</p>}<Link href="/assinatura" className="primary-button focus-tv" style={{ width: 'fit-content', marginTop: 7 }} data-testid="link-profile-subscription">Ver assinatura</Link></div>
     {installState.platform !== 'tv' && !installState.alreadyInstalled && <div className="status-card" style={{ marginTop: 14 }}>
       <h3>Instalar o app</h3>
-      <p className="muted" style={{ fontSize: '.8rem' }}>Adicione o CineVito à tela do seu aparelho pra abrir direto, como um app.</p>
-      <button className="primary-button focus-tv" style={{ width: 'fit-content', marginTop: 7 }} onClick={installState.canInstallDirectly ? installState.install : () => setShowInstallInstructions(true)}>
-        <Download size={15} />{installState.canInstallDirectly ? 'Instalar CineVito' : 'Como instalar'}
-      </button>
+      {installState.canInstallDirectly && <><p className="muted" style={{ fontSize: '.8rem' }}>Adicione o CineVito à tela do seu aparelho pra abrir direto, como um app.</p><button className="primary-button focus-tv" style={{ width: 'fit-content', marginTop: 7 }} onClick={installState.install}><Download size={15} />Instalar CineVito</button></>}
+      {!installState.canInstallDirectly && installState.platform === 'ios' && <p className="muted" style={{ fontSize: '.8rem' }}>Toque no botão de Compartilhar do Safari e depois em "Adicionar à Tela de Início".</p>}
+      {!installState.canInstallDirectly && installState.platform !== 'ios' && <p className="muted" style={{ fontSize: '.8rem' }}>Ainda não deu pra instalar direto por aqui. Tenta pelo menu do navegador (⋮) → "Instalar app" ou "Adicionar à tela inicial".</p>}
     </div>}
-    {showInstallInstructions && <InstallInstructionsModal platform={installState.platform} onClose={() => setShowInstallInstructions(false)} />}
   </section><section className="panel panel-pad"><h2 className="panel-title">Seu código de indicação</h2>{profile?.codigo_indicacao ? <><p className="muted" style={{ fontSize: '.8rem', lineHeight: 1.5 }}>Compartilhe o link. A indicação só é confirmada depois que a pessoa fizer um pagamento.</p><div className="code-box"><code data-testid="text-referral-code">{profile.codigo_indicacao}</code><button className="icon-button focus-tv" onClick={copyReferral} aria-label="Copiar link de indicação" data-testid="button-copy-referral">{copied ? <Check size={16} /> : <Copy size={16} />}</button></div><p className="muted" style={{ fontSize: '.72rem', marginBottom: 0 }}>{copied ? 'Link copiado.' : 'Não há campanha ativa no momento? Seu código continua válido.'}</p></> : <div className="notice notice-cyan"><Info size={16} /><span>Seu código aparece aqui depois do primeiro pagamento aprovado (acesso de cortesia não gera código).</span></div>}</section></div></div>;
 }
 function loadMercadoPagoSdk(): Promise<void> {
@@ -857,7 +889,7 @@ function AdminPage() {
   const [generos, setGeneros] = useState<Genero[]>([]);
   const [novaCategoria, setNovaCategoria] = useState('');
   const [novoGenero, setNovoGenero] = useState('');
-  const [videoForm, setVideoForm] = useState({ url_video: '', titulo: '', descricao: '', categoria_id: '', genero: '', url_capa: '', licenca: '', ano: '' });
+  const [videoForm, setVideoForm] = useState({ url_video: '', titulo: '', descricao: '', categoria_id: '', genero: '', url_capa: '', licenca: '', ano: '', elenco: '', ao_vivo: false });
   const [editingVideoId, setEditingVideoId] = useState<string | null>(null);
   const [savingVideo, setSavingVideo] = useState(false);
   const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
@@ -888,6 +920,14 @@ function AdminPage() {
   const [novoEpisodioDescricao, setNovoEpisodioDescricao] = useState('');
   const [layoutItems, setLayoutItems] = useState<LayoutItem[]>([]);
   const [dragLayoutIndex, setDragLayoutIndex] = useState<number | null>(null);
+  const [novaSecaoTipo, setNovaSecaoTipo] = useState<LayoutItem['tipo']>('carrossel');
+  const [novaSecaoTitulo, setNovaSecaoTitulo] = useState('');
+  const [novaSecaoNome, setNovaSecaoNome] = useState('');
+  const [novaSecaoValor, setNovaSecaoValor] = useState('');
+  const [criandoSecao, setCriandoSecao] = useState(false);
+  const [selectedLayoutSection, setSelectedLayoutSection] = useState<LayoutItem | null>(null);
+  const [secaoVideoIds, setSecaoVideoIds] = useState<string[]>([]);
+  const [dragSecaoVideoIndex, setDragSecaoVideoIndex] = useState<number | null>(null);
   const [cupons, setCupons] = useState<Cupom[]>([]);
   const [novoCupomCodigo, setNovoCupomCodigo] = useState('');
   const [novoCupomDesconto, setNovoCupomDesconto] = useState('10');
@@ -921,7 +961,7 @@ function AdminPage() {
     try { await adminCreateGenero(novoGenero.trim()); setNovoGenero(''); await loadCategoriasEGeneros(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível criar o gênero.'); }
   }
   function resetVideoForm() {
-    setVideoForm({ url_video: '', titulo: '', descricao: '', categoria_id: '', genero: '', url_capa: '', licenca: '', ano: '' });
+    setVideoForm({ url_video: '', titulo: '', descricao: '', categoria_id: '', genero: '', url_capa: '', licenca: '', ano: '', elenco: '', ao_vivo: false });
     setEditingVideoId(null);
   }
   function editVideo(video: Video) {
@@ -935,6 +975,8 @@ function AdminPage() {
       url_capa: video.url_capa || '',
       licenca: video.licenca || '',
       ano: video.ano ? String(video.ano) : '',
+      elenco: video.elenco || '',
+      ao_vivo: Boolean(video.ao_vivo),
     });
   }
   async function saveVideo() {
@@ -953,6 +995,8 @@ function AdminPage() {
       url_capa: videoForm.url_capa.trim() || null,
       licenca: videoForm.licenca.trim() || null,
       ano: videoForm.ano ? Number(videoForm.ano) : null,
+      elenco: videoForm.elenco.trim() || null,
+      ao_vivo: videoForm.ao_vivo,
       fonte: 'Cadastrado manualmente',
     };
     try {
@@ -1156,8 +1200,17 @@ function AdminPage() {
   function labelForLayoutItem(item: LayoutItem) {
     if (item.tipo === 'series') return 'Séries';
     if (item.tipo === 'catalogo_geral') return 'Catálogo geral (todos os vídeos)';
-    return item.colecoes?.titulo || 'Coleção sem nome';
+    if (item.tipo === 'colecao') return item.colecoes?.titulo || 'Coleção sem nome';
+    if (item.tipo === 'hero') return item.titulo || 'Banner de destaque (Hero)';
+    if (item.tipo === 'carrossel') return item.titulo || 'Carrossel';
+    if (item.tipo === 'top10') return item.titulo || 'Top 10';
+    if (item.tipo === 'elenco') return item.titulo || `Elenco: ${item.config?.nome || '?'}`;
+    if (item.tipo === 'categoria') return item.titulo || `Categoria: ${item.config?.valor || '?'}`;
+    if (item.tipo === 'ao_vivo') return item.titulo || 'Ao vivo / Esportes';
+    return 'Seção';
   }
+  function podeGerenciarVideosDaSecao(tipo: LayoutItem['tipo']) { return tipo === 'hero' || tipo === 'carrossel' || tipo === 'top10'; }
+  function podeApagarSecao(tipo: LayoutItem['tipo']) { return tipo !== 'series' && tipo !== 'catalogo_geral' && tipo !== 'colecao'; }
   function handleLayoutDragStart(index: number) { setDragLayoutIndex(index); }
   function handleLayoutDragOver(event: DragEvent) { event.preventDefault(); }
   async function handleLayoutDrop(targetIndex: number) {
@@ -1173,12 +1226,86 @@ function AdminPage() {
       setMessage(error instanceof Error ? error.message : 'Não foi possível salvar a nova ordem do layout.');
     }
   }
+  function moveLayoutSection(index: number, direcao: -1 | 1) {
+    const alvo = index + direcao;
+    if (alvo < 0 || alvo >= layoutItems.length) return;
+    const reordered = [...layoutItems];
+    const [moved] = reordered.splice(index, 1);
+    reordered.splice(alvo, 0, moved);
+    setLayoutItems(reordered);
+    adminReorderLayout(reordered.map((item) => item.id)).catch((error) => setMessage(error instanceof Error ? error.message : 'Não foi possível salvar a nova ordem do layout.'));
+  }
   async function toggleLayoutVisibleHandler(item: LayoutItem) {
     try {
       await adminToggleLayoutVisible(item.id, !item.visivel);
       await loadLayout();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Não foi possível atualizar a visibilidade.');
+    }
+  }
+  async function createLayoutSection() {
+    setMessage('');
+    if (novaSecaoTipo === 'elenco' && !novaSecaoNome.trim()) { setMessage('Digite o nome do ator/diretor da seção.'); return; }
+    if (novaSecaoTipo === 'categoria' && !novaSecaoValor.trim()) { setMessage('Digite a categoria/gênero da seção.'); return; }
+    setCriandoSecao(true);
+    try {
+      const config: LayoutSectionConfig = {};
+      if (novaSecaoTipo === 'elenco') config.nome = novaSecaoNome.trim();
+      if (novaSecaoTipo === 'categoria') config.valor = novaSecaoValor.trim();
+      if (novaSecaoTipo === 'hero' || novaSecaoTipo === 'carrossel' || novaSecaoTipo === 'top10') config.video_ids = [];
+      await adminCreateLayoutSection({ tipo: novaSecaoTipo, titulo: novaSecaoTitulo.trim() || undefined, config });
+      setNovaSecaoTitulo('');
+      setNovaSecaoNome('');
+      setNovaSecaoValor('');
+      setNovaSecaoTipo('carrossel');
+      await loadLayout();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Não foi possível criar a seção.');
+    } finally {
+      setCriandoSecao(false);
+    }
+  }
+  function selectLayoutSectionForVideos(item: LayoutItem) {
+    setSelectedLayoutSection(item);
+    setSecaoVideoIds(item.config?.video_ids || []);
+  }
+  async function persistSecaoVideoIds(newList: string[]) {
+    if (!selectedLayoutSection) return;
+    setSecaoVideoIds(newList);
+    try {
+      const novoConfig = { ...selectedLayoutSection.config, video_ids: newList };
+      await adminUpdateLayoutSection(selectedLayoutSection.id, { config: novoConfig });
+      setSelectedLayoutSection({ ...selectedLayoutSection, config: novoConfig });
+      await loadLayout();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Não foi possível salvar os vídeos da seção.');
+    }
+  }
+  function addVideoToSecao(videoId: string) {
+    if (!videoId || secaoVideoIds.includes(videoId)) return;
+    persistSecaoVideoIds([...secaoVideoIds, videoId]);
+  }
+  function removeVideoFromSecao(videoId: string) {
+    persistSecaoVideoIds(secaoVideoIds.filter((id) => id !== videoId));
+  }
+  function handleSecaoVideoDragStart(index: number) { setDragSecaoVideoIndex(index); }
+  function handleSecaoVideoDragOver(event: DragEvent) { event.preventDefault(); }
+  function handleSecaoVideoDrop(targetIndex: number) {
+    if (dragSecaoVideoIndex === null || dragSecaoVideoIndex === targetIndex) { setDragSecaoVideoIndex(null); return; }
+    const reordered = [...secaoVideoIds];
+    const [moved] = reordered.splice(dragSecaoVideoIndex, 1);
+    reordered.splice(targetIndex, 0, moved);
+    setDragSecaoVideoIndex(null);
+    persistSecaoVideoIds(reordered);
+  }
+  async function deleteLayoutSectionHandler(item: LayoutItem) {
+    if (!window.confirm('Apagar esta seção do layout? Os vídeos dela continuam no catálogo normal.')) return;
+    try {
+      await adminDeleteLayoutSection(item.id);
+      if (selectedLayoutSection?.id === item.id) { setSelectedLayoutSection(null); setSecaoVideoIds([]); }
+      await loadLayout();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Não foi possível apagar a seção.');
     }
   }
 
@@ -1325,7 +1452,7 @@ function AdminPage() {
     if (item === 'videos') { loadVideos(); loadCategoriasEGeneros(); }
     if (item === 'colecoes') { loadColecoes(); loadVideos(); }
     if (item === 'series') { loadSeries(); loadVideos(); loadCategoriasEGeneros(); }
-    if (item === 'layout') loadLayout();
+    if (item === 'layout') { loadLayout(); loadVideos(); }
     if (item === 'cupons') loadCupons();
     if (item === 'planos') loadPlans();
     if (item === 'clientes') loadClients();
@@ -1340,13 +1467,15 @@ function AdminPage() {
     <div className="field"><label htmlFor="v-descricao">Sinopse</label><input id="v-descricao" className="input focus-tv" value={videoForm.descricao} onChange={(e) => setVideoForm({ ...videoForm, descricao: e.target.value })} placeholder="Uma linha sobre o vídeo" /></div>
     <div className="field"><label htmlFor="v-categoria">Categoria</label><select id="v-categoria" className="input focus-tv" value={videoForm.categoria_id} onChange={(e) => setVideoForm({ ...videoForm, categoria_id: e.target.value })}><option value="">Selecione...</option>{categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select><div style={{ display: 'flex', gap: 8, marginTop: 6 }}><input className="input focus-tv" value={novaCategoria} onChange={(e) => setNovaCategoria(e.target.value)} placeholder="Criar nova categoria..." /><button type="button" className="secondary-button focus-tv" onClick={handleCreateCategoria}>Criar</button></div></div>
     <div className="field"><label htmlFor="v-genero">Gênero</label><select id="v-genero" className="input focus-tv" value={videoForm.genero} onChange={(e) => setVideoForm({ ...videoForm, genero: e.target.value })}><option value="">Selecione...</option>{generos.map((g) => <option key={g.id} value={g.nome}>{g.nome}</option>)}</select><div style={{ display: 'flex', gap: 8, marginTop: 6 }}><input className="input focus-tv" value={novoGenero} onChange={(e) => setNovoGenero(e.target.value)} placeholder="Criar novo gênero..." /><button type="button" className="secondary-button focus-tv" onClick={handleCreateGenero}>Criar</button></div></div>
+    <div className="field"><label htmlFor="v-elenco">Elenco (separe os nomes por vírgula)</label><input id="v-elenco" className="input focus-tv" value={videoForm.elenco} onChange={(e) => setVideoForm({ ...videoForm, elenco: e.target.value })} placeholder="Ex.: Gal Gadot, Fernanda Torres" /></div>
+    <label className="check-row"><input type="checkbox" checked={videoForm.ao_vivo} onChange={(e) => setVideoForm({ ...videoForm, ao_vivo: e.target.checked })} />Transmissão ao vivo / esportes (aparece na seção "Ao vivo")</label>
     <div className="field"><label htmlFor="v-capa">URL da capa (opcional)</label><input id="v-capa" className="input focus-tv" value={videoForm.url_capa} onChange={(e) => setVideoForm({ ...videoForm, url_capa: e.target.value })} placeholder="https://..." /></div>
     <div className="field"><label htmlFor="v-licenca">Licença</label><input id="v-licenca" className="input focus-tv" value={videoForm.licenca} onChange={(e) => setVideoForm({ ...videoForm, licenca: e.target.value })} placeholder="Ex.: Domínio Público" /></div>
     <div className="field"><label htmlFor="v-ano">Ano</label><input id="v-ano" type="number" className="input focus-tv" value={videoForm.ano} onChange={(e) => setVideoForm({ ...videoForm, ano: e.target.value })} placeholder="Ex.: 1968" /></div>
     <button className="primary-button focus-tv" onClick={saveVideo} disabled={savingVideo}>{savingVideo ? 'Salvando...' : editingVideoId ? 'Salvar alterações' : 'Adicionar ao catálogo'}</button>
     {editingVideoId && <button className="quiet-button focus-tv" style={{ marginLeft: 10 }} onClick={resetVideoForm}>Cancelar edição</button>}
     <h3 style={{ marginTop: 26 }}>Vídeos cadastrados</h3>
-    <div className="admin-list" style={{ marginTop: 10 }}>{videos.length ? videos.map((video) => <div className="result-row" key={video.id}><span><strong>{video.titulo}</strong><small style={{ display: 'block', color: '#96a0af', marginTop: 3 }}>{video.genero || 'sem gênero'} · {video.ano || 'sem ano'}</small></span><span style={{ display: 'flex', gap: 8 }}><button className="quiet-button focus-tv" onClick={() => editVideo(video)}>Editar</button><button className="quiet-button focus-tv" onClick={() => deleteVideo(video.id)} disabled={deletingVideoId === video.id}>{deletingVideoId === video.id ? 'Apagando...' : 'Apagar'}</button></span></div>) : <p className="muted">Nenhum vídeo cadastrado ainda.</p>}</div>
+    <div className="admin-list" style={{ marginTop: 10 }}>{videos.length ? videos.map((video) => <div className="result-row" key={video.id}><span><strong>{video.titulo}</strong><small style={{ display: 'block', color: '#96a0af', marginTop: 3 }}>{video.genero || 'sem gênero'} · {video.ano || 'sem ano'}{video.ao_vivo ? ' · Ao vivo' : ''}</small></span><span style={{ display: 'flex', gap: 8 }}><button className="quiet-button focus-tv" onClick={() => editVideo(video)}>Editar</button><button className="quiet-button focus-tv" onClick={() => deleteVideo(video.id)} disabled={deletingVideoId === video.id}>{deletingVideoId === video.id ? 'Apagando...' : 'Apagar'}</button></span></div>) : <p className="muted">Nenhum vídeo cadastrado ainda.</p>}</div>
   </section>}
 
   {tab === 'colecoes' && <section className="panel panel-pad"><div className="eyebrow">Curadoria</div><h2 className="panel-title" style={{ marginTop: 8 }}>Coleções (fileiras do catálogo)</h2><p className="muted" style={{ fontSize: '.82rem', lineHeight: 1.6 }}>Crie fileiras como "Top 10" ou "Sessão da Tarde" e arraste os títulos pra definir a ordem exata em que aparecem. Toda coleção nova entra automaticamente na aba Layout, no fim da fila.</p>
@@ -1399,13 +1528,40 @@ function AdminPage() {
     </div>}
   </section>}
 
-  {tab === 'layout' && <section className="panel panel-pad"><div className="eyebrow">Catálogo · Início</div><h2 className="panel-title" style={{ marginTop: 8 }}>Layout do catálogo</h2><p className="muted" style={{ fontSize: '.82rem', lineHeight: 1.6 }}>Arraste as fileiras abaixo pra mudar a ordem em que aparecem na tela inicial do catálogo (o "Início"). O botão esconde/mostra uma fileira sem apagar nada do que você criou.</p>
+  {tab === 'layout' && <section className="panel panel-pad"><div className="eyebrow">Catálogo · Início</div><h2 className="panel-title" style={{ marginTop: 8 }}>Construtor de Layout</h2><p className="muted" style={{ fontSize: '.82rem', lineHeight: 1.6 }}>Arraste (ou use as setas ↑↓) pra mudar a ordem das fileiras na tela inicial. O botão esconde/mostra uma fileira sem apagar nada do que você criou.</p>
     <div style={{ marginTop: 14 }}>{layoutItems.length ? layoutItems.map((item, index) => (
       <div key={item.id} draggable onDragStart={() => handleLayoutDragStart(index)} onDragOver={handleLayoutDragOver} onDrop={() => handleLayoutDrop(index)} className="result-row" style={{ cursor: 'grab', opacity: item.visivel ? 1 : 0.5, border: dragLayoutIndex === index ? '1px dashed var(--accent-teal, #2ec4b6)' : undefined }}>
         <span>{index + 1}. {labelForLayoutItem(item)}{!item.visivel && ' (oculto)'}</span>
-        <button className="quiet-button focus-tv" onClick={() => toggleLayoutVisibleHandler(item)}>{item.visivel ? 'Esconder' : 'Mostrar'}</button>
+        <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <button className="quiet-button focus-tv" onClick={() => moveLayoutSection(index, -1)} disabled={index === 0} aria-label="Subir">↑</button>
+          <button className="quiet-button focus-tv" onClick={() => moveLayoutSection(index, 1)} disabled={index === layoutItems.length - 1} aria-label="Descer">↓</button>
+          {podeGerenciarVideosDaSecao(item.tipo) && <button className="secondary-button focus-tv" onClick={() => selectLayoutSectionForVideos(item)}>Gerenciar vídeos</button>}
+          <button className="quiet-button focus-tv" onClick={() => toggleLayoutVisibleHandler(item)}>{item.visivel ? 'Esconder' : 'Mostrar'}</button>
+          {podeApagarSecao(item.tipo) && <button className="quiet-button focus-tv" onClick={() => deleteLayoutSectionHandler(item)} aria-label="Apagar seção"><Trash2 size={15} /></button>}
+        </span>
       </div>
     )) : <p className="muted">Carregando...</p>}</div>
+
+    <h3 style={{ marginTop: 26 }}>Adicionar nova seção</h3>
+    <div className="field"><label htmlFor="secao-tipo">Tipo de fileira</label><select id="secao-tipo" className="input focus-tv" value={novaSecaoTipo} onChange={(e) => setNovaSecaoTipo(e.target.value as LayoutItem['tipo'])}>{LAYOUT_SECTION_TYPES.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></div>
+    <div className="field"><label htmlFor="secao-titulo">Título da seção (opcional, aparece pro usuário)</label><input id="secao-titulo" className="input focus-tv" value={novaSecaoTitulo} onChange={(e) => setNovaSecaoTitulo(e.target.value)} placeholder="Ex.: Lançamentos da semana" /></div>
+    {novaSecaoTipo === 'elenco' && <div className="field"><label htmlFor="secao-nome">Nome do ator/diretor</label><input id="secao-nome" className="input focus-tv" value={novaSecaoNome} onChange={(e) => setNovaSecaoNome(e.target.value)} placeholder="Ex.: Gal Gadot" /><p className="muted" style={{ fontSize: '.75rem', marginTop: 4 }}>Essa seção mostra sozinha todo vídeo cujo campo "Elenco" contenha esse nome.</p></div>}
+    {novaSecaoTipo === 'categoria' && <div className="field"><label htmlFor="secao-valor">Categoria/gênero</label><input id="secao-valor" className="input focus-tv" value={novaSecaoValor} onChange={(e) => setNovaSecaoValor(e.target.value)} placeholder="Ex.: K-Drama, Séries Turcas, Anime" /><p className="muted" style={{ fontSize: '.75rem', marginTop: 4 }}>Combina com o campo Categoria ou Gênero de cada vídeo.</p></div>}
+    {(novaSecaoTipo === 'hero' || novaSecaoTipo === 'carrossel' || novaSecaoTipo === 'top10') && <p className="muted" style={{ fontSize: '.78rem' }}>Depois de criar, use o botão "Gerenciar vídeos" na lista acima pra escolher e ordenar os títulos dessa fileira.</p>}
+    {novaSecaoTipo === 'ao_vivo' && <p className="muted" style={{ fontSize: '.78rem' }}>Essa seção mostra sozinha todo vídeo marcado como "Transmissão ao vivo" na aba Vídeos.</p>}
+    <button className="primary-button focus-tv" onClick={createLayoutSection} disabled={criandoSecao}><Plus size={15} />{criandoSecao ? 'Criando...' : 'Adicionar nova seção'}</button>
+
+    {selectedLayoutSection && podeGerenciarVideosDaSecao(selectedLayoutSection.tipo) && <div style={{ marginTop: 26 }}>
+      <h3>Vídeos de "{labelForLayoutItem(selectedLayoutSection)}"</h3>
+      <div className="field"><label htmlFor="secao-add-video">Adicionar vídeo</label><select id="secao-add-video" className="input focus-tv" defaultValue="" onChange={(e) => { const value = e.target.value; if (value) addVideoToSecao(value); e.target.value = ''; }}><option value="">Selecione um vídeo...</option>{videos.filter((v) => !secaoVideoIds.includes(v.id)).map((v) => <option key={v.id} value={v.id}>{v.titulo}</option>)}</select></div>
+      <p className="muted" style={{ fontSize: '.78rem' }}>Arraste os itens abaixo pra reordenar{selectedLayoutSection.tipo === 'top10' ? ' — a ordem vira o ranking do Top 10' : ''}.</p>
+      <div style={{ marginTop: 8 }}>{resolveVideosByIds(videos, secaoVideoIds).map((video, index) => (
+        <div key={video.id} draggable onDragStart={() => handleSecaoVideoDragStart(index)} onDragOver={handleSecaoVideoDragOver} onDrop={() => handleSecaoVideoDrop(index)} className="result-row" style={{ cursor: 'grab', border: dragSecaoVideoIndex === index ? '1px dashed var(--accent-teal, #2ec4b6)' : undefined }}>
+          <span>{index + 1}. {video.titulo}</span>
+          <button className="quiet-button focus-tv" onClick={() => removeVideoFromSecao(video.id)}>Remover</button>
+        </div>
+      ))}{!secaoVideoIds.length && <p className="muted">Nenhum vídeo nesta seção ainda.</p>}</div>
+    </div>}
   </section>}
 
   {tab === 'cupons' && <section className="panel panel-pad"><div className="eyebrow">Ofertas e promoções</div><h2 className="panel-title" style={{ marginTop: 8 }}>Cupons de desconto</h2><p className="muted" style={{ fontSize: '.82rem', lineHeight: 1.6 }}>O cliente digita o código na tela de checkout pra ganhar o desconto. Nunca deixe um cupom zerar o valor total — o Mercado Pago rejeita cobrança de R$ 0,00.</p>
