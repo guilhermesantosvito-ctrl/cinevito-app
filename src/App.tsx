@@ -168,33 +168,22 @@ function extractVideoUrl(input: string): string {
   if (iframeMatch) return iframeMatch[1];
   return trimmed;
 }
-
-function getEmbedInfo(url?: string | null): { type: 'file' | 'embed' | 'none'; src: string } {
+export function getEmbedInfo(url?: string | null): { type: 'file' | 'embed' | 'none'; src: string; viaProxy?: boolean } {
   if (!url) return { type: 'none', src: '' };
   const trimmed = url.trim();
 
   const yt = trimmed.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{6,})/);
-  if (yt) return { type: 'embed', src: `https://www.youtube.com/embed/${yt[1]}` };
+  if (yt) return { type: 'embed', src: `https://www.youtube.com/embed/${yt[1]}`, viaProxy: false };
   const vimeo = trimmed.match(/vimeo\.com\/(?:video\/)?(\d+)/);
-  if (vimeo) return { type: 'embed', src: `https://player.vimeo.com/video/${vimeo[1]}` };
+  if (vimeo) return { type: 'embed', src: `https://player.vimeo.com/video/${vimeo[1]}`, viaProxy: false };
   const archive = trimmed.match(/archive\.org\/details\/([^/?#]+)/);
-  if (archive) return { type: 'embed', src: `https://archive.org/embed/${archive[1]}` };
-  if (trimmed.includes('archive.org/embed/')) return { type: 'embed', src: trimmed };
-  if (/\.(mp4|webm|ogv|m3u8)(\?|$)/i.test(trimmed)) return { type: 'file', src: trimmed };
-
-  // Roteia todos os servidores de terceiro (MixDrop, Streamtape, DoodStream, Byse...) pelo Proxy do Netlify para burlar o "Client blocked!"
-  if (
-    trimmed.includes('mixdrop') || 
-    trimmed.includes('miixdrop') || 
-    trimmed.includes('streamtape') || 
-    trimmed.includes('byse') || 
-    trimmed.includes('playmogo') || 
-    trimmed.includes('dood')
-  ) {
-    return { type: 'embed', src: `/api/proxy-video?url_video=${encodeURIComponent(trimmed)}` };
-  }
-
-  return { type: 'embed', src: trimmed };
+  if (archive) return { type: 'embed', src: `https://archive.org/embed/${archive[1]}`, viaProxy: false };
+  if (trimmed.includes('archive.org/embed/')) return { type: 'embed', src: trimmed, viaProxy: false };
+  if (/\\.(mp4|webm|ogv|m3u8)(\?|$)/i.test(trimmed)) return { type: 'file', src: trimmed };
+  // Todos os demais (servidores de terceiro: MixDrop, Byse, DoodStream, Streamtape...)
+  // passam pelo proxy Netlify que faz strip do anti-embed.
+  const proxyUrl = '/api/proxy-video?url_video=' + encodeURIComponent(trimmed);
+  return { type: 'embed', src: proxyUrl, viaProxy: true };
 }
 
 type PlataformaInstalacao = 'ios' | 'android' | 'desktop' | 'tv';

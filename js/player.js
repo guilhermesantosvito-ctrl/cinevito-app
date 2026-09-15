@@ -48,6 +48,7 @@ let progressoJaCarregado = 0;
   progressoJaCarregado = progresso?.progresso_segundos || 0;
 
   const tipo = detectarTipoPlayer(video.url_video);
+  const embedInfo = getEmbedInfo(video.url_video);
   const botaoVoltar = '<a href="catalogo.html" class="botao-voltar-player">←</a>';
 
   if (tipo === "direto") {
@@ -78,9 +79,10 @@ let progressoJaCarregado = 0;
     });
 
   } else {
+    const iframeUrl = embedInfo.src;
     document.getElementById("player-wrapper").innerHTML =
       botaoVoltar +
-      `<iframe src="${video.url_video}" allowfullscreen webkitallowfullscreen></iframe>`;
+      `<iframe src="${iframeUrl}" allowfullscreen webkitallowfullscreen></iframe>`;
   }
 
   document.getElementById("video-titulo").textContent = video.titulo;

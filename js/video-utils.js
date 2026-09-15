@@ -26,18 +26,21 @@ function normalizarUrlVideo(urlBruta) {
 }
 
 // Usada na hora de REPRODUZIR — decide iframe ou <video>
-function detectarTipoPlayer(url) {
-  if (
-    url.includes("archive.org/embed/") ||
-    url.includes("youtube.com/embed/") ||
-    url.includes("player.vimeo.com/")
-  ) {
-    return "iframe";
-  }
-  if (/\.(mp4|webm|ogv)(\?.*)?$/i.test(url)) {
-    return "direto";
-  }
-  return "iframe"; // aposta segura como padrão
+function getEmbedInfo(url) {
+  if (!url) return { type: 'none', src: '' };
+  const trimmed = url.trim();
+  const yt = trimmed.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{6,})/);
+  if (yt) return { type: 'embed', src: 'https://www.youtube.com/embed/' + yt[1], viaProxy: false };
+  const vimeo = trimmed.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+  if (vimeo) return { type: 'embed', src: 'https://player.vimeo.com/video/' + vimeo[1], viaProxy: false };
+  const archive = trimmed.match(/archive\.org\/details\/([^/?#]+)/);
+  if (archive) return { type: 'embed', src: 'https://archive.org/embed/' + archive[1], viaProxy: false };
+  if (trimmed.includes('archive.org/embed/')) return { type: 'embed', src: trimmed, viaProxy: false };
+  if (/\.(mp4|webm|ogv|m3u8)(\?|$)/i.test(trimmed)) return { type: 'file', src: trimmed };
+  // Servidores de terceiro: MixDrop, Byse, DoodStream, Streamtape...
+  // passam pelo proxy Netlify que faz strip do anti-embed.
+  const proxyUrl = '/api/proxy-video?url_video=' + encodeURIComponent(trimmed);
+  return { type: 'embed', src: proxyUrl, viaProxy: true };
 }
 
 // Sugere automaticamente uma capa quando o link é do Internet Archive
