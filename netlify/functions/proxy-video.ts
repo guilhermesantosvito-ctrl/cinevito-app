@@ -158,6 +158,14 @@ export const handler: Handler = async (event) => {
         '$1<script>window.googleAd=1;</script>'
       );
 
+      // Interceptador de document.createElement para remover sandbox de iframes criados
+      // dinamicamente (ex: MixDrop, Streamtape criam iframes via JS com sandbox que
+      // detecta o container e dispara a mensagem de bloqueio)
+      htmlFinal = htmlFinal.replace(
+        /(<head[^>]*>)/i,
+        '$1<script>(function(){var _createElement=document.createElement;document.createElement=function(tag){var el=_createElement.call(document,tag);if(tag&&tag.toLowerCase()==="iframe"){try{el.removeAttribute("sandbox");}catch(e){}}return el;};})();</script>'
+      );
+
       // Remover/inverter verificações de anti-frame-bust
       htmlFinal = htmlFinal.replace(
         /(if\s*\(\s*(top|parent)\.location\s*!==\s*self\.location\s*\)\s*\{[^}]*\})/gi,
