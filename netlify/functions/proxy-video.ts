@@ -146,25 +146,25 @@ export const handler: Handler = async (event) => {
     // "Client blocked!" do Streamtape)
     let htmlFinal = proxyHtml;
     if (isThirdPartyServer) {
-      // Remove atributo sandbox de iframes internos (MixDrop)
+      // Remove atributo sandbox de iframes internos que servem como detector anti-embed
+      // (ex: Streamtape injeta iframe sandbox que, se detectado, mostra "Client blocked!")
       htmlFinal = htmlFinal.replace(
         /<iframe[^>]*sandbox="[^"]*"[^>]*>/gi,
-        (match) => match.replace(/sandbox="[^"]*"/, '')
+        (match) => {
+          // Mantém allow-scripts e allow-popups, remove allow-same-origin (que permite
+          // o iframe detectar o container e mostrar a mensagem de bloqueio)
+          return match.replace(/sandbox="[^"]*"/, 'sandbox="allow-scripts allow-popups"');
+        }
       );
 
-      // o Streamtape define e.adblock=true se window.googleAd for undefined,
-      // e depois redireciona para advtpe.com. Neutraliza marcando googleAd=true.
-      // Detecta se é streamtape/advtpe e injeta antes do <head>
-      if (/streamtape\.com/i.test(extractedUrl) || /advtpe\.com/i.test(extractedUrl)) {
-        htmlFinal = htmlFinal.replace(
-          /(<head[^>]*>)/i,
-          '$1<script>window.googleAd=1;<\/script>'
-        );
-      }
+      // Injetar window.googleAd=1 antes do <head> — isso faz o Streamtape achar que
+      // não tem adblock (void 0===window.googleAd&&(e.adblock=!0))
       htmlFinal = htmlFinal.replace(
-        /(if\s*\(\s*top\.(location|self)\s*[!=]==\s*self\.(location|self)\s*\)\s*\{[^}]*\})/gi,
-        '// anti-frame-bust removido (top!=self)'
+        /(<head[^>]*>)/i,
+        '$1<script>window.googleAd=1;</script>'
       );
+
+      // Remover/inverter verificações de anti-frame-bust
       htmlFinal = htmlFinal.replace(
         /(if\s*\(\s*(top|parent)\.location\s*!==\s*self\.location\s*\)\s*\{[^}]*\})/gi,
         '// anti-frame-bust removido (top.location!==self.location)'
@@ -174,7 +174,7 @@ export const handler: Handler = async (event) => {
         '// anti-frame-bust removido (window.top!==window.self)'
       );
 
-      // 2. Verificação de hostname (if (self.location.hostname !== 'x'))
+      // Verificação de hostname (if (self.location.hostname !== 'x'))
       htmlFinal = htmlFinal.replace(
         /(if\s*\(\s*self\.location\.hostname\s*!==\s*['"][^'"]+['"]\s*\)\s*\{[^}]*\})/gi,
         '// anti-frame-bust removido (hostname check)'
