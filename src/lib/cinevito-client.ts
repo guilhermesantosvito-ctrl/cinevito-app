@@ -86,6 +86,7 @@ const SUPABASE_SESSION_KEY = 'sb-cefyzitdkvtynhwsxdvv-auth-token';
 const BACKGROUND_KEY = 'cinevito-background-since';
 const BACKGROUND_LIMIT_MS = 3 * 60 * 1000;
 const ADMIN_FLAG_KEY = 'cinevito-is-admin';
+const DEVICE_ID_KEY = 'cinevito-device-id';
 export function isAdminCached(): boolean {
   return localStorage.getItem(ADMIN_FLAG_KEY) === 'true';
 }
@@ -162,6 +163,34 @@ export function clearSession() {
   localStorage.removeItem('cinevito-demo-user');
   window.dispatchEvent(new Event('cinevito-auth-change'));
 }
+
+// Identificador fixo deste aparelho/navegador, usado só pelo controle de
+// abuso do teste grátis (função "registrar-acesso") — não tem relação com
+// a conta ou a sessão de login.
+function getOrCreateDeviceId(): string {
+  let id = localStorage.getItem(DEVICE_ID_KEY);
+  if (!id) {
+    id = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    localStorage.setItem(DEVICE_ID_KEY, id);
+  }
+  return id;
+}
+// Chama a Edge Function que decide, com base neste IP e neste aparelho, se
+// a conta ainda tem direito ao teste grátis de 3 dias (e já registra a
+// assinatura "trial" ou "inativa" no banco). É best-effort: se falhar (rede
+// instável, função fora do ar), o cadastro continua normalmente e a pessoa
+// só fica com o período de carência baseado na data de criação da conta até
+// essa chamada ser bem-sucedida em um próximo acesso.
+export async function registrarAcesso(usuario_id: string): Promise<{ trial_concedido: boolean } | null> {
+  try {
+    return await request<{ trial_concedido: boolean }>('/functions/v1/registrar-acesso', {
+      method: 'POST',
+      body: JSON.stringify({ usuario_id, device_id: getOrCreateDeviceId() }),
+    });
+  } catch {
+    return null;
+  }
+}
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!hasRuntimeConfig) throw new Error('A configuração do CineVito ainda não está disponível neste ambiente.');
   const token = getAccessToken();
@@ -199,6 +228,9 @@ export async function signUp(nome: string, email: string, password: string, nasc
     { method: 'POST', body: JSON.stringify({ email, password, data: { nome, nascimento, codigo_indicacao: codigo || undefined } }) },
   );
   if (result.access_token) saveSession(result as { access_token: string; user: SessionUser });
+  // Registra (best-effort) se esta conta/aparelho ainda tem direito ao
+  // teste grátis, logo após o cadastro, antes da pessoa entrar no catálogo.
+  if (result.user?.id) await registrarAcesso(result.user.id);
   return result;
 }
 export async function fetchVideos(): Promise<Video[]> {
@@ -639,23 +671,25 @@ export async function checkCatalogAccess(): Promise<boolean> {
   const info = perfil[0];
   if (info?.is_admin) return true;
 
+  // Busca a assinatura mais recente SEM filtrar por status: precisamos
+  // saber se já existe alguma decisão registrada pra essa conta (mesmo que
+  // "inativa", vinda do controle de abuso do teste grátis), pra não cair no
+  // período de carência por engano pra quem já usou o teste antes.
   const assinaturas = await request<Array<{ status?: string; data_expiracao?: string }>>(
-    `/rest/v1/assinaturas?select=status,data_expiracao&usuario_id=eq.${encodeURIComponent(user.id)}&status=in.(ativa,trial)&order=criado_em.desc&limit=1`,
+    `/rest/v1/assinaturas?select=status,data_expiracao&usuario_id=eq.${encodeURIComponent(user.id)}&order=criado_em.desc&limit=1`,
   );
   const atual = assinaturas[0];
   if (atual) {
+    if (atual.status !== 'ativa' && atual.status !== 'trial') return false;
     if (!atual.data_expiracao) return true;
     return new Date(atual.data_expiracao) > new Date();
   }
 
-  // A data de criação da conta: usamos primeiro a que já veio junto com o
-  // login/cadastro (disponível na hora, sem depender de nada do banco).
-  // Só recorremos à da tabela "profiles" se por algum motivo a sessão não
-  // tiver essa informação. Antes, dependíamos só da tabela "profiles" — e
-  // se essa linha ainda não tivesse sido criada no banco no exato instante
-  // dessa checagem (corrida com o gatilho que cria o perfil), o usuário
-  // recém-cadastrado caía direto em "sem acesso", mesmo tendo direito ao
-  // teste grátis.
+  // Ainda não existe nenhuma assinatura registrada pra essa conta: o mais
+  // provável é que a chamada de "registrar-acesso" feita no cadastro ainda
+  // não tenha terminado de rodar. Damos um período de carência baseado na
+  // data de criação da conta (a que já veio junto com o cadastro, sem
+  // depender do banco) só até essa linha existir de verdade.
   const criadoEm = user.created_at || info?.criado_em;
   if (criadoEm) {
     const limite = new Date(criadoEm);
