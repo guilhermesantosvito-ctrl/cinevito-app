@@ -235,8 +235,27 @@ function stepsForPlatform(platform: PlataformaInstalacao): InstallStep[] {
     { icon: Plus, title: 'Toque em "Instalar app" ou "Adicionar à tela inicial"', description: 'O nome exato pode variar um pouco dependendo do navegador do seu aparelho.' },
   ];
 }
+// Detecta se o Android atual já está usando o Chrome (o único navegador em
+// que a instalação em 1 toque funciona de forma confiável). Exclui outros
+// navegadores baseados em Chromium (Samsung Internet, Edge, Opera) e
+// navegadores "embutidos" dentro de outros apps (Instagram, WhatsApp etc,
+// identificados pelo "; wv)" no user-agent).
+function ehChromeAndroid(): boolean {
+  const ua = navigator.userAgent.toLowerCase();
+  if (!/android/.test(ua)) return false;
+  return /chrome\//.test(ua) && !/edg\//.test(ua) && !/opr\//.test(ua) && !/samsungbrowser\//.test(ua) && !/firefox\//.test(ua) && !/; wv\)/.test(ua);
+}
+// Reabre a página atual especificamente no Chrome, usando um link "intent"
+// (só funciona no Android, e só se o Chrome estiver instalado no aparelho).
+// É best-effort: se não der certo, a pessoa continua na mesma página e ainda
+// tem o passo a passo manual como alternativa.
+function abrirNoChrome() {
+  const semProtocolo = window.location.href.replace(/^https?:\/\//, '');
+  window.location.href = `intent://${semProtocolo}#Intent;scheme=https;package=com.android.chrome;end`;
+}
 function InstallInstructionsModal({ platform, onClose }: { platform: PlataformaInstalacao; onClose: () => void }) {
   const steps = stepsForPlatform(platform);
+  const mostrarBotaoChrome = platform === 'android' && !ehChromeAndroid();
   return (
     <div role="dialog" aria-modal="true" aria-label="Como instalar o CineVito" onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(6,9,14,.72)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 0 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: '#0f141c', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, padding: '22px 20px 26px', boxShadow: '0 -8px 40px rgba(0,0,0,.5)' }}>
@@ -247,9 +266,15 @@ function InstallInstructionsModal({ platform, onClose }: { platform: PlataformaI
           </div>
           <button onClick={onClose} className="icon-button focus-tv" aria-label="Fechar instruções"><X size={18} /></button>
         </div>
-        <p className="muted" style={{ fontSize: '.83rem', marginTop: 6, marginBottom: 20 }}>
+        <p className="muted" style={{ fontSize: '.83rem', marginTop: 6, marginBottom: mostrarBotaoChrome ? 12 : 20 }}>
           {platform === 'ios' ? 'Leva só alguns segundos — depois é sempre um toque no ícone, igual um app baixado.' : 'Alguns passos rápidos e o CineVito fica salvo na sua tela inicial.'}
         </p>
+        {mostrarBotaoChrome && (
+          <div className="notice notice-cyan" style={{ marginBottom: 20 }}>
+            <Info size={16} />
+            <span>Você não está no Chrome. <button onClick={abrirNoChrome} style={{ background: 'none', border: 'none', textDecoration: 'underline', color: '#00c8ff', cursor: 'pointer', padding: 0, font: 'inherit' }}>Toque aqui pra abrir no Chrome</button> — lá a instalação costuma liberar direto, sem precisar dos passos abaixo.</span>
+          </div>
+        )}
         <div style={{ display: 'grid', gap: 16 }}>
           {steps.map((step, index) => (
             <div key={step.title} style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
