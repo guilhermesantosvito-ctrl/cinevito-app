@@ -648,8 +648,17 @@ export async function checkCatalogAccess(): Promise<boolean> {
     return new Date(atual.data_expiracao) > new Date();
   }
 
-  if (info?.criado_em) {
-    const limite = new Date(info.criado_em);
+  // A data de criação da conta: usamos primeiro a que já veio junto com o
+  // login/cadastro (disponível na hora, sem depender de nada do banco).
+  // Só recorremos à da tabela "profiles" se por algum motivo a sessão não
+  // tiver essa informação. Antes, dependíamos só da tabela "profiles" — e
+  // se essa linha ainda não tivesse sido criada no banco no exato instante
+  // dessa checagem (corrida com o gatilho que cria o perfil), o usuário
+  // recém-cadastrado caía direto em "sem acesso", mesmo tendo direito ao
+  // teste grátis.
+  const criadoEm = user.created_at || info?.criado_em;
+  if (criadoEm) {
+    const limite = new Date(criadoEm);
     limite.setDate(limite.getDate() + 3);
     return new Date() < limite;
   }
