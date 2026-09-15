@@ -1,5 +1,4 @@
 import { useState } from 'react';
-// Se o seu cliente Supabase estiver em outro caminho, ajuste o import abaixo
 // import { supabase } from '../lib/supabase-client';
 
 export function UserUploadPage({ user }: { user: any }) {
@@ -27,7 +26,6 @@ export function UserUploadPage({ user }: { user: any }) {
       // const { error: uploadError } = await supabase.storage
       //   .from('uploads-pendentes')
       //   .upload(filePath, file);
-
       // if (uploadError) throw uploadError;
 
       // 2. Insere o registro na tabela "video_uploads" com status pendente
@@ -43,10 +41,9 @@ export function UserUploadPage({ user }: { user: any }) {
       //     file_size_bytes: file.size,
       //     status: 'pendente'
       //   });
-
       // if (dbError) throw dbError;
 
-      setMessage('Vídeo enviado com sucesso! Ele passará por moderação e em breve estará no catálogo.');
+      setMessage('Vídeo enviado com sucesso! Ele passará por moderação e em breve estará disponível.');
       setFile(null);
       setTitle('');
       setDescription('');
@@ -63,11 +60,22 @@ export function UserUploadPage({ user }: { user: any }) {
         <div className="page-head-copy">
           <div className="eyebrow">Colaboração</div>
           <h1 className="page-title">Enviar Vídeo</h1>
-          <p>Envie seu conteúdo para análise da equipe do CineVito.</p>
+          <p>Compartilhe seus materiais com a comunidade CineVito.</p>
         </div>
       </div>
 
-      <form onSubmit={handleUpload} className="panel panel-pad" style={{ maxWidth: '600px', marginTop: '20px', display: 'grid', gap: '16px' }}>
+      {/* Passo a passo explicativo para o usuário */}
+      <div className="panel panel-pad" style={{ marginBottom: '20px', background: 'rgba(0, 200, 255, 0.04)', border: '1px solid rgba(0, 200, 255, 0.15)' }}>
+        <h3 style={{ fontSize: '1rem', marginBottom: '10px', color: '#00c8ff' }}>Como funciona o envio?</h3>
+        <ul style={{ paddingLeft: '20px', display: 'grid', gap: '6px', fontSize: '0.88rem' }} className="muted">
+          <li><strong>1. Selecione o arquivo:</strong> Escolha um vídeo em formato MP4 ou WebM direto do seu aparelho.</li>
+          <li><strong>2. Preencha os detalhes:</strong> Dê um título claro e uma breve descrição para identificarmos o conteúdo.</li>
+          <li><strong>3. Envie para análise:</strong> O vídeo vai para uma fila de revisão administrativa para garantir a segurança da plataforma.</li>
+          <li><strong>4. Publicação:</strong> Assim que aprovado pelo administrador, ele entra no catálogo com crédito anonimizado para sua privacidade!</li>
+        </ul>
+      </div>
+
+      <form onSubmit={handleUpload} className="panel panel-pad" style={{ display: 'grid', gap: '16px' }}>
         <div className="field">
           <label>Arquivo de Vídeo (MP4 / WebM)</label>
           <input 
@@ -80,24 +88,25 @@ export function UserUploadPage({ user }: { user: any }) {
         </div>
 
         <div className="field">
-          <label>Título</label>
+          <label>Título do Vídeo</label>
           <input 
             type="text" 
             className="input focus-tv" 
             value={title} 
             onChange={e => setTitle(e.target.value)} 
-            placeholder="Ex: Meu curta-metragem ou gravação" 
+            placeholder="Ex: Meu curta-metragem" 
+            required
           />
         </div>
 
         <div className="field">
-          <label>Descrição</label>
+          <label>Descrição <span className="muted">(Opcional)</span></label>
           <textarea 
             className="input focus-tv" 
             value={description} 
             onChange={e => setDescription(e.target.value)} 
             placeholder="Conte um pouco sobre o vídeo..." 
-            rows={4}
+            rows={3}
           />
         </div>
 
@@ -105,7 +114,7 @@ export function UserUploadPage({ user }: { user: any }) {
         {errorMsg && <p className="form-error" role="alert">{errorMsg}</p>}
 
         <button type="submit" className="primary-button focus-tv" disabled={loading}>
-          {loading ? 'Enviando arquivo...' : 'Enviar para aprovação'}
+          {loading ? 'Enviando arquivo...' : 'Enviar vídeo para aprovação'}
         </button>
       </form>
     </div>
