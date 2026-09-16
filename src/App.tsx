@@ -173,11 +173,19 @@ function getEmbedInfo(url?: string | null): { type: 'file' | 'embed' | 'none'; s
   if (!url) return { type: 'none', src: '' };
   const trimmed = url.trim();
   
-  // Tratamento específico para MixDrop: converte /f/ ou links diretos para /e/ (embed permitido)
+  // Conversão automática para MixDrop (/e/)
   if (trimmed.includes('mixdrop') || trimmed.includes('miixdrop')) {
-    const mixMatch = trimmed.match(/(?:mixdrop|miixdrop)\.(?:top|to|club|co|sx|bz)\/(?:f|e)\/([a-zA-Z0-9_-]+)/);
+    const mixMatch = trimmed.match(/(?:mixdrop|miixdrop)\.(?:top|to|club|co|sx|bz)\/(?:f|e|e6)\/([a-zA-Z0-9_-]+)/);
     if (mixMatch) {
       return { type: 'embed', src: `https://mixdrop.top/e/${mixMatch[1]}` };
+    }
+  }
+
+  // Conversão automática para Streamtape (/e/) para evitar "Client blocked!"
+  if (trimmed.includes('streamtape')) {
+    const tapeMatch = trimmed.match(/streamtape\.com\/(?:v|e)\/([a-zA-Z0-9_-]+)/);
+    if (tapeMatch) {
+      return { type: 'embed', src: `https://streamtape.com/e/${tapeMatch[1]}` };
     }
   }
 
