@@ -17,6 +17,7 @@ import {
   processPayment, requestPasswordReset, revokeAccess, salvarProgresso, signIn, signUp, submitSuggestion, updatePlanActive, type Categoria, type Cliente, type Colecao, type ContinuarAssistindoItem, type Cupom, type Episodio, type Equipe, type Genero, type LayoutItem, type LayoutSectionConfig, type MinhaAssinatura, type Plan, type SessionUser, type Serie, type Temporada, type Video,
 } from '@/lib/cinevito-client';
 
+// Importações cruciais da função de upload que garantem que o sistema não perca a funcionalidade
 import { UserUploadPage } from './pages/user-upload';
 import { AdminUploadsPage } from './pages/admin-uploads';
 import '@/index.css';
@@ -169,11 +170,14 @@ function extractVideoUrl(input: string): string {
   return trimmed;
 }
 
+// ============================================================================
+// CONVERSÃO DE LINKS DOS SERVIDORES DO SEU BOT (RESOLUÇÃO DO BLOQUEIO)
+// ============================================================================
 function getEmbedInfo(url?: string | null): { type: 'file' | 'embed' | 'none'; src: string } {
   if (!url) return { type: 'none', src: '' };
   const trimmed = url.trim();
 
-  // Tratamento do MixDrop (/f/ ou /e/ para /e/)
+  // 1. MixDrop (/f/ ou /e/ ou /e6/ para /e/)
   if (trimmed.includes('mixdrop') || trimmed.includes('miixdrop')) {
     const mixMatch = trimmed.match(/(?:mixdrop|miixdrop)\.(?:top|to|club|co|sx|bz)\/(?:f|e|e6)\/([a-zA-Z0-9_-]+)/);
     if (mixMatch) {
@@ -181,7 +185,7 @@ function getEmbedInfo(url?: string | null): { type: 'file' | 'embed' | 'none'; s
     }
   }
 
-  // Tratamento do Streamtape (/v/ ou /e/ para /e/)
+  // 2. Streamtape (/v/ ou /e/ para /e/)
   if (trimmed.includes('streamtape')) {
     const tapeMatch = trimmed.match(/streamtape\.com\/(?:v|e)\/([a-zA-Z0-9_-]+)/);
     if (tapeMatch) {
@@ -189,7 +193,7 @@ function getEmbedInfo(url?: string | null): { type: 'file' | 'embed' | 'none'; s
     }
   }
 
-  // Tratamento do DoodStream / Playmogo (/d/ ou /e/ para /e/)
+  // 3. DoodStream / Playmogo (/d/ ou /e/ para /e/)
   if (trimmed.includes('playmogo') || trimmed.includes('dood')) {
     const doodMatch = trimmed.match(/(?:playmogo\.com|doodstream\.com|dood\.(?:to|watch|so|la|sh|re))\/[de]\/([a-zA-Z0-9_-]+)/);
     if (doodMatch) {
@@ -197,7 +201,7 @@ function getEmbedInfo(url?: string | null): { type: 'file' | 'embed' | 'none'; s
     }
   }
 
-  // Tratamento do Byse (/d/ ou /e/ para /e/)
+  // 4. Byse (/d/ ou /e/ para /e/)
   if (trimmed.includes('bysebuho') || trimmed.includes('byse')) {
     const byseMatch = trimmed.match(/bysebuho\.com\/[de]\/([a-zA-Z0-9_-]+)/);
     if (byseMatch) {
@@ -1687,9 +1691,11 @@ function AdminPage() {
       <div className="field"><label htmlFor="v-descricao">Sinopse</label><input id="v-descricao" className="input focus-tv" value={videoForm.descricao} onChange={(e) => setVideoForm({ ...videoForm, descricao: e.target.value })} placeholder="Sinopse" /></div>
       <div className="field"><label htmlFor="v-categoria">Categoria</label><select id="v-categoria" className="input focus-tv" value={videoForm.categoria_id} onChange={(e) => setVideoForm({ ...videoForm, categoria_id: e.target.value })}><option value="">Selecione...</option>{categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select><div style={{ display: 'flex', gap: 8, marginTop: 6 }}><input className="input focus-tv" value={novaCategoria} onChange={(e) => setNovaCategoria(e.target.value)} placeholder="Nova categoria..." /><button type="button" className="secondary-button focus-tv" onClick={handleCreateCategoria}>Criar</button></div></div>
       <div className="field"><label htmlFor="v-genero">Gênero</label><select id="v-genero" className="input focus-tv" value={videoForm.genero} onChange={(e) => setVideoForm({ ...videoForm, genero: e.target.value })}><option value="">Selecione...</option>{generos.map((g) => <option key={g.id} value={g.nome}>{g.nome}</option>)}</select><div style={{ display: 'flex', gap: 8, marginTop: 6 }}><input className="input focus-tv" value={novoGenero} onChange={(e) => setNovoGenero(e.target.value)} placeholder="Novo gênero..." /><button type="button" className="secondary-button focus-tv" onClick={handleCreateGenero}>Criar</button></div></div>
-      
+      <div className="field"><label htmlFor="v-elenco">Elenco (separe os nomes por vírgula)</label><input id="v-elenco" className="input focus-tv" value={videoForm.elenco} onChange={(e) => setVideoForm({ ...videoForm, elenco: e.target.value })} placeholder="Ex.: Gal Gadot, Fernanda Torres" /></div>
+      <label className="check-row"><input type="checkbox" checked={videoForm.ao_vivo} onChange={(e) => setVideoForm({ ...videoForm, ao_vivo: e.target.checked })} />Transmissão ao vivo / esportes (aparece na seção "Ao vivo")</label>
       <div className="field"><label htmlFor="v-capa">URL da capa (opcional)</label><input id="v-capa" className="input focus-tv" value={videoForm.url_capa} onChange={(e) => setVideoForm({ ...videoForm, url_capa: e.target.value })} placeholder="https://..." /></div>
-
+      <div className="field"><label htmlFor="v-licenca">Licença</label><input id="v-licenca" className="input focus-tv" value={videoForm.licenca} onChange={(e) => setVideoForm({ ...videoForm, licenca: e.target.value })} placeholder="Ex.: Domínio Público" /></div>
+      <div className="field"><label htmlFor="v-ano">Ano</label><input id="v-ano" type="number" className="input focus-tv" value={videoForm.ano} onChange={(e) => setVideoForm({ ...videoForm, ano: e.target.value })} placeholder="Ex.: 1968" /></div>
       <button className="primary-button focus-tv" onClick={saveVideo} disabled={savingVideo}>{savingVideo ? 'Salvando...' : editingVideoId ? 'Salvar alterações' : 'Adicionar ao catálogo'}</button>
       {editingVideoId && <button className="quiet-button focus-tv" style={{ marginLeft: 10 }} onClick={resetVideoForm}>Cancelar</button>}
       <h3 style={{ marginTop: 26 }}>Vídeos cadastrados</h3>
