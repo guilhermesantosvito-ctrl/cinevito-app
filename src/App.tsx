@@ -172,22 +172,6 @@ function extractVideoUrl(input: string): string {
 function getEmbedInfo(url?: string | null): { type: 'file' | 'embed' | 'none'; src: string } {
   if (!url) return { type: 'none', src: '' };
   const trimmed = url.trim();
-  
-  // Conversão automática para MixDrop (/e/)
-  if (trimmed.includes('mixdrop') || trimmed.includes('miixdrop')) {
-    const mixMatch = trimmed.match(/(?:mixdrop|miixdrop)\.(?:top|to|club|co|sx|bz)\/(?:f|e|e6)\/([a-zA-Z0-9_-]+)/);
-    if (mixMatch) {
-      return { type: 'embed', src: `https://mixdrop.top/e/${mixMatch[1]}` };
-    }
-  }
-
-  // Conversão automática para Streamtape (/e/) para evitar "Client blocked!"
-  if (trimmed.includes('streamtape')) {
-    const tapeMatch = trimmed.match(/streamtape\.com\/(?:v|e)\/([a-zA-Z0-9_-]+)/);
-    if (tapeMatch) {
-      return { type: 'embed', src: `https://streamtape.com/e/${tapeMatch[1]}` };
-    }
-  }
 
   const yt = trimmed.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{6,})/);
   if (yt) return { type: 'embed', src: `https://www.youtube.com/embed/${yt[1]}` };
@@ -197,6 +181,19 @@ function getEmbedInfo(url?: string | null): { type: 'file' | 'embed' | 'none'; s
   if (archive) return { type: 'embed', src: `https://archive.org/embed/${archive[1]}` };
   if (trimmed.includes('archive.org/embed/')) return { type: 'embed', src: trimmed };
   if (/\.(mp4|webm|ogv|m3u8)(\?|$)/i.test(trimmed)) return { type: 'file', src: trimmed };
+
+  // Roteia todos os servidores de terceiro (MixDrop, Streamtape, DoodStream, Byse...) pelo Proxy do Netlify para burlar o "Client blocked!"
+  if (
+    trimmed.includes('mixdrop') || 
+    trimmed.includes('miixdrop') || 
+    trimmed.includes('streamtape') || 
+    trimmed.includes('byse') || 
+    trimmed.includes('playmogo') || 
+    trimmed.includes('dood')
+  ) {
+    return { type: 'embed', src: `/api/proxy-video?url_video=${encodeURIComponent(trimmed)}` };
+  }
+
   return { type: 'embed', src: trimmed };
 }
 
