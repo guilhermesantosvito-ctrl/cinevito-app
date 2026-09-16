@@ -173,22 +173,18 @@ function getEmbedInfo(url?: string | null): { type: 'file' | 'embed' | 'none'; s
   if (!url) return { type: 'none', src: '' };
   const trimmed = url.trim();
 
-  // Tratamento do MixDrop
   if (trimmed.includes('mixdrop') || trimmed.includes('miixdrop')) {
     const mixMatch = trimmed.match(/(?:mixdrop|miixdrop)\.(?:top|to|club|co|sx|bz)\/(?:f|e|e6)\/([a-zA-Z0-9_-]+)/);
     if (mixMatch) return { type: 'embed', src: `https://mixdrop.top/e/${mixMatch[1]}` };
   }
-  // Tratamento do Streamtape
   if (trimmed.includes('streamtape')) {
     const tapeMatch = trimmed.match(/streamtape\.com\/(?:v|e)\/([a-zA-Z0-9_-]+)/);
     if (tapeMatch) return { type: 'embed', src: `https://streamtape.com/e/${tapeMatch[1]}` };
   }
-  // Tratamento do DoodStream / Playmogo
   if (trimmed.includes('playmogo') || trimmed.includes('dood')) {
     const doodMatch = trimmed.match(/(?:playmogo\.com|doodstream\.com|dood\.(?:to|watch|so|la|sh|re))\/[de]\/([a-zA-Z0-9_-]+)/);
     if (doodMatch) return { type: 'embed', src: `https://playmogo.com/e/${doodMatch[1]}` };
   }
-  // Tratamento do Byse
   if (trimmed.includes('bysebuho') || trimmed.includes('byse')) {
     const byseMatch = trimmed.match(/bysebuho\.com\/[de]\/([a-zA-Z0-9_-]+)/);
     if (byseMatch) return { type: 'embed', src: `https://bysebuho.com/e/${byseMatch[1]}` };
@@ -360,7 +356,6 @@ function Brand() {
   return <Link href={user ? '/catalogo' : '/'} className="brand-mark focus-tv" data-testid="link-brand"><Clapperboard size={22} strokeWidth={1.8} /><span>CineVito</span></Link>;
 }
 
-// ADICIONAMOS A ROTA "AO VIVO" (RADIO) AO MENU
 const navigation = [
   { href: '/catalogo', label: 'Catálogo', icon: Film },
   { href: '/aovivo', label: 'Ao Vivo', icon: Radio },
@@ -445,7 +440,7 @@ function AuthPage() {
     setError('');
     setNotice('');
     if (!form.email || !form.password || (mode === 'signup' && !form.nome)) {
-      setError('Preencha os campos obrigatórios para continuar.');
+      setError('Preencha os campos obrigatórios para continue.');
       return;
     }
     setBusy(true);
@@ -797,6 +792,9 @@ function findVideo(videos: Video[], id: string) {
   return videos.find((video) => video.id === id);
 }
 
+// ============================================================================
+// PLAYER REESCRITO: COM AUTO-RECONNECT E SEM A IMPACIÊNCIA DO "LOW LATENCY"
+// ============================================================================
 function PlayerPage() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
@@ -853,46 +851,68 @@ function PlayerPage() {
     if (embed.type === 'file' && embed.src.includes('.m3u8') && videoRef.current) {
       const videoElement = videoRef.current;
       
-      if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
-        videoElement.src = embed.src;
-        videoElement.play().catch(() => {});
-      } else {
-        const startHls = () => {
-          const Hls = (window as any).Hls;
-          if (Hls && Hls.isSupported()) {
-            hlsInstance = new Hls({
-              enableWorker: true,
-              lowLatencyMode: true,
-              backBufferLength: 90
-            });
-            
-            hlsInstance.loadSource(embed.src);
-            hlsInstance.attachMedia(videoElement);
-            
-            hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
-              videoElement.play().catch(() => {});
-            });
-
-            hlsInstance.on(Hls.Events.ERROR, (event: any, data: any) => {
-              if (data.fatal) {
-                if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-                  hlsInstance.startLoad();
-                } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-                  hlsInstance.recoverMediaError();
-                }
-              }
-            });
+      const startHls = () => {
+        const Hls = (window as any).Hls;
+        if (Hls && Hls.isSupported()) {
+          // Destrói instância antiga se a pessoa trocar de canal rápido
+          if (hlsInstance) {
+            hlsInstance.destroy();
           }
-        };
 
-        if (!(window as any).Hls) {
-          const script = document.createElement('script');
-          script.src = 'https://cdn.jsdelivr.net/npm/hls.js@latest';
-          script.onload = startHls;
-          document.head.appendChild(script);
-        } else {
-          startHls();
+          // Versão pacil e auto-recuperável (Sem lowLatencyMode)
+          hlsInstance = new Hls({
+            enableWorker: true,
+            backBufferLength: 90,
+            maxBufferLength: 30, // Mais tempo de buffer para não engasgar
+            manifestLoadingTimeOut: 10000,
+            manifestLoadingMaxRetry: 5,
+            levelLoadingTimeOut: 10000,
+            levelLoadingMaxRetry: 5,
+          });
+          
+          hlsInstance.loadSource(embed.src);
+          hlsInstance.attachMedia(videoElement);
+          
+          hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+            videoElement.play().catch((e: any) => {
+               console.log("Autoplay retido. O usuário precisa clicar no play da tela.");
+            });
+          });
+
+          // Reconexão inteligente
+          hlsInstance.on(Hls.Events.ERROR, (event: any, data: any) => {
+            if (data.fatal) {
+              switch (data.type) {
+                case Hls.ErrorTypes.NETWORK_ERROR:
+                  // Se o servidor negar a primeira tentativa, ele espera 2 segundos e tenta de novo sozinho
+                  setTimeout(() => {
+                      if(hlsInstance) hlsInstance.startLoad();
+                  }, 2000); 
+                  break;
+                case Hls.ErrorTypes.MEDIA_ERROR:
+                  if(hlsInstance) hlsInstance.recoverMediaError();
+                  break;
+                default:
+                  if(hlsInstance) hlsInstance.destroy();
+                  break;
+              }
+            }
+          });
+        } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
+          // Fallback para Safari/Apple TVs nativas
+          videoElement.src = embed.src;
+          videoElement.play().catch(() => {});
         }
+      };
+
+      if (!(window as any).Hls) {
+        const script = document.createElement('script');
+        // Usa uma versão minificada e cravada para não dar bugs
+        script.src = 'https://cdn.jsdelivr.net/npm/hls.js@1.3.5/dist/hls.min.js'; 
+        script.onload = startHls;
+        document.head.appendChild(script);
+      } else {
+        startHls();
       }
     }
 
@@ -908,8 +928,11 @@ function PlayerPage() {
   
   return <div className="content-wrap page-main"><button className="quiet-button focus-tv" onClick={() => setLocation('/catalogo')} data-testid="button-back-catalog"><ArrowLeft size={16} />Voltar ao catálogo</button><div className="player-stage" style={{ marginTop: 17 }}><div className="player-box">
     
-    {embed.type === 'file' && <video ref={videoRef} src={embed.src.includes('.m3u8') ? undefined : embed.src} controls autoPlay playsInline data-testid="video-player" style={{ width: '100%', height: '100%' }} />}
+    {/* PLAYER NATIVO (IPTV E ARQUIVOS) */}
+    {embed.type === 'file' && <video ref={videoRef} src={embed.src.includes('.m3u8') ? undefined : embed.src} controls autoPlay playsInline data-testid="video-player" style={{ width: '100%', height: '100%', backgroundColor: '#000' }} />}
+    
     {embed.type === 'embed' && <iframe src={embed.src} title={video.titulo} allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowFullScreen style={{ width: '100%', height: '100%', border: 0 }} data-testid="video-player" />}
+    
     {embed.type === 'none' && <div className="player-idle"><Play size={38} /><strong>Pronto para assistir</strong><span>Este título ainda não tem um link de vídeo cadastrado.</span></div>}
   </div><div className="player-details"><div><div className="eyebrow">{video.genero || video.categoria || 'CineVito'} {video.ano ? ` / ${video.ano}` : ''}{episodioInfo ? ` · Ep. ${episodioInfo.episodio.numero}` : ''}</div><h1 className="section-title" style={{ marginTop: 7 }} data-testid="text-player-title">{video.titulo}</h1><p>{video.descricao || 'Este título faz parte do catálogo CineVito.'}</p></div><div className="player-actions"><button className={`secondary-button focus-tv ${saved ? 'active' : ''}`} onClick={toggle} data-testid="button-player-favorite"><Heart size={15} fill={saved ? 'currentColor' : 'none'} />{saved ? 'Na coleção' : 'Salvar'}</button>{episodioInfo?.proximo && <button className="primary-button focus-tv" onClick={() => setLocation(`/player/${episodioInfo.proximo!.video_id}`)}>Próximo episódio<ChevronRight size={16} /></button>}</div></div>
   {episodiosDaTemporada.length > 1 && <div style={{ marginTop: 20 }}>
@@ -1765,7 +1788,6 @@ function AdminPage() {
       <div className="field"><label htmlFor="v-capa">URL da capa (opcional)</label><input id="v-capa" className="input focus-tv" value={videoForm.url_capa} onChange={(e) => setVideoForm({ ...videoForm, url_capa: e.target.value })} placeholder="https://..." /></div>
       <div className="field"><label htmlFor="v-licenca">Licença</label><input id="v-licenca" className="input focus-tv" value={videoForm.licenca} onChange={(e) => setVideoForm({ ...videoForm, licenca: e.target.value })} placeholder="Ex.: Domínio Público" /></div>
       <div className="field"><label htmlFor="v-ano">Ano</label><input id="v-ano" type="number" className="input focus-tv" value={videoForm.ano} onChange={(e) => setVideoForm({ ...videoForm, ano: e.target.value })} placeholder="Ex.: 1968" /></div>
-      
       <button className="primary-button focus-tv" onClick={saveVideo} disabled={savingVideo}>{savingVideo ? 'Salvando...' : editingVideoId ? 'Salvar alterações' : 'Adicionar ao catálogo'}</button>
       {editingVideoId && <button className="quiet-button focus-tv" style={{ marginLeft: 10 }} onClick={resetVideoForm}>Cancelar</button>}
       <h3 style={{ marginTop: 26 }}>Vídeos cadastrados</h3>
