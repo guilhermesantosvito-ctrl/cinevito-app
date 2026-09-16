@@ -17,7 +17,6 @@ import {
   processPayment, requestPasswordReset, revokeAccess, salvarProgresso, signIn, signUp, submitSuggestion, updatePlanActive, type Categoria, type Cliente, type Colecao, type ContinuarAssistindoItem, type Cupom, type Episodio, type Equipe, type Genero, type LayoutItem, type LayoutSectionConfig, type MinhaAssinatura, type Plan, type SessionUser, type Serie, type Temporada, type Video,
 } from '@/lib/cinevito-client';
 
-// Importações cruciais da função de upload que garantem que o sistema não perca a funcionalidade
 import { UserUploadPage } from './pages/user-upload';
 import { AdminUploadsPage } from './pages/admin-uploads';
 import '@/index.css';
@@ -170,43 +169,29 @@ function extractVideoUrl(input: string): string {
   return trimmed;
 }
 
-// ============================================================================
-// CONVERSÃO DE LINKS DOS SERVIDORES DO SEU BOT (RESOLUÇÃO DO BLOQUEIO)
-// ============================================================================
 function getEmbedInfo(url?: string | null): { type: 'file' | 'embed' | 'none'; src: string } {
   if (!url) return { type: 'none', src: '' };
   const trimmed = url.trim();
 
-  // 1. MixDrop (/f/ ou /e/ ou /e6/ para /e/)
+  // Tratamento do MixDrop
   if (trimmed.includes('mixdrop') || trimmed.includes('miixdrop')) {
     const mixMatch = trimmed.match(/(?:mixdrop|miixdrop)\.(?:top|to|club|co|sx|bz)\/(?:f|e|e6)\/([a-zA-Z0-9_-]+)/);
-    if (mixMatch) {
-      return { type: 'embed', src: `https://mixdrop.top/e/${mixMatch[1]}` };
-    }
+    if (mixMatch) return { type: 'embed', src: `https://mixdrop.top/e/${mixMatch[1]}` };
   }
-
-  // 2. Streamtape (/v/ ou /e/ para /e/)
+  // Tratamento do Streamtape
   if (trimmed.includes('streamtape')) {
     const tapeMatch = trimmed.match(/streamtape\.com\/(?:v|e)\/([a-zA-Z0-9_-]+)/);
-    if (tapeMatch) {
-      return { type: 'embed', src: `https://streamtape.com/e/${tapeMatch[1]}` };
-    }
+    if (tapeMatch) return { type: 'embed', src: `https://streamtape.com/e/${tapeMatch[1]}` };
   }
-
-  // 3. DoodStream / Playmogo (/d/ ou /e/ para /e/)
+  // Tratamento do DoodStream / Playmogo
   if (trimmed.includes('playmogo') || trimmed.includes('dood')) {
     const doodMatch = trimmed.match(/(?:playmogo\.com|doodstream\.com|dood\.(?:to|watch|so|la|sh|re))\/[de]\/([a-zA-Z0-9_-]+)/);
-    if (doodMatch) {
-      return { type: 'embed', src: `https://playmogo.com/e/${doodMatch[1]}` };
-    }
+    if (doodMatch) return { type: 'embed', src: `https://playmogo.com/e/${doodMatch[1]}` };
   }
-
-  // 4. Byse (/d/ ou /e/ para /e/)
+  // Tratamento do Byse
   if (trimmed.includes('bysebuho') || trimmed.includes('byse')) {
     const byseMatch = trimmed.match(/bysebuho\.com\/[de]\/([a-zA-Z0-9_-]+)/);
-    if (byseMatch) {
-      return { type: 'embed', src: `https://bysebuho.com/e/${byseMatch[1]}` };
-    }
+    if (byseMatch) return { type: 'embed', src: `https://bysebuho.com/e/${byseMatch[1]}` };
   }
 
   const yt = trimmed.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{6,})/);
@@ -217,7 +202,6 @@ function getEmbedInfo(url?: string | null): { type: 'file' | 'embed' | 'none'; s
   if (archive) return { type: 'embed', src: `https://archive.org/embed/${archive[1]}` };
   if (trimmed.includes('archive.org/embed/')) return { type: 'embed', src: trimmed };
   
-  // Tratamento de IPTV e vídeos diretos (o player irá carregar o HLS.js se for .m3u8)
   if (/\.(mp4|webm|ogv|m3u8)(\?|$)/i.test(trimmed)) return { type: 'file', src: trimmed };
   
   return { type: 'embed', src: trimmed };
@@ -376,8 +360,10 @@ function Brand() {
   return <Link href={user ? '/catalogo' : '/'} className="brand-mark focus-tv" data-testid="link-brand"><Clapperboard size={22} strokeWidth={1.8} /><span>CineVito</span></Link>;
 }
 
+// ADICIONAMOS A ROTA "AO VIVO" (RADIO) AO MENU
 const navigation = [
   { href: '/catalogo', label: 'Catálogo', icon: Film },
+  { href: '/aovivo', label: 'Ao Vivo', icon: Radio },
   { href: '/colecao', label: 'Minha coleção', icon: Library },
   { href: '/sugestao', label: 'Sugerir', icon: Send },
   { href: '/faq', label: 'Ajuda', icon: Info },
@@ -602,6 +588,65 @@ function ContinueCard({ item, onOpen }: { item: ContinuarAssistindoItem; onOpen:
   return <article className="video-card reveal"><div className="poster focus-tv" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen()} style={style}><div className="poster-art" style={video.url_capa ? { backgroundImage: `url(${video.url_capa})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}><span className="poster-meta">CONTINUAR</span><strong className="poster-word">{item.series?.titulo || video.titulo}</strong></div></div><div className="video-info"><div><h3 className="video-title">{item.series?.titulo || video.titulo}</h3><p className="video-subtitle">{subtitle || 'Continuar assistindo'}</p></div><Play size={14} color="#00c8ff" /></div></article>;
 }
 
+// ============================================================================
+// NOVA PÁGINA: TV AO VIVO (EXCLUSIVA PARA CANAIS)
+// ============================================================================
+function LiveTVPage() {
+  const [, setLocation] = useLocation();
+  const user = useAuth();
+  const access = useCatalogAccess(user);
+  const { videos, loading, error } = useVideos();
+  const [genre, setGenre] = useState('Todos os canais');
+  const [query, setQuery] = useState('');
+  const [favorites, setFavorites] = useState<string[]>(() => JSON.parse(localStorage.getItem('cinevito-favorites') || '[]'));
+
+  // Puxa somente o que for marcado como TV no admin
+  const liveChannels = useMemo(() => videos.filter(v => v.ao_vivo), [videos]);
+  
+  // Cria os botões de filtro dinamicamente com base no que você cadastrar
+  const genres = useMemo(() => {
+    const list = new Set(liveChannels.map(v => v.genero).filter(Boolean) as string[]);
+    return ['Todos os canais', ...Array.from(list)];
+  }, [liveChannels]);
+
+  const filtered = useMemo(() => liveChannels.filter((video) => {
+    const text = `${video.titulo} ${video.descricao || ''} ${video.genero || ''}`.toLowerCase();
+    const selectedGenre = normalizeCatalogLabel(genre);
+    const videoGenre = normalizeCatalogLabel(video.genero);
+    return (!query || text.includes(query.toLowerCase()))
+      && (genre === 'Todos os canais' || videoGenre === selectedGenre || videoGenre.includes(selectedGenre));
+  }), [liveChannels, query, genre]);
+
+  function toggleFavorite(id: string) {
+    const next = favorites.includes(id) ? favorites.filter((value) => value !== id) : [...favorites, id];
+    setFavorites(next);
+    localStorage.setItem('cinevito-favorites', JSON.stringify(next));
+  }
+  function openVideo(id: string) {
+    setLocation(access ? `/player/${id}` : '/assinatura');
+  }
+
+  return <div className="content-wrap page-main">
+    <PageHeader eyebrow="Programação 24h" title="TV Ao Vivo" description="Canais de esportes, notícias e entretenimento rodando sem parar." />
+    {!user && <div className="notice notice-orange"><CircleAlert size={17} color="#ff8228" /><span><strong>Você está navegando como visitante.</strong> Entre para salvar canais favoritos.</span><Link href="/" className="quiet-button focus-tv">Entrar</Link></div>}
+    {user && access === false && <div className="notice notice-orange"><CircleAlert size={17} color="#ff8228" /><span><strong>Seu acesso gratuito acabou.</strong> Assine um plano para continuar assistindo.</span><Link href="/assinatura" className="quiet-button focus-tv">Ver planos</Link></div>}
+    
+    <div className="catalog-toolbar">
+      <div className="search-wrap"><Search size={16} /><input className="input focus-tv" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar canal..." aria-label="Buscar canal" /></div>
+    </div>
+    
+    {genres.length > 1 && <div className="chip-row" aria-label="Filtrar por gênero">{genres.map((item) => <button key={item} className={`chip focus-tv ${genre === item ? 'active' : ''}`} onClick={() => setGenre(item)}>{item}</button>)}</div>}
+    
+    {loading && <div className="video-grid">{Array.from({ length: 5 }).map((_, index) => <div className="skeleton" style={{ aspectRatio: '2/3' }} key={index} />)}</div>}
+    {error && <div className="notice notice-orange" role="alert"><CircleAlert size={17} color="#ff8275" /><span>{error}</span><button className="quiet-button focus-tv" onClick={() => window.location.reload()}><RefreshCw size={15} />Tentar de novo</button></div>}
+    
+    {!loading && !error && <section className="shelf" style={{ marginTop: 22 }}>
+      <div className="shelf-heading"><h2 className="section-title">{genre}</h2><div className="section-rule" /><span>{filtered.length.toString().padStart(2, '0')} canais</span></div>
+      {filtered.length ? <div className="video-grid">{filtered.map((video) => <Poster key={video.id} video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} subtitle="Transmissão ao vivo" />)}</div> : <div className="empty-state"><Radio size={25} /><h3>Nenhum canal encontrado</h3><p>Tente buscar por outro nome ou limpe os filtros.</p></div>}
+    </section>}
+  </div>;
+}
+
 function CatalogPage() {
   const [, setLocation] = useLocation();
   const user = useAuth();
@@ -616,6 +661,8 @@ function CatalogPage() {
   const [genre, setGenre] = useState('Todos os gêneros');
   const [query, setQuery] = useState('');
   const [favorites, setFavorites] = useState<string[]>(() => JSON.parse(localStorage.getItem('cinevito-favorites') || '[]'));
+  
+  // O FILTRO DE FILMES AGORA ESCONDE O QUE FOR MARCADO COMO "AO VIVO" (Para não misturar)
   const filtered = useMemo(() => videos.filter((video) => {
     const text = `${video.titulo} ${video.descricao || ''} ${video.genero || ''}`.toLowerCase();
     const selectedGenre = normalizeCatalogLabel(genre);
@@ -623,13 +670,16 @@ function CatalogPage() {
     return (!query || text.includes(query.toLowerCase()))
       && (genre === 'Todos os gêneros' || videoGenre === selectedGenre || videoGenre.includes(selectedGenre))
       && videoBelongsToShelf(video, shelf)
-      && !episodioVideoIds.has(video.id);
+      && !episodioVideoIds.has(video.id)
+      && !video.ao_vivo; // Esconde os canais de TV daqui
   }), [videos, query, genre, shelf, episodioVideoIds]);
+
   const filteredSeries = useMemo(() => series.filter((serie) => {
     const selectedGenre = normalizeCatalogLabel(genre);
     const serieGenre = normalizeCatalogLabel(serie.genero);
     return genre === 'Todos os gêneros' || serieGenre === selectedGenre || serieGenre.includes(selectedGenre);
   }), [series, genre]);
+  
   function toggleFavorite(id: string) {
     const next = favorites.includes(id) ? favorites.filter((value) => value !== id) : [...favorites, id];
     setFavorites(next);
@@ -655,7 +705,7 @@ function CatalogPage() {
   }
   function renderCatalogoGeralSection(key: string) {
     return <section className="shelf" key={key} style={{ marginTop: 22 }}>
-      <div className="shelf-heading"><h2 className="section-title">{shelf === 'Início' ? 'Todo o catálogo' : shelf}</h2><div className="section-rule" /><span>{filtered.length.toString().padStart(2, '0')} títulos</span></div>
+      <div className="shelf-heading"><h2 className="section-title">{shelf === 'Início' ? 'Filmes em destaque' : shelf}</h2><div className="section-rule" /><span>{filtered.length.toString().padStart(2, '0')} títulos</span></div>
       {filtered.length ? <div className="video-grid">{filtered.map((video) => <Poster key={video.id} video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} />)}</div> : <div className="empty-state" data-testid="status-catalog-empty"><Search size={25} /><h3>{videos.length ? 'Nenhum título encontrado' : 'Catálogo ainda vazio'}</h3><p>{videos.length ? 'Tente outro termo ou limpe os filtros para voltar ao catálogo.' : 'Os títulos aparecem aqui assim que forem cadastrados no painel administrativo.'}</p>{videos.length > 0 && <button className="quiet-button focus-tv" onClick={() => { setQuery(''); setGenre('Todos os gêneros'); setShelf('Início'); }} data-testid="button-clear-catalog-filters">Limpar filtros</button>}</div>}
     </section>;
   }
@@ -754,7 +804,6 @@ function PlayerPage() {
   const user = useAuth();
   const access = useCatalogAccess(user);
 
-  // REFERÊNCIA IMPORTANTE PARA O PLAYER NATIVO (IPTV E ARQUIVOS M3U8)
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -798,24 +847,20 @@ function PlayerPage() {
 
   const embed = getEmbedInfo(video?.url_video);
 
-  // NOVO: SISTEMA DE INTELIGÊNCIA PARA LER IPTV (M3U8) COM AUTO-PLAY E TRATAMENTO DE ERRO
   useEffect(() => {
     let hlsInstance: any = null;
 
     if (embed.type === 'file' && embed.src.includes('.m3u8') && videoRef.current) {
       const videoElement = videoRef.current;
       
-      // O Safari e algumas TVs suportam .m3u8 nativamente sem precisar de bibliotecas
       if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
         videoElement.src = embed.src;
         videoElement.play().catch(() => {});
       } else {
-        // Inicia o tradutor em tempo real
         const startHls = () => {
           const Hls = (window as any).Hls;
           if (Hls && Hls.isSupported()) {
             hlsInstance = new Hls({
-              // Configurações para melhorar a estabilidade da TV ao vivo
               enableWorker: true,
               lowLatencyMode: true,
               backBufferLength: 90
@@ -824,14 +869,10 @@ function PlayerPage() {
             hlsInstance.loadSource(embed.src);
             hlsInstance.attachMedia(videoElement);
             
-            // FORÇA O AUTO-PLAY QUANDO SINTONIZA
             hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
-              videoElement.play().catch(() => {
-                 console.log("O navegador bloqueou o play automático. O usuário precisa clicar no play.");
-              });
+              videoElement.play().catch(() => {});
             });
 
-            // TENTA RECONECTAR SOZINHO SE A INTERNET DO CLIENTE OU DO CANAL FALHAR
             hlsInstance.on(Hls.Events.ERROR, (event: any, data: any) => {
               if (data.fatal) {
                 if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
@@ -855,7 +896,6 @@ function PlayerPage() {
       }
     }
 
-    // Limpeza quando o usuário sai da página ou troca de canal
     return () => {
       if (hlsInstance) {
         hlsInstance.destroy();
@@ -868,12 +908,8 @@ function PlayerPage() {
   
   return <div className="content-wrap page-main"><button className="quiet-button focus-tv" onClick={() => setLocation('/catalogo')} data-testid="button-back-catalog"><ArrowLeft size={16} />Voltar ao catálogo</button><div className="player-stage" style={{ marginTop: 17 }}><div className="player-box">
     
-    {/* PLAYER DE IPTV E ARQUIVOS DIRETOS CONECTADO À REFERÊNCIA DO HLS.JS */}
     {embed.type === 'file' && <video ref={videoRef} src={embed.src.includes('.m3u8') ? undefined : embed.src} controls autoPlay playsInline data-testid="video-player" style={{ width: '100%', height: '100%' }} />}
-    
-    {/* PLAYER DE IFRAME PARA O MIXDROP/STREAMTAPE/DOODSTREAM/YOUTUBE - AGORA SEM SANDBOX BLOQUEADOR */}
     {embed.type === 'embed' && <iframe src={embed.src} title={video.titulo} allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowFullScreen style={{ width: '100%', height: '100%', border: 0 }} data-testid="video-player" />}
-    
     {embed.type === 'none' && <div className="player-idle"><Play size={38} /><strong>Pronto para assistir</strong><span>Este título ainda não tem um link de vídeo cadastrado.</span></div>}
   </div><div className="player-details"><div><div className="eyebrow">{video.genero || video.categoria || 'CineVito'} {video.ano ? ` / ${video.ano}` : ''}{episodioInfo ? ` · Ep. ${episodioInfo.episodio.numero}` : ''}</div><h1 className="section-title" style={{ marginTop: 7 }} data-testid="text-player-title">{video.titulo}</h1><p>{video.descricao || 'Este título faz parte do catálogo CineVito.'}</p></div><div className="player-actions"><button className={`secondary-button focus-tv ${saved ? 'active' : ''}`} onClick={toggle} data-testid="button-player-favorite"><Heart size={15} fill={saved ? 'currentColor' : 'none'} />{saved ? 'Na coleção' : 'Salvar'}</button>{episodioInfo?.proximo && <button className="primary-button focus-tv" onClick={() => setLocation(`/player/${episodioInfo.proximo!.video_id}`)}>Próximo episódio<ChevronRight size={16} /></button>}</div></div>
   {episodiosDaTemporada.length > 1 && <div style={{ marginTop: 20 }}>
@@ -971,7 +1007,6 @@ function ProfilePage() {
           <Link href="/assinatura" className="primary-button focus-tv" style={{ width: 'fit-content', marginTop: 7 }} data-testid="link-profile-subscription">Ver assinatura</Link>
         </div>
 
-        {/* Atalho para Envio de Vídeos */}
         <div className="status-card" style={{ marginTop: 14 }}>
           <h3>Envie seus vídeos</h3>
           <p className="muted" style={{ fontSize: '.8rem' }}>Quer enviar um filme ou curta para o CineVito? Faça sua submissão por aqui.</p>
@@ -1725,7 +1760,6 @@ function AdminPage() {
       <div className="field"><label htmlFor="v-descricao">Sinopse</label><input id="v-descricao" className="input focus-tv" value={videoForm.descricao} onChange={(e) => setVideoForm({ ...videoForm, descricao: e.target.value })} placeholder="Sinopse" /></div>
       <div className="field"><label htmlFor="v-categoria">Categoria</label><select id="v-categoria" className="input focus-tv" value={videoForm.categoria_id} onChange={(e) => setVideoForm({ ...videoForm, categoria_id: e.target.value })}><option value="">Selecione...</option>{categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select><div style={{ display: 'flex', gap: 8, marginTop: 6 }}><input className="input focus-tv" value={novaCategoria} onChange={(e) => setNovaCategoria(e.target.value)} placeholder="Nova categoria..." /><button type="button" className="secondary-button focus-tv" onClick={handleCreateCategoria}>Criar</button></div></div>
       <div className="field"><label htmlFor="v-genero">Gênero</label><select id="v-genero" className="input focus-tv" value={videoForm.genero} onChange={(e) => setVideoForm({ ...videoForm, genero: e.target.value })}><option value="">Selecione...</option>{generos.map((g) => <option key={g.id} value={g.nome}>{g.nome}</option>)}</select><div style={{ display: 'flex', gap: 8, marginTop: 6 }}><input className="input focus-tv" value={novoGenero} onChange={(e) => setNovoGenero(e.target.value)} placeholder="Novo gênero..." /><button type="button" className="secondary-button focus-tv" onClick={handleCreateGenero}>Criar</button></div></div>
-      
       <div className="field"><label htmlFor="v-elenco">Elenco (separe os nomes por vírgula)</label><input id="v-elenco" className="input focus-tv" value={videoForm.elenco} onChange={(e) => setVideoForm({ ...videoForm, elenco: e.target.value })} placeholder="Ex.: Gal Gadot, Fernanda Torres" /></div>
       <label className="check-row"><input type="checkbox" checked={videoForm.ao_vivo} onChange={(e) => setVideoForm({ ...videoForm, ao_vivo: e.target.checked })} />Transmissão ao vivo / esportes (aparece na seção "Ao vivo")</label>
       <div className="field"><label htmlFor="v-capa">URL da capa (opcional)</label><input id="v-capa" className="input focus-tv" value={videoForm.url_capa} onChange={(e) => setVideoForm({ ...videoForm, url_capa: e.target.value })} placeholder="https://..." /></div>
@@ -1779,6 +1813,7 @@ function Router() {
   return <Switch>
     <Route path="/" component={AuthPage} /><Route path="/index.html" component={AuthPage} />
     <Route path="/catalogo" component={CatalogPage} /><Route path="/catalogo.html" component={CatalogPage} />
+    <Route path="/aovivo" component={LiveTVPage} /><Route path="/aovivo.html" component={LiveTVPage} />
     <Route path="/player/:id" component={PlayerPage} /><Route path="/player.html" component={PlayerPage} />
     <Route path="/serie/:id" component={SeriePage} />
     <Route path="/perfil" component={ProfilePage} /><Route path="/perfil.html" component={ProfilePage} />
@@ -1788,7 +1823,6 @@ function Router() {
     <Route path="/faq" component={FaqPage} /><Route path="/faq.html" component={FaqPage} />
     <Route path="/admin" component={AdminPage} /><Route path="/admin.html" component={AdminPage} />
     
-    {/* Novas rotas de upload e moderação */}
     <Route path="/upload"><UserUploadPage user={getStoredUser()} /></Route>
     <Route path="/admin/uploads" component={AdminUploadsPage} />
 
