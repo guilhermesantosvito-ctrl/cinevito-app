@@ -17,7 +17,6 @@ import {
   processPayment, requestPasswordReset, revokeAccess, salvarProgresso, signIn, signUp, submitSuggestion, updatePlanActive, type Categoria, type Cliente, type Colecao, type ContinuarAssistindoItem, type Cupom, type Episodio, type Equipe, type Genero, type LayoutItem, type LayoutSectionConfig, type MinhaAssinatura, type Plan, type SessionUser, type Serie, type Temporada, type Video,
 } from '@/lib/cinevito-client';
 
-// Importações cruciais da função de upload que garantem que o sistema não perca a funcionalidade
 import { UserUploadPage } from './pages/user-upload';
 import { AdminUploadsPage } from './pages/admin-uploads';
 import '@/index.css';
@@ -170,14 +169,11 @@ function extractVideoUrl(input: string): string {
   return trimmed;
 }
 
-// ============================================================================
-// CONVERSÃO DE LINKS DOS SERVIDORES DO SEU BOT (RESOLUÇÃO DO BLOQUEIO)
-// ============================================================================
 function getEmbedInfo(url?: string | null): { type: 'file' | 'embed' | 'none'; src: string } {
   if (!url) return { type: 'none', src: '' };
   const trimmed = url.trim();
 
-  // 1. MixDrop (/f/ ou /e/ ou /e6/ para /e/)
+  // Tratamento do MixDrop (/f/ ou /e/ para /e/)
   if (trimmed.includes('mixdrop') || trimmed.includes('miixdrop')) {
     const mixMatch = trimmed.match(/(?:mixdrop|miixdrop)\.(?:top|to|club|co|sx|bz)\/(?:f|e|e6)\/([a-zA-Z0-9_-]+)/);
     if (mixMatch) {
@@ -185,7 +181,7 @@ function getEmbedInfo(url?: string | null): { type: 'file' | 'embed' | 'none'; s
     }
   }
 
-  // 2. Streamtape (/v/ ou /e/ para /e/)
+  // Tratamento do Streamtape (/v/ ou /e/ para /e/)
   if (trimmed.includes('streamtape')) {
     const tapeMatch = trimmed.match(/streamtape\.com\/(?:v|e)\/([a-zA-Z0-9_-]+)/);
     if (tapeMatch) {
@@ -193,7 +189,7 @@ function getEmbedInfo(url?: string | null): { type: 'file' | 'embed' | 'none'; s
     }
   }
 
-  // 3. DoodStream / Playmogo (/d/ ou /e/ para /e/)
+  // Tratamento do DoodStream / Playmogo (/d/ ou /e/ para /e/)
   if (trimmed.includes('playmogo') || trimmed.includes('dood')) {
     const doodMatch = trimmed.match(/(?:playmogo\.com|doodstream\.com|dood\.(?:to|watch|so|la|sh|re))\/[de]\/([a-zA-Z0-9_-]+)/);
     if (doodMatch) {
@@ -201,7 +197,7 @@ function getEmbedInfo(url?: string | null): { type: 'file' | 'embed' | 'none'; s
     }
   }
 
-  // 4. Byse (/d/ ou /e/ para /e/)
+  // Tratamento do Byse (/d/ ou /e/ para /e/)
   if (trimmed.includes('bysebuho') || trimmed.includes('byse')) {
     const byseMatch = trimmed.match(/bysebuho\.com\/[de]\/([a-zA-Z0-9_-]+)/);
     if (byseMatch) {
@@ -216,6 +212,8 @@ function getEmbedInfo(url?: string | null): { type: 'file' | 'embed' | 'none'; s
   const archive = trimmed.match(/archive\.org\/details\/([^/?#]+)/);
   if (archive) return { type: 'embed', src: `https://archive.org/embed/${archive[1]}` };
   if (trimmed.includes('archive.org/embed/')) return { type: 'embed', src: trimmed };
+  
+  // Tratamento de IPTV e vídeos diretos (o player irá carregar o HLS.js se for .m3u8)
   if (/\.(mp4|webm|ogv|m3u8)(\?|$)/i.test(trimmed)) return { type: 'file', src: trimmed };
   
   return { type: 'embed', src: trimmed };
@@ -751,13 +749,19 @@ function PlayerPage() {
   const { videos, loading } = useVideos();
   const user = useAuth();
   const access = useCatalogAccess(user);
+
+  // REFERÊNCIA IMPORTANTE PARA O PLAYER NATIVO (IPTV E ARQUIVOS M3U8)
+  const videoRef = useRef<HTMLVideoElement>(null);
+
   useEffect(() => {
     if (access === false) setLocation('/assinatura');
-  }, [access]);
+  }, [access, setLocation]);
+
   const video = findVideo(videos, params.id || new URLSearchParams(window.location.search).get('id') || '');
   const [saved, setSaved] = useState(() => JSON.parse(localStorage.getItem('cinevito-favorites') || '[]').includes(video?.id));
   const [episodioInfo, setEpisodioInfo] = useState<{ episodio: Episodio; serieId: string; proximo?: Episodio } | null>(null);
   const [episodiosDaTemporada, setEpisodiosDaTemporada] = useState<Episodio[]>([]);
+
   useEffect(() => {
     if (!video || access !== true) return;
     let cancelled = false;
@@ -778,8 +782,8 @@ function PlayerPage() {
       } catch { /* salvar progresso é best-effort */ }
     })();
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [video?.id, access, user?.id]);
+
   function toggle() {
     if (!video) return;
     const current: string[] = JSON.parse(localStorage.getItem('cinevito-favorites') || '[]');
@@ -787,13 +791,51 @@ function PlayerPage() {
     localStorage.setItem('cinevito-favorites', JSON.stringify(next));
     setSaved(!saved);
   }
+
+  const embed = getEmbedInfo(video?.url_video);
+
+  // NOVO: SISTEMA DE INTELIGÊNCIA PARA LER IPTV (M3U8) USANDO HLS.JS (BAIXADO AUTOMATICAMENTE)
+  useEffect(() => {
+    if (embed.type === 'file' && embed.src.includes('.m3u8') && videoRef.current) {
+      const videoElement = videoRef.current;
+      
+      // O Safari e algumas TVs suportam .m3u8 nativamente sem precisar de bibliotecas
+      if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
+        videoElement.src = embed.src;
+      } else {
+        // Para Google Chrome, Edge, etc, o CineVito baixa o tradutor em tempo real
+        const loadHls = () => {
+          const Hls = (window as any).Hls;
+          if (Hls && Hls.isSupported()) {
+            const hls = new Hls();
+            hls.loadSource(embed.src);
+            hls.attachMedia(videoElement);
+          }
+        };
+
+        if (!(window as any).Hls) {
+          const script = document.createElement('script');
+          script.src = 'https://cdn.jsdelivr.net/npm/hls.js@1';
+          script.onload = loadHls;
+          document.head.appendChild(script);
+        } else {
+          loadHls();
+        }
+      }
+    }
+  }, [embed.src, embed.type]);
+
   if (loading || access === null || access === false) return <div className="content-wrap page-main"><div className="skeleton" style={{ aspectRatio: '16/9' }} /></div>;
   if (!video) return <div className="content-wrap page-main"><div className="empty-state"><CircleAlert size={26} /><h3>Vídeo não encontrado</h3><p>Esse título não está mais disponível no catálogo.</p><Link href="/catalogo" className="primary-button focus-tv">Voltar ao catálogo</Link></div></div>;
-  const embed = getEmbedInfo(video.url_video);
+  
   return <div className="content-wrap page-main"><button className="quiet-button focus-tv" onClick={() => setLocation('/catalogo')} data-testid="button-back-catalog"><ArrowLeft size={16} />Voltar ao catálogo</button><div className="player-stage" style={{ marginTop: 17 }}><div className="player-box">
-    {embed.type === 'file' && <video src={embed.src} controls playsInline data-testid="video-player" style={{ width: '100%', height: '100%' }} />}
-    {/* AQUI FOI REMOVIDO O BLOQUEIO DE SANDBOX E REFERRER PARA EVITAR TELAS AZUIS NO MIXDROP */}
+    
+    {/* PLAYER DE IPTV E ARQUIVOS DIRETOS CONECTADO À REFERÊNCIA DO HLS.JS */}
+    {embed.type === 'file' && <video ref={videoRef} src={embed.src.includes('.m3u8') ? undefined : embed.src} controls autoPlay playsInline data-testid="video-player" style={{ width: '100%', height: '100%' }} />}
+    
+    {/* PLAYER DE IFRAME PARA O MIXDROP/STREAMTAPE/DOODSTREAM/YOUTUBE - AGORA SEM SANDBOX BLOQUEADOR */}
     {embed.type === 'embed' && <iframe src={embed.src} title={video.titulo} allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowFullScreen style={{ width: '100%', height: '100%', border: 0 }} data-testid="video-player" />}
+    
     {embed.type === 'none' && <div className="player-idle"><Play size={38} /><strong>Pronto para assistir</strong><span>Este título ainda não tem um link de vídeo cadastrado.</span></div>}
   </div><div className="player-details"><div><div className="eyebrow">{video.genero || video.categoria || 'CineVito'} {video.ano ? ` / ${video.ano}` : ''}{episodioInfo ? ` · Ep. ${episodioInfo.episodio.numero}` : ''}</div><h1 className="section-title" style={{ marginTop: 7 }} data-testid="text-player-title">{video.titulo}</h1><p>{video.descricao || 'Este título faz parte do catálogo CineVito.'}</p></div><div className="player-actions"><button className={`secondary-button focus-tv ${saved ? 'active' : ''}`} onClick={toggle} data-testid="button-player-favorite"><Heart size={15} fill={saved ? 'currentColor' : 'none'} />{saved ? 'Na coleção' : 'Salvar'}</button>{episodioInfo?.proximo && <button className="primary-button focus-tv" onClick={() => setLocation(`/player/${episodioInfo.proximo!.video_id}`)}>Próximo episódio<ChevronRight size={16} /></button>}</div></div>
   {episodiosDaTemporada.length > 1 && <div style={{ marginTop: 20 }}>
@@ -869,6 +911,7 @@ function ProfilePage() {
   const [subscription, setSubscription] = useState<MinhaAssinatura | null>(null);
   const [copied, setCopied] = useState(false);
   const installState = useInstallPrompt(user);
+  const [showInstallInstructions, setShowInstallInstructions] = useState(false);
   useEffect(() => { if (hasRuntimeConfig && user) { fetchProfile().then(setProfile).catch(() => setProfile(null)); fetchMySubscription().then(setSubscription).catch(() => setSubscription(null)); } }, [user]);
   const name = profile?.nome || titleCaseName(user);
   const { status, origem } = subscriptionLabel(subscription);
@@ -902,10 +945,11 @@ function ProfilePage() {
         {installState.platform !== 'tv' && !installState.alreadyInstalled && <div className="status-card" style={{ marginTop: 14 }}>
           <h3>Instalar o app</h3>
           <p className="muted" style={{ fontSize: '.8rem' }}>Adicione o CineVito à tela do seu aparelho pra abrir direto, como um app.</p>
-          <button className="primary-button focus-tv" style={{ width: 'fit-content', marginTop: 7 }} onClick={installState.canInstallDirectly ? installState.install : () => alert('Acesse o menu do navegador para instalar.')}>
+          <button className="primary-button focus-tv" style={{ width: 'fit-content', marginTop: 7 }} onClick={installState.canInstallDirectly ? installState.install : () => setShowInstallInstructions(true)}>
             <Download size={15} />{installState.canInstallDirectly ? 'Instalar CineVito' : 'Como instalar'}
           </button>
         </div>}
+        {showInstallInstructions && <InstallInstructionsModal platform={installState.platform} onClose={() => setShowInstallInstructions(false)} />}
       </section>
       <section className="panel panel-pad">
         <h2 className="panel-title">Seu código de indicação</h2>
@@ -1644,7 +1688,6 @@ function AdminPage() {
       <div className="field"><label htmlFor="v-categoria">Categoria</label><select id="v-categoria" className="input focus-tv" value={videoForm.categoria_id} onChange={(e) => setVideoForm({ ...videoForm, categoria_id: e.target.value })}><option value="">Selecione...</option>{categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select><div style={{ display: 'flex', gap: 8, marginTop: 6 }}><input className="input focus-tv" value={novaCategoria} onChange={(e) => setNovaCategoria(e.target.value)} placeholder="Nova categoria..." /><button type="button" className="secondary-button focus-tv" onClick={handleCreateCategoria}>Criar</button></div></div>
       <div className="field"><label htmlFor="v-genero">Gênero</label><select id="v-genero" className="input focus-tv" value={videoForm.genero} onChange={(e) => setVideoForm({ ...videoForm, genero: e.target.value })}><option value="">Selecione...</option>{generos.map((g) => <option key={g.id} value={g.nome}>{g.nome}</option>)}</select><div style={{ display: 'flex', gap: 8, marginTop: 6 }}><input className="input focus-tv" value={novoGenero} onChange={(e) => setNovoGenero(e.target.value)} placeholder="Novo gênero..." /><button type="button" className="secondary-button focus-tv" onClick={handleCreateGenero}>Criar</button></div></div>
       
-      {/* Campo da Capa restaurado */}
       <div className="field"><label htmlFor="v-capa">URL da capa (opcional)</label><input id="v-capa" className="input focus-tv" value={videoForm.url_capa} onChange={(e) => setVideoForm({ ...videoForm, url_capa: e.target.value })} placeholder="https://..." /></div>
 
       <button className="primary-button focus-tv" onClick={saveVideo} disabled={savingVideo}>{savingVideo ? 'Salvando...' : editingVideoId ? 'Salvar alterações' : 'Adicionar ao catálogo'}</button>
