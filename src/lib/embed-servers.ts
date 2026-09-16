@@ -20,8 +20,8 @@ export type EmbedServer =
 
 export const SERVER_EMBED_BLOCKLISTS: Record<string, RegExp[]> = {
   mixdrop: [
-    /miixdrop\.top\/f\//i,
-    /mixdrop\.io\/e\//i,
+    /mixdrop\.top\//i,
+    /mixdrop\.io\//i,
   ],
   byse: [
     /bysebuho\.com\/d\//i,

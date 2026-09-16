@@ -105,14 +105,13 @@ export const handler: Handler = async (event) => {
     // Para tudo que não é arquivo direto (YouTube, Vimeo, mixdrop, streamtape, etc.)
     // Faz proxy do HTML/iframe
     const isThirdPartyServer =
-      /miixdrop\.top\/f\//i.test(extractedUrl) ||
-      /miixdrop\.top\/e\//i.test(extractedUrl) ||
-      /mixdrop\.io\/e\//i.test(extractedUrl) ||
-      /bysebuho\.com\/d\//i.test(extractedUrl) ||
-      /playmogo\.com\/d\//i.test(extractedUrl) ||
+      /mixdrop\.top\//i.test(extractedUrl) ||
+      /mixdrop\.io\//i.test(extractedUrl) ||
+      /bysebuho\.com\//i.test(extractedUrl) ||
+      /playmogo\.com\//i.test(extractedUrl) ||
+      /streamtape\.com/i.test(extractedUrl) ||
       /doodstream\.com/i.test(extractedUrl) ||
       /dood\.to/i.test(extractedUrl) ||
-      /streamtape\.com/i.test(extractedUrl) ||
       /advtpe\.com/i.test(extractedUrl) ||
       /embed69\.org/i.test(extractedUrl) ||
       /embedplayapi\.top/i.test(extractedUrl) ||
