@@ -798,35 +798,69 @@ function PlayerPage() {
 
   const embed = getEmbedInfo(video?.url_video);
 
-  // NOVO: SISTEMA DE INTELIGÊNCIA PARA LER IPTV (M3U8) USANDO HLS.JS (BAIXADO AUTOMATICAMENTE)
+  // NOVO: SISTEMA DE INTELIGÊNCIA PARA LER IPTV (M3U8) COM AUTO-PLAY E TRATAMENTO DE ERRO
   useEffect(() => {
+    let hlsInstance: any = null;
+
     if (embed.type === 'file' && embed.src.includes('.m3u8') && videoRef.current) {
       const videoElement = videoRef.current;
       
       // O Safari e algumas TVs suportam .m3u8 nativamente sem precisar de bibliotecas
       if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
         videoElement.src = embed.src;
+        videoElement.play().catch(() => {});
       } else {
-        // Para Google Chrome, Edge, etc, o CineVito baixa o tradutor em tempo real
-        const loadHls = () => {
+        // Inicia o tradutor em tempo real
+        const startHls = () => {
           const Hls = (window as any).Hls;
           if (Hls && Hls.isSupported()) {
-            const hls = new Hls();
-            hls.loadSource(embed.src);
-            hls.attachMedia(videoElement);
+            hlsInstance = new Hls({
+              // Configurações para melhorar a estabilidade da TV ao vivo
+              enableWorker: true,
+              lowLatencyMode: true,
+              backBufferLength: 90
+            });
+            
+            hlsInstance.loadSource(embed.src);
+            hlsInstance.attachMedia(videoElement);
+            
+            // FORÇA O AUTO-PLAY QUANDO SINTONIZA
+            hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+              videoElement.play().catch(() => {
+                 console.log("O navegador bloqueou o play automático. O usuário precisa clicar no play.");
+              });
+            });
+
+            // TENTA RECONECTAR SOZINHO SE A INTERNET DO CLIENTE OU DO CANAL FALHAR
+            hlsInstance.on(Hls.Events.ERROR, (event: any, data: any) => {
+              if (data.fatal) {
+                if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                  hlsInstance.startLoad();
+                } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                  hlsInstance.recoverMediaError();
+                }
+              }
+            });
           }
         };
 
         if (!(window as any).Hls) {
           const script = document.createElement('script');
-          script.src = 'https://cdn.jsdelivr.net/npm/hls.js@1';
-          script.onload = loadHls;
+          script.src = 'https://cdn.jsdelivr.net/npm/hls.js@latest';
+          script.onload = startHls;
           document.head.appendChild(script);
         } else {
-          loadHls();
+          startHls();
         }
       }
     }
+
+    // Limpeza quando o usuário sai da página ou troca de canal
+    return () => {
+      if (hlsInstance) {
+        hlsInstance.destroy();
+      }
+    };
   }, [embed.src, embed.type]);
 
   if (loading || access === null || access === false) return <div className="content-wrap page-main"><div className="skeleton" style={{ aspectRatio: '16/9' }} /></div>;
@@ -1691,11 +1725,13 @@ function AdminPage() {
       <div className="field"><label htmlFor="v-descricao">Sinopse</label><input id="v-descricao" className="input focus-tv" value={videoForm.descricao} onChange={(e) => setVideoForm({ ...videoForm, descricao: e.target.value })} placeholder="Sinopse" /></div>
       <div className="field"><label htmlFor="v-categoria">Categoria</label><select id="v-categoria" className="input focus-tv" value={videoForm.categoria_id} onChange={(e) => setVideoForm({ ...videoForm, categoria_id: e.target.value })}><option value="">Selecione...</option>{categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select><div style={{ display: 'flex', gap: 8, marginTop: 6 }}><input className="input focus-tv" value={novaCategoria} onChange={(e) => setNovaCategoria(e.target.value)} placeholder="Nova categoria..." /><button type="button" className="secondary-button focus-tv" onClick={handleCreateCategoria}>Criar</button></div></div>
       <div className="field"><label htmlFor="v-genero">Gênero</label><select id="v-genero" className="input focus-tv" value={videoForm.genero} onChange={(e) => setVideoForm({ ...videoForm, genero: e.target.value })}><option value="">Selecione...</option>{generos.map((g) => <option key={g.id} value={g.nome}>{g.nome}</option>)}</select><div style={{ display: 'flex', gap: 8, marginTop: 6 }}><input className="input focus-tv" value={novoGenero} onChange={(e) => setNovoGenero(e.target.value)} placeholder="Novo gênero..." /><button type="button" className="secondary-button focus-tv" onClick={handleCreateGenero}>Criar</button></div></div>
+      
       <div className="field"><label htmlFor="v-elenco">Elenco (separe os nomes por vírgula)</label><input id="v-elenco" className="input focus-tv" value={videoForm.elenco} onChange={(e) => setVideoForm({ ...videoForm, elenco: e.target.value })} placeholder="Ex.: Gal Gadot, Fernanda Torres" /></div>
       <label className="check-row"><input type="checkbox" checked={videoForm.ao_vivo} onChange={(e) => setVideoForm({ ...videoForm, ao_vivo: e.target.checked })} />Transmissão ao vivo / esportes (aparece na seção "Ao vivo")</label>
       <div className="field"><label htmlFor="v-capa">URL da capa (opcional)</label><input id="v-capa" className="input focus-tv" value={videoForm.url_capa} onChange={(e) => setVideoForm({ ...videoForm, url_capa: e.target.value })} placeholder="https://..." /></div>
       <div className="field"><label htmlFor="v-licenca">Licença</label><input id="v-licenca" className="input focus-tv" value={videoForm.licenca} onChange={(e) => setVideoForm({ ...videoForm, licenca: e.target.value })} placeholder="Ex.: Domínio Público" /></div>
       <div className="field"><label htmlFor="v-ano">Ano</label><input id="v-ano" type="number" className="input focus-tv" value={videoForm.ano} onChange={(e) => setVideoForm({ ...videoForm, ano: e.target.value })} placeholder="Ex.: 1968" /></div>
+      
       <button className="primary-button focus-tv" onClick={saveVideo} disabled={savingVideo}>{savingVideo ? 'Salvando...' : editingVideoId ? 'Salvar alterações' : 'Adicionar ao catálogo'}</button>
       {editingVideoId && <button className="quiet-button focus-tv" style={{ marginLeft: 10 }} onClick={resetVideoForm}>Cancelar</button>}
       <h3 style={{ marginTop: 26 }}>Vídeos cadastrados</h3>
