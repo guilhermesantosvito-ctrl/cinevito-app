@@ -220,6 +220,7 @@ function useInstallPrompt(user: SessionUser | null) {
   const [visible, setVisible] = useState(false);
   const [platform, setPlatform] = useState<PlataformaInstalacao>('desktop');
   const [alreadyInstalled, setAlreadyInstalled] = useState(false);
+  
   useEffect(() => {
     function handler(event: Event) {
       event.preventDefault();
@@ -228,12 +229,15 @@ function useInstallPrompt(user: SessionUser | null) {
     window.addEventListener('beforeinstallprompt', handler);
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
+
   useEffect(() => {
     const jaInstalado = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as unknown as { standalone?: boolean }).standalone === true;
     setAlreadyInstalled(jaInstalado);
     const plataforma = detectarPlataformaInstalacao();
     setPlatform(plataforma);
+    
     if (!user || jaInstalado || plataforma === 'tv') { setVisible(false); return; }
+    
     if (plataforma === 'desktop') {
       const dispensadoEm = Number(localStorage.getItem('cinevito-install-dismissed-desktop') || 0);
       const janela = 14 * 24 * 60 * 60 * 1000;
@@ -243,11 +247,13 @@ function useInstallPrompt(user: SessionUser | null) {
     }
     setVisible(true);
   }, [user?.id]);
+
   function dismiss() {
     if (platform === 'desktop') localStorage.setItem('cinevito-install-dismissed-desktop', String(Date.now()));
     else sessionStorage.setItem('cinevito-install-dismissed-session', '1');
     setVisible(false);
   }
+
   async function install() {
     if (!deferredEvent) return;
     deferredEvent.prompt();
@@ -263,7 +269,7 @@ type InstallStep = { icon: typeof Share2; title: string; description: string };
 function stepsForPlatform(platform: PlataformaInstalacao): InstallStep[] {
   if (platform === 'ios') {
     return [
-      { icon: Share2, title: 'Toque em Compartilhar', description: 'Na barra do Safari, toque no ícone de compartilhar.' },
+      { icon: Share2, title: 'Toque em Compartilhar', description: 'Na barra do Safari (ou topo da tela), toque no ícone de compartilhar.' },
       { icon: Plus, title: 'Toque em "Adicionar à Tela de Início"', description: 'Role a lista de opções e toque nela.' },
       { icon: Smartphone, title: 'Toque em "Adicionar"', description: 'Confirme para adicionar o app.' },
     ];
@@ -299,7 +305,7 @@ function InstallInstructionsModal({ platform, onClose }: { platform: PlataformaI
           <button onClick={onClose} className="icon-button focus-tv" aria-label="Fechar instruções"><X size={18} /></button>
         </div>
         <p className="muted" style={{ fontSize: '.83rem', marginTop: 6, marginBottom: mostrarBotaoChrome ? 12 : 20 }}>
-          {platform === 'ios' ? 'Leva só alguns segundos.' : 'Alguns passos rápidos e o CineVito fica salvo na sua tela inicial.'}
+          {platform === 'ios' ? 'Leva só alguns segundos.' : 'Seu navegador não suporta instalação direta, mas você pode salvar na tela inicial com estes passos rápidos:'}
         </p>
         {mostrarBotaoChrome && (
           <div className="notice notice-cyan" style={{ marginBottom: 20 }}>
@@ -782,7 +788,7 @@ function findVideo(videos: Video[], id: string) {
 }
 
 // ============================================================================
-// PLAYER REESCRITO: COM AUTO-RECONNECT INTELIGENTE E COMPATÍVEL COM IPHONE
+// PLAYER REESCRITO: TELA BLINDADA PARA IPHONE, ANDROID E TVS
 // ============================================================================
 function PlayerPage() {
   const params = useParams<{ id: string }>();
@@ -836,79 +842,63 @@ function PlayerPage() {
 
   useEffect(() => {
     let hlsInstance: any = null;
-    const videoElement = videoRef.current;
 
-    // Apenas aplica lógica avançada se for um arquivo de vídeo (MP4 ou M3U8)
-    if (videoElement && embed.type === 'file') {
+    if (embed.type === 'file' && embed.src.includes('.m3u8') && videoRef.current) {
+      const videoElement = videoRef.current;
       
-      // 1. Tratamento nativo para iPhones, iPads e Safari no Mac (Apple não suporta hls.js)
-      if (videoElement.canPlayType('application/vnd.apple.mpegurl') && embed.src.includes('.m3u8')) {
-        videoElement.src = embed.src;
-        // Não forçamos o play automático no iOS aqui para não dar erro
-      } 
-      // 2. Tratamento para Chrome, Android, Windows (usando HLS.js)
-      else if (embed.src.includes('.m3u8')) {
-        const startHls = () => {
-          const Hls = (window as any).Hls;
-          if (Hls && Hls.isSupported()) {
-            if (hlsInstance) {
-              hlsInstance.destroy();
-            }
+      const initPlayer = () => {
+        const Hls = (window as any).Hls;
+        
+        // Se suporta HLS.js (Chrome, Android, Windows)
+        if (Hls && Hls.isSupported()) {
+          hlsInstance = new Hls({
+            enableWorker: true,
+            backBufferLength: 90,
+            maxBufferLength: 30,
+          });
+          
+          hlsInstance.loadSource(embed.src);
+          hlsInstance.attachMedia(videoElement);
+          
+          hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+            videoElement.play().catch(() => console.log("Autoplay retido pelo navegador."));
+          });
 
-            // Configuração para estabilidade em canais gratuitos
-            hlsInstance = new Hls({
-              enableWorker: true,
-              backBufferLength: 90,
-              maxBufferLength: 30, 
-              manifestLoadingTimeOut: 10000,
-              manifestLoadingMaxRetry: 5,
-              levelLoadingTimeOut: 10000,
-              levelLoadingMaxRetry: 5,
-            });
-            
-            hlsInstance.loadSource(embed.src);
-            hlsInstance.attachMedia(videoElement);
-            
-            // Quando carregar com sucesso, tenta tocar (pode ser bloqueado pelo celular se não estiver mutado)
-            hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
-              videoElement.play().catch(() => {
-                 console.log("O celular bloqueou o Auto-Play. O usuário precisa apertar o Play na tela.");
-              });
-            });
-
-            // Tenta reconectar a TV sozinho se der erro na internet
-            hlsInstance.on(Hls.Events.ERROR, (event: any, data: any) => {
-              if (data.fatal) {
-                switch (data.type) {
-                  case Hls.ErrorTypes.NETWORK_ERROR:
-                    setTimeout(() => {
-                        if(hlsInstance) hlsInstance.startLoad();
-                    }, 2000); 
-                    break;
-                  case Hls.ErrorTypes.MEDIA_ERROR:
-                    if(hlsInstance) hlsInstance.recoverMediaError();
-                    break;
-                  default:
-                    if(hlsInstance) hlsInstance.destroy();
-                    break;
-                }
+          hlsInstance.on(Hls.Events.ERROR, (event: any, data: any) => {
+            if (data.fatal) {
+              if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                setTimeout(() => hlsInstance?.startLoad(), 2000);
+              } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                hlsInstance?.recoverMediaError();
+              } else {
+                hlsInstance?.destroy();
               }
-            });
-          }
-        };
+            }
+          });
+        } 
+        // Se for um iPhone, iPad ou Mac Safari (Suporte nativo sem biblioteca)
+        else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
+          videoElement.src = embed.src;
+          // O comando load() é obrigatório para não bugar no iOS
+          videoElement.load();
+          videoElement.play().catch(() => console.log("Autoplay retido pelo iOS."));
+        }
+      };
 
-        if (!(window as any).Hls) {
+      // Injeta a biblioteca só se ela ainda não existir na página
+      if (!(window as any).Hls) {
+        if (!document.getElementById('hls-script')) {
           const script = document.createElement('script');
-          script.src = 'https://cdn.jsdelivr.net/npm/hls.js@1.3.5/dist/hls.min.js'; 
-          script.onload = startHls;
+          script.id = 'hls-script';
+          script.src = 'https://cdn.jsdelivr.net/npm/hls.js@1.3.5/dist/hls.min.js';
+          script.onload = initPlayer;
           document.head.appendChild(script);
         } else {
-          startHls();
+          // Se o script já está sendo baixado por outra página
+          document.getElementById('hls-script')?.addEventListener('load', initPlayer);
         }
-      } 
-      // 3. Arquivos MP4 comuns
-      else {
-         videoElement.src = embed.src;
+      } else {
+        initPlayer();
       }
     }
 
@@ -924,18 +914,20 @@ function PlayerPage() {
   
   return <div className="content-wrap page-main"><button className="quiet-button focus-tv" onClick={() => setLocation('/catalogo')} data-testid="button-back-catalog"><ArrowLeft size={16} />Voltar ao catálogo</button><div className="player-stage" style={{ marginTop: 17 }}><div className="player-box">
     
-    {/* PLAYER NATIVO - Ajustado para rodar em iPhones (playsInline) */}
+    {/* PLAYER NATIVO - Blindado com a key={embed.src} para forçar a reconstrução do vídeo e evitar travamentos entre canais */}
     {embed.type === 'file' && (
       <video 
+        key={embed.src} 
         ref={videoRef} 
+        src={embed.src.includes('.m3u8') ? undefined : embed.src} 
         controls 
+        autoPlay 
         playsInline 
         data-testid="video-player" 
         style={{ width: '100%', height: '100%', backgroundColor: '#000' }} 
       />
     )}
     
-    {/* PLAYER DE IFRAME */}
     {embed.type === 'embed' && <iframe src={embed.src} title={video.titulo} allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowFullScreen style={{ width: '100%', height: '100%', border: 0 }} data-testid="video-player" />}
     
     {embed.type === 'none' && <div className="player-idle"><Play size={38} /><strong>Pronto para assistir</strong><span>Este título ainda não tem um link de vídeo cadastrado.</span></div>}
