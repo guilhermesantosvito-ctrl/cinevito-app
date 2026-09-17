@@ -220,7 +220,6 @@ function useInstallPrompt(user: SessionUser | null) {
   const [visible, setVisible] = useState(false);
   const [platform, setPlatform] = useState<PlataformaInstalacao>('desktop');
   const [alreadyInstalled, setAlreadyInstalled] = useState(false);
-  
   useEffect(() => {
     function handler(event: Event) {
       event.preventDefault();
@@ -229,15 +228,12 @@ function useInstallPrompt(user: SessionUser | null) {
     window.addEventListener('beforeinstallprompt', handler);
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
-
   useEffect(() => {
     const jaInstalado = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as unknown as { standalone?: boolean }).standalone === true;
     setAlreadyInstalled(jaInstalado);
     const plataforma = detectarPlataformaInstalacao();
     setPlatform(plataforma);
-    
     if (!user || jaInstalado || plataforma === 'tv') { setVisible(false); return; }
-    
     if (plataforma === 'desktop') {
       const dispensadoEm = Number(localStorage.getItem('cinevito-install-dismissed-desktop') || 0);
       const janela = 14 * 24 * 60 * 60 * 1000;
@@ -247,13 +243,11 @@ function useInstallPrompt(user: SessionUser | null) {
     }
     setVisible(true);
   }, [user?.id]);
-
   function dismiss() {
     if (platform === 'desktop') localStorage.setItem('cinevito-install-dismissed-desktop', String(Date.now()));
     else sessionStorage.setItem('cinevito-install-dismissed-session', '1');
     setVisible(false);
   }
-
   async function install() {
     if (!deferredEvent) return;
     deferredEvent.prompt();
@@ -269,7 +263,7 @@ type InstallStep = { icon: typeof Share2; title: string; description: string };
 function stepsForPlatform(platform: PlataformaInstalacao): InstallStep[] {
   if (platform === 'ios') {
     return [
-      { icon: Share2, title: 'Toque em Compartilhar', description: 'Na barra do Safari (ou topo da tela), toque no ícone de compartilhar.' },
+      { icon: Share2, title: 'Toque em Compartilhar', description: 'Na barra do Safari, toque no ícone de compartilhar.' },
       { icon: Plus, title: 'Toque em "Adicionar à Tela de Início"', description: 'Role a lista de opções e toque nela.' },
       { icon: Smartphone, title: 'Toque em "Adicionar"', description: 'Confirme para adicionar o app.' },
     ];
@@ -842,14 +836,12 @@ function PlayerPage() {
 
   useEffect(() => {
     let hlsInstance: any = null;
+    const videoElement = videoRef.current;
 
-    if (embed.type === 'file' && embed.src.includes('.m3u8') && videoRef.current) {
-      const videoElement = videoRef.current;
-      
+    if (videoElement && embed.type === 'file') {
       const initPlayer = () => {
         const Hls = (window as any).Hls;
         
-        // Se suporta HLS.js (Chrome, Android, Windows)
         if (Hls && Hls.isSupported()) {
           hlsInstance = new Hls({
             enableWorker: true,
@@ -861,7 +853,7 @@ function PlayerPage() {
           hlsInstance.attachMedia(videoElement);
           
           hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
-            videoElement.play().catch(() => console.log("Autoplay retido pelo navegador."));
+            videoElement.play().catch(() => console.log("Autoplay retido pelo navegador. Clique para som."));
           });
 
           hlsInstance.on(Hls.Events.ERROR, (event: any, data: any) => {
@@ -876,27 +868,22 @@ function PlayerPage() {
             }
           });
         } 
-        // Se for um iPhone, iPad ou Mac Safari (Suporte nativo sem biblioteca)
         else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
           videoElement.src = embed.src;
-          // O comando load() é obrigatório para não bugar no iOS
           videoElement.load();
-          videoElement.play().catch(() => console.log("Autoplay retido pelo iOS."));
+          videoElement.play().catch(() => console.log("Autoplay retido pelo iOS. Clique para som."));
         }
       };
 
-      // Injeta a biblioteca só se ela ainda não existir na página
-      if (!(window as any).Hls) {
-        if (!document.getElementById('hls-script')) {
-          const script = document.createElement('script');
+      if (!(window as any).Hls && embed.src.includes('.m3u8')) {
+        let script = document.getElementById('hls-script') as HTMLScriptElement;
+        if (!script) {
+          script = document.createElement('script');
           script.id = 'hls-script';
-          script.src = 'https://cdn.jsdelivr.net/npm/hls.js@1.3.5/dist/hls.min.js';
-          script.onload = initPlayer;
+          script.src = 'https://cdn.jsdelivr.net/npm/hls.js@latest';
           document.head.appendChild(script);
-        } else {
-          // Se o script já está sendo baixado por outra página
-          document.getElementById('hls-script')?.addEventListener('load', initPlayer);
         }
+        script.addEventListener('load', initPlayer);
       } else {
         initPlayer();
       }
@@ -914,7 +901,7 @@ function PlayerPage() {
   
   return <div className="content-wrap page-main"><button className="quiet-button focus-tv" onClick={() => setLocation('/catalogo')} data-testid="button-back-catalog"><ArrowLeft size={16} />Voltar ao catálogo</button><div className="player-stage" style={{ marginTop: 17 }}><div className="player-box">
     
-    {/* PLAYER NATIVO - Blindado com a key={embed.src} para forçar a reconstrução do vídeo e evitar travamentos entre canais */}
+    {/* PLAYER NATIVO (IPTV) - COM O AUTO-PLAY MUDO QUE BURLA O BLOQUEIO DA APPLE/GOOGLE */}
     {embed.type === 'file' && (
       <video 
         key={embed.src} 
@@ -922,6 +909,7 @@ function PlayerPage() {
         src={embed.src.includes('.m3u8') ? undefined : embed.src} 
         controls 
         autoPlay 
+        muted 
         playsInline 
         data-testid="video-player" 
         style={{ width: '100%', height: '100%', backgroundColor: '#000' }} 
