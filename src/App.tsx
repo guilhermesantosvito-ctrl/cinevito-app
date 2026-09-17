@@ -835,63 +835,71 @@ function PlayerPage() {
   const embed = getEmbedInfo(video?.url_video);
 
   useEffect(() => {
-    let hlsInstance: any = null;
-    const videoElement = videoRef.current;
+    let hls: any = null;
+    const videoEl = videoRef.current;
 
-    if (videoElement && embed.type === 'file') {
-      const initPlayer = () => {
+    // Se o elemento de vídeo não existir ou não for arquivo direto, não faz nada
+    if (!videoEl || embed.type !== 'file') return;
+
+    const src = embed.src;
+    const isM3U8 = src.includes('.m3u8');
+
+    // Se for um MP4 normal, só carrega o link e sai
+    if (!isM3U8) {
+      videoEl.src = src;
+      return;
+    }
+
+    // Função central que liga o vídeo
+    const initPlayer = () => {
+      // 1. TENTA NATIVO PRIMEIRO (Para iPhone, iPad e Safari)
+      if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+        videoEl.src = src;
+        // Não forçamos autoplay via script no iOS para evitar o erro do ícone quebrado
+      } 
+      // 2. TENTA O TRADUTOR HLS.JS (Para Android, Windows, Chrome)
+      else if ((window as any).Hls && (window as any).Hls.isSupported()) {
         const Hls = (window as any).Hls;
+        hls = new Hls({
+          startLevel: -1, 
+          enableWorker: true,
+          lowLatencyMode: false, // Segurança contra engasgos na TV
+        });
+
+        hls.loadSource(src);
+        hls.attachMedia(videoEl);
         
-        if (Hls && Hls.isSupported()) {
-          hlsInstance = new Hls({
-            enableWorker: true,
-            backBufferLength: 90,
-            maxBufferLength: 30,
-          });
-          
-          hlsInstance.loadSource(embed.src);
-          hlsInstance.attachMedia(videoElement);
-          
-          hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
-            videoElement.play().catch(() => console.log("Autoplay retido pelo navegador. Clique para som."));
-          });
-
-          hlsInstance.on(Hls.Events.ERROR, (event: any, data: any) => {
-            if (data.fatal) {
-              if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-                setTimeout(() => hlsInstance?.startLoad(), 2000);
-              } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-                hlsInstance?.recoverMediaError();
-              } else {
-                hlsInstance?.destroy();
-              }
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          videoEl.play().catch((e: any) => console.log("Play retido pelo navegador (Autoplay policy)."));
+        });
+        
+        hls.on(Hls.Events.ERROR, (event: any, data: any) => {
+          if (data.fatal) {
+            if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+              hls.startLoad();
+            } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+              hls.recoverMediaError();
+            } else {
+              hls.destroy();
             }
-          });
-        } 
-        else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
-          videoElement.src = embed.src;
-          videoElement.load();
-          videoElement.play().catch(() => console.log("Autoplay retido pelo iOS. Clique para som."));
-        }
-      };
-
-      if (!(window as any).Hls && embed.src.includes('.m3u8')) {
-        let script = document.getElementById('hls-script') as HTMLScriptElement;
-        if (!script) {
-          script = document.createElement('script');
-          script.id = 'hls-script';
-          script.src = 'https://cdn.jsdelivr.net/npm/hls.js@latest';
-          document.head.appendChild(script);
-        }
-        script.addEventListener('load', initPlayer);
-      } else {
-        initPlayer();
+          }
+        });
       }
+    };
+
+    // Baixa o Script do tradutor apenas se não for iPhone e ainda não estiver na página
+    if (isM3U8 && !(window as any).Hls && !videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/hls.js@1.3.5/dist/hls.min.js';
+      script.onload = initPlayer;
+      document.head.appendChild(script);
+    } else {
+      initPlayer();
     }
 
     return () => {
-      if (hlsInstance) {
-        hlsInstance.destroy();
+      if (hls) {
+        hls.destroy();
       }
     };
   }, [embed.src, embed.type]);
@@ -901,12 +909,11 @@ function PlayerPage() {
   
   return <div className="content-wrap page-main"><button className="quiet-button focus-tv" onClick={() => setLocation('/catalogo')} data-testid="button-back-catalog"><ArrowLeft size={16} />Voltar ao catálogo</button><div className="player-stage" style={{ marginTop: 17 }}><div className="player-box">
     
-    {/* PLAYER NATIVO (IPTV) - COM O AUTO-PLAY MUDO QUE BURLA O BLOQUEIO DA APPLE/GOOGLE */}
+    {/* PLAYER NATIVO (IPTV E ARQUIVOS) - Agora com Key para recarregar o motor e Muted para permitir autoplay em celular */}
     {embed.type === 'file' && (
       <video 
         key={embed.src} 
         ref={videoRef} 
-        src={embed.src.includes('.m3u8') ? undefined : embed.src} 
         controls 
         autoPlay 
         muted 
