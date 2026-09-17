@@ -777,21 +777,124 @@ function CatalogPage() {
   </div>;
 }
 
+// ============================================================================
+// NOVO COMPONENTE ISOLADO: BLINDA O PLAYER CONTRA ERROS DE NAVEGADOR
+// ============================================================================
+function VideoPlayer({ embed, title }: { embed: { type: string, src: string }, title?: string }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  
+  // O componente "espera" a biblioteca carregar antes de tentar ligar a TV
+  const [hlsReady, setHlsReady] = useState(!!(window as any).Hls);
+
+  useEffect(() => {
+    if ((window as any).Hls) {
+      setHlsReady(true);
+      return;
+    }
+    const scriptId = 'hls-js-library';
+    let script = document.getElementById(scriptId) as HTMLScriptElement;
+    if (!script) {
+      script = document.createElement('script');
+      script.id = scriptId;
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.4.12/hls.min.js';
+      script.async = true;
+      document.head.appendChild(script);
+    }
+    const onScriptLoad = () => setHlsReady(true);
+    script.addEventListener('load', onScriptLoad);
+    return () => script.removeEventListener('load', onScriptLoad);
+  }, []);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || embed.type !== 'file' || !embed.src) return;
+
+    let hls: any = null;
+    const isM3U8 = embed.src.toLowerCase().includes('.m3u8');
+
+    // MP4 Normal
+    if (!isM3U8) {
+      video.src = embed.src;
+      video.play().catch(() => {});
+      return;
+    }
+
+    // iPhone, iPad, Apple TV, Safari (Sistema Nativo da Apple)
+    if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = embed.src;
+      video.play().catch(() => console.log('Autoplay retido pelo iOS.'));
+    } 
+    // Chrome, Android, Windows (Tradutor HLS.JS)
+    else if (hlsReady && (window as any).Hls) {
+      const Hls = (window as any).Hls;
+      if (Hls.isSupported()) {
+        hls = new Hls({
+          maxBufferLength: 30,
+          maxMaxBufferLength: 60,
+        });
+        hls.loadSource(embed.src);
+        hls.attachMedia(video);
+        
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          video.play().catch(() => console.log('Autoplay retido pelo navegador.'));
+        });
+
+        // Auto-Reconexão
+        hls.on(Hls.Events.ERROR, (event: any, data: any) => {
+          if (data.fatal) {
+            if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+              hls.startLoad();
+            } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+              hls.recoverMediaError();
+            } else {
+              hls.destroy();
+            }
+          }
+        });
+      }
+    }
+
+    // Limpeza de memória ao sair do canal (previne travamentos)
+    return () => {
+      if (hls) hls.destroy();
+      video.removeAttribute('src');
+      video.load();
+    };
+  }, [embed.src, embed.type, hlsReady]);
+
+  if (embed.type === 'embed') {
+    return <iframe src={embed.src} title={title} allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowFullScreen style={{ width: '100%', height: '100%', border: 0 }} data-testid="video-player" />;
+  }
+
+  if (embed.type === 'file') {
+    return (
+      <video 
+        ref={videoRef} 
+        controls 
+        autoPlay 
+        muted 
+        playsInline 
+        // Esse pôster invisível IMPEDE que o celular mostre o ícone de imagem quebrada!
+        poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+        data-testid="video-player" 
+        style={{ width: '100%', height: '100%', backgroundColor: '#000' }} 
+      />
+    );
+  }
+
+  return <div className="player-idle"><Play size={38} /><strong>Pronto para assistir</strong><span>Este título ainda não tem um link de vídeo cadastrado.</span></div>;
+}
+
 function findVideo(videos: Video[], id: string) {
   return videos.find((video) => video.id === id);
 }
 
-// ============================================================================
-// PLAYER DEFINITIVO (À PROVA DE BALAS PARA IOS E ANDROID)
-// ============================================================================
 function PlayerPage() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { videos, loading } = useVideos();
   const user = useAuth();
   const access = useCatalogAccess(user);
-
-  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     if (access === false) setLocation('/assinatura');
@@ -834,115 +937,14 @@ function PlayerPage() {
 
   const embed = getEmbedInfo(video?.url_video);
 
-  useEffect(() => {
-    const videoElement = videoRef.current;
-    if (!videoElement || embed.type !== 'file' || !embed.src) return;
-
-    const src = embed.src;
-    let hlsInstance: any = null;
-
-    const initPlayer = () => {
-      // 1. Arquivos MP4 comuns (não HLS)
-      if (!src.includes('.m3u8')) {
-        videoElement.src = src;
-        videoElement.play().catch(() => {});
-        return;
-      }
-
-      // 2. iOS Safari, iPadOS e Apple TV (SISTEMA NATIVO DA APPLE)
-      if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
-        videoElement.src = src;
-        // Obrigatório no iOS para evitar o erro de imagem quebrada
-        videoElement.load(); 
-        
-        // A Apple exige que a página aguarde o canal sintonizar antes de dar o Play
-        videoElement.addEventListener('loadedmetadata', () => {
-          videoElement.play().catch(() => console.log('Autoplay retido pelo iOS.'));
-        });
-      } 
-      // 3. Google Chrome, Android, Windows (USA O TRADUTOR HLS.JS)
-      else if ((window as any).Hls && (window as any).Hls.isSupported()) {
-        const Hls = (window as any).Hls;
-        hlsInstance = new Hls({
-          enableWorker: true,
-          lowLatencyMode: true,
-          backBufferLength: 90,
-        });
-        
-        hlsInstance.loadSource(src);
-        hlsInstance.attachMedia(videoElement);
-        
-        hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
-          videoElement.play().catch(() => console.log('Autoplay retido pelo navegador.'));
-        });
-
-        // Anti-falhas de Internet
-        hlsInstance.on(Hls.Events.ERROR, (event: any, data: any) => {
-          if (data.fatal) {
-            if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-              hlsInstance.startLoad();
-            } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-              hlsInstance.recoverMediaError();
-            } else {
-              hlsInstance.destroy();
-            }
-          }
-        });
-      }
-    };
-
-    // Só baixa a biblioteca se for arquivo M3U8 e se o celular não for Apple
-    if (src.includes('.m3u8') && !videoElement.canPlayType('application/vnd.apple.mpegurl')) {
-      if ((window as any).Hls) {
-        initPlayer();
-      } else {
-        // Impede de baixar duas vezes o mesmo arquivo e causar conflitos
-        let script = document.getElementById('hls-script') as HTMLScriptElement;
-        if (!script) {
-          script = document.createElement('script');
-          script.id = 'hls-script';
-          script.src = 'https://cdn.jsdelivr.net/npm/hls.js@1.3.5/dist/hls.min.js';
-          document.head.appendChild(script);
-        }
-        script.addEventListener('load', initPlayer);
-      }
-    } else {
-      initPlayer();
-    }
-
-    return () => {
-      // Limpeza brutal de memória ao sair do canal (Evita travamentos de app)
-      if (hlsInstance) {
-        hlsInstance.destroy();
-      }
-      if (videoElement) {
-        videoElement.removeAttribute('src');
-        videoElement.load();
-      }
-    };
-  }, [embed.src, embed.type]);
-
   if (loading || access === null || access === false) return <div className="content-wrap page-main"><div className="skeleton" style={{ aspectRatio: '16/9' }} /></div>;
   if (!video) return <div className="content-wrap page-main"><div className="empty-state"><CircleAlert size={26} /><h3>Vídeo não encontrado</h3><p>Esse título não está mais disponível no catálogo.</p><Link href="/catalogo" className="primary-button focus-tv">Voltar ao catálogo</Link></div></div>;
   
   return <div className="content-wrap page-main"><button className="quiet-button focus-tv" onClick={() => setLocation('/catalogo')} data-testid="button-back-catalog"><ArrowLeft size={16} />Voltar ao catálogo</button><div className="player-stage" style={{ marginTop: 17 }}><div className="player-box">
     
-    {/* A CAIXA NÃO PODE TER O SRC ESCRITO DIRETO NELA. SE TIVER, O ANDROID TRAVA. */}
-    {embed.type === 'file' && (
-      <video 
-        ref={videoRef} 
-        controls 
-        autoPlay 
-        muted 
-        playsInline 
-        data-testid="video-player" 
-        style={{ width: '100%', height: '100%', backgroundColor: '#000' }} 
-      />
-    )}
-    
-    {embed.type === 'embed' && <iframe src={embed.src} title={video.titulo} allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowFullScreen style={{ width: '100%', height: '100%', border: 0 }} data-testid="video-player" />}
-    
-    {embed.type === 'none' && <div className="player-idle"><Play size={38} /><strong>Pronto para assistir</strong><span>Este título ainda não tem um link de vídeo cadastrado.</span></div>}
+    {/* COMPONENTE ISOLADO DE VÍDEO (Resolve travamento React) */}
+    <VideoPlayer embed={embed} title={video.titulo} />
+
   </div><div className="player-details"><div><div className="eyebrow">{video.genero || video.categoria || 'CineVito'} {video.ano ? ` / ${video.ano}` : ''}{episodioInfo ? ` · Ep. ${episodioInfo.episodio.numero}` : ''}</div><h1 className="section-title" style={{ marginTop: 7 }} data-testid="text-player-title">{video.titulo}</h1><p>{video.descricao || 'Este título faz parte do catálogo CineVito.'}</p></div><div className="player-actions"><button className={`secondary-button focus-tv ${saved ? 'active' : ''}`} onClick={toggle} data-testid="button-player-favorite"><Heart size={15} fill={saved ? 'currentColor' : 'none'} />{saved ? 'Na coleção' : 'Salvar'}</button>{episodioInfo?.proximo && <button className="primary-button focus-tv" onClick={() => setLocation(`/player/${episodioInfo.proximo!.video_id}`)}>Próximo episódio<ChevronRight size={16} /></button>}</div></div>
   {episodiosDaTemporada.length > 1 && <div style={{ marginTop: 20 }}>
     <h3 className="section-title" style={{ fontSize: '1rem' }}>Episódios desta temporada</h3>
@@ -1868,6 +1870,7 @@ function App() {
       navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => undefined);
     }
   }, []);
+  
   return <QueryClientProvider client={queryClient}><TooltipProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><ErrorBoundary><AppShell><Router /></AppShell></ErrorBoundary></WouterRouter><Toaster /></TooltipProvider></QueryClientProvider>;
 }
 
