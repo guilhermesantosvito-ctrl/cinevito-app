@@ -220,6 +220,7 @@ function useInstallPrompt(user: SessionUser | null) {
   const [visible, setVisible] = useState(false);
   const [platform, setPlatform] = useState<PlataformaInstalacao>('desktop');
   const [alreadyInstalled, setAlreadyInstalled] = useState(false);
+  
   useEffect(() => {
     function handler(event: Event) {
       event.preventDefault();
@@ -228,12 +229,15 @@ function useInstallPrompt(user: SessionUser | null) {
     window.addEventListener('beforeinstallprompt', handler);
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
+
   useEffect(() => {
     const jaInstalado = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as unknown as { standalone?: boolean }).standalone === true;
     setAlreadyInstalled(jaInstalado);
     const plataforma = detectarPlataformaInstalacao();
     setPlatform(plataforma);
+    
     if (!user || jaInstalado || plataforma === 'tv') { setVisible(false); return; }
+    
     if (plataforma === 'desktop') {
       const dispensadoEm = Number(localStorage.getItem('cinevito-install-dismissed-desktop') || 0);
       const janela = 14 * 24 * 60 * 60 * 1000;
@@ -243,11 +247,13 @@ function useInstallPrompt(user: SessionUser | null) {
     }
     setVisible(true);
   }, [user?.id]);
+
   function dismiss() {
     if (platform === 'desktop') localStorage.setItem('cinevito-install-dismissed-desktop', String(Date.now()));
     else sessionStorage.setItem('cinevito-install-dismissed-session', '1');
     setVisible(false);
   }
+
   async function install() {
     if (!deferredEvent) return;
     deferredEvent.prompt();
@@ -263,7 +269,7 @@ type InstallStep = { icon: typeof Share2; title: string; description: string };
 function stepsForPlatform(platform: PlataformaInstalacao): InstallStep[] {
   if (platform === 'ios') {
     return [
-      { icon: Share2, title: 'Toque em Compartilhar', description: 'Na barra do Safari, toque no ícone de compartilhar.' },
+      { icon: Share2, title: 'Toque em Compartilhar', description: 'Na barra do Safari (ou topo da tela), toque no ícone de compartilhar.' },
       { icon: Plus, title: 'Toque em "Adicionar à Tela de Início"', description: 'Role a lista de opções e toque nela.' },
       { icon: Smartphone, title: 'Toque em "Adicionar"', description: 'Confirme para adicionar o app.' },
     ];
@@ -782,7 +788,7 @@ function findVideo(videos: Video[], id: string) {
 }
 
 // ============================================================================
-// PLAYER REESCRITO: TELA BLINDADA PARA IPHONE, ANDROID E TVS
+// PLAYER REESCRITO: INSTALAÇÃO GLOBAL E RECONEXÃO BLINDADA
 // ============================================================================
 function PlayerPage() {
   const params = useParams<{ id: string }>();
@@ -835,71 +841,68 @@ function PlayerPage() {
   const embed = getEmbedInfo(video?.url_video);
 
   useEffect(() => {
-    let hls: any = null;
-    const videoEl = videoRef.current;
+    let hlsInstance: any = null;
+    const videoElement = videoRef.current;
 
-    // Se o elemento de vídeo não existir ou não for arquivo direto, não faz nada
-    if (!videoEl || embed.type !== 'file') return;
+    if (!videoElement || embed.type !== 'file' || !embed.src) return;
 
     const src = embed.src;
     const isM3U8 = src.includes('.m3u8');
 
-    // Se for um MP4 normal, só carrega o link e sai
-    if (!isM3U8) {
-      videoEl.src = src;
-      return;
-    }
+    const setupPlayer = () => {
+      // 1. Arquivos MP4 Diretos
+      if (!isM3U8) {
+        videoElement.src = src;
+        videoElement.play().catch(() => {});
+        return;
+      }
 
-    // Função central que liga o vídeo
-    const initPlayer = () => {
-      // 1. TENTA NATIVO PRIMEIRO (Para iPhone, iPad e Safari)
-      if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
-        videoEl.src = src;
-        // Não forçamos autoplay via script no iOS para evitar o erro do ícone quebrado
+      // 2. iOS Safari NATIVO (Ignora o script)
+      if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
+        videoElement.src = src;
+        videoElement.addEventListener('loadedmetadata', () => {
+           videoElement.play().catch(() => console.log("iOS Autoplay bloqueado. Toque para iniciar."));
+        });
       } 
-      // 2. TENTA O TRADUTOR HLS.JS (Para Android, Windows, Chrome)
+      // 3. Android, Windows, Chrome (Usa o tradutor HLS.js pré-carregado)
       else if ((window as any).Hls && (window as any).Hls.isSupported()) {
         const Hls = (window as any).Hls;
-        hls = new Hls({
-          startLevel: -1, 
+        
+        hlsInstance = new Hls({
           enableWorker: true,
-          lowLatencyMode: false, // Segurança contra engasgos na TV
+          lowLatencyMode: true, // Modo mais rápido e estável
+        });
+        
+        hlsInstance.attachMedia(videoElement);
+        
+        hlsInstance.on(Hls.Events.MEDIA_ATTACHED, () => {
+          hlsInstance.loadSource(src);
         });
 
-        hls.loadSource(src);
-        hls.attachMedia(videoEl);
-        
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          videoEl.play().catch((e: any) => console.log("Play retido pelo navegador (Autoplay policy)."));
+        hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+          videoElement.play().catch(() => console.log("Navegador bloqueou Autoplay. Toque para iniciar."));
         });
-        
-        hls.on(Hls.Events.ERROR, (event: any, data: any) => {
+
+        hlsInstance.on(Hls.Events.ERROR, (event: any, data: any) => {
           if (data.fatal) {
             if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-              hls.startLoad();
+              hlsInstance.startLoad();
             } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-              hls.recoverMediaError();
+              hlsInstance.recoverMediaError();
             } else {
-              hls.destroy();
+              hlsInstance.destroy();
             }
           }
         });
       }
     };
 
-    // Baixa o Script do tradutor apenas se não for iPhone e ainda não estiver na página
-    if (isM3U8 && !(window as any).Hls && !videoEl.canPlayType('application/vnd.apple.mpegurl')) {
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/hls.js@1.3.5/dist/hls.min.js';
-      script.onload = initPlayer;
-      document.head.appendChild(script);
-    } else {
-      initPlayer();
-    }
+    // Invoca o setup na mesma hora (o script foi carregado na raiz do App)
+    setupPlayer();
 
     return () => {
-      if (hls) {
-        hls.destroy();
+      if (hlsInstance) {
+        hlsInstance.destroy();
       }
     };
   }, [embed.src, embed.type]);
@@ -909,7 +912,7 @@ function PlayerPage() {
   
   return <div className="content-wrap page-main"><button className="quiet-button focus-tv" onClick={() => setLocation('/catalogo')} data-testid="button-back-catalog"><ArrowLeft size={16} />Voltar ao catálogo</button><div className="player-stage" style={{ marginTop: 17 }}><div className="player-box">
     
-    {/* PLAYER NATIVO (IPTV E ARQUIVOS) - Agora com Key para recarregar o motor e Muted para permitir autoplay em celular */}
+    {/* PLAYER NATIVO - Configurado com os atributos essenciais para celular (muted, playsInline) e a key para forçar a reconstrução na troca de canais */}
     {embed.type === 'file' && (
       <video 
         key={embed.src} 
@@ -1850,7 +1853,15 @@ function App() {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => undefined);
     }
+    
+    // CARREGAMENTO GLOBAL DO TRADUTOR: Acaba com a tela preta de vez!
+    if (!(window as any).Hls) {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/hls.js@latest';
+      document.head.appendChild(script);
+    }
   }, []);
+  
   return <QueryClientProvider client={queryClient}><TooltipProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><ErrorBoundary><AppShell><Router /></AppShell></ErrorBoundary></WouterRouter><Toaster /></TooltipProvider></QueryClientProvider>;
 }
 
