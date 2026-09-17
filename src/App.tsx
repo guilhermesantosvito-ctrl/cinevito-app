@@ -512,9 +512,25 @@ function PageHeader({ eyebrow, title, description, action }: { eyebrow: string; 
   return <div className="page-head"><div className="page-head-copy"><div className="eyebrow">{eyebrow}</div><h1 className="page-title">{title}</h1>{description && <p>{description}</p>}</div>{action}</div>;
 }
 
+// ============================================================================
+// NOVO: COMPONENTE POSTER INTELIGENTE PARA LOGOS DE TV
+// ============================================================================
 function Poster({ video, favorite, onFavorite, onOpen, subtitle }: { video: Video; favorite: boolean; onFavorite: () => void; onOpen: () => void; subtitle?: string }) {
-  const poster = video.url_capa ? undefined : ({ '--poster': 'linear-gradient(145deg, #0d596c, #172532 50%, #e58d49)' } as CSSProperties);
-  return <article className="video-card reveal" data-testid={`card-video-${video.id}`}><div className="poster focus-tv" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen()} style={poster}><div className="poster-art" style={video.url_capa ? { backgroundImage: `url(${video.url_capa})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}><span className="poster-meta">{video.ao_vivo ? 'AO VIVO' : (video.ano || 'CINEVITO')}</span><strong className="poster-word">{video.titulo}</strong></div>{video.premium && <span className="premium-badge">Premium</span>}<button className={`poster-favorite focus-tv ${favorite ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); onFavorite(); }} aria-label={favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'} data-testid={`button-favorite-${video.id}`}><Heart size={15} fill={favorite ? 'currentColor' : 'none'} /></button></div><div className="video-info"><div><h3 className="video-title" data-testid={`text-video-title-${video.id}`}>{video.titulo}</h3><p className="video-subtitle">{subtitle || video.genero || video.categoria || 'Catálogo CineVito'}</p></div><Play size={14} color="#00c8ff" /></div></article>;
+  // Fundo escuro premium para os logos Transparentes da aba "Ao Vivo"
+  const tvGradient = { '--poster': 'linear-gradient(145deg, #1e293b, #0f172a 80%)' } as CSSProperties;
+  const fallbackGradient = { '--poster': 'linear-gradient(145deg, #0d596c, #172532 50%, #e58d49)' } as CSSProperties;
+  
+  // Se for filme (e tiver capa), o fundo é a própria capa. Se for TV, injetamos o escuro.
+  const posterStyle = video.url_capa && !video.ao_vivo ? undefined : (video.ao_vivo ? tvGradient : fallbackGradient);
+
+  const artStyle = video.url_capa ? { 
+    backgroundImage: `url(${video.url_capa})`, 
+    backgroundSize: video.ao_vivo ? '75%' : 'cover', // Filmes preenchem (cover). TV encaixa 75% no centro!
+    backgroundPosition: 'center', 
+    backgroundRepeat: 'no-repeat' 
+  } : undefined;
+
+  return <article className="video-card reveal" data-testid={`card-video-${video.id}`}><div className="poster focus-tv" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen()} style={posterStyle}><div className="poster-art" style={artStyle}><span className="poster-meta">{video.ao_vivo ? 'AO VIVO' : (video.ano || 'CINEVITO')}</span><strong className="poster-word">{video.titulo}</strong></div>{video.premium && <span className="premium-badge">Premium</span>}<button className={`poster-favorite focus-tv ${favorite ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); onFavorite(); }} aria-label={favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'} data-testid={`button-favorite-${video.id}`}><Heart size={15} fill={favorite ? 'currentColor' : 'none'} /></button></div><div className="video-info"><div><h3 className="video-title" data-testid={`text-video-title-${video.id}`}>{video.titulo}</h3><p className="video-subtitle">{subtitle || video.genero || video.categoria || 'Catálogo CineVito'}</p></div><Play size={14} color="#00c8ff" /></div></article>;
 }
 
 function RankedPoster({ video, rank, favorite, onFavorite, onOpen }: { video: Video; rank: number; favorite: boolean; onFavorite: () => void; onOpen: () => void }) {
@@ -540,7 +556,7 @@ function HeroBanner({ videos, onOpen }: { videos: Video[]; onOpen: (id: string) 
   const video = videos[index % videos.length];
   return <section className="shelf" style={{ marginTop: 22 }}>
     <div role="button" tabIndex={0} onClick={() => onOpen(video.id)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen(video.id)} className="focus-tv" style={{ aspectRatio: '16/7', borderRadius: 14, overflow: 'hidden', position: 'relative', cursor: 'pointer', background: video.url_capa ? undefined : 'linear-gradient(145deg, #0d596c, #172532 50%, #e58d49)' }}>
-      {video.url_capa && <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${video.url_capa})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />}
+      {video.url_capa && <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${video.url_capa})`, backgroundSize: video.ao_vivo ? 'contain' : 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', opacity: video.ao_vivo ? 0.8 : 1 }} />}
       <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(0deg, rgba(0,0,0,.8), rgba(0,0,0,.05) 65%)' }} />
       <div style={{ position: 'absolute', left: 20, bottom: 20, right: 20 }}>
         <div className="eyebrow" style={{ color: '#00c8ff' }}>Em destaque</div>
@@ -583,9 +599,6 @@ function ContinueCard({ item, onOpen }: { item: ContinuarAssistindoItem; onOpen:
   return <article className="video-card reveal"><div className="poster focus-tv" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen()} style={style}><div className="poster-art" style={video.url_capa ? { backgroundImage: `url(${video.url_capa})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}><span className="poster-meta">CONTINUAR</span><strong className="poster-word">{item.series?.titulo || video.titulo}</strong></div></div><div className="video-info"><div><h3 className="video-title">{item.series?.titulo || video.titulo}</h3><p className="video-subtitle">{subtitle || 'Continuar assistindo'}</p></div><Play size={14} color="#00c8ff" /></div></article>;
 }
 
-// ============================================================================
-// PÁGINA: TV AO VIVO (EXCLUSIVA PARA CANAIS)
-// ============================================================================
 function LiveTVPage() {
   const [, setLocation] = useLocation();
   const user = useAuth();
@@ -777,13 +790,8 @@ function CatalogPage() {
   </div>;
 }
 
-// ============================================================================
-// NOVO COMPONENTE ISOLADO: BLINDA O PLAYER CONTRA ERROS DE NAVEGADOR
-// ============================================================================
 function VideoPlayer({ embed, title }: { embed: { type: string, src: string }, title?: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  
-  // O componente "espera" a biblioteca carregar antes de tentar ligar a TV
   const [hlsReady, setHlsReady] = useState(!!(window as any).Hls);
 
   useEffect(() => {
@@ -812,19 +820,16 @@ function VideoPlayer({ embed, title }: { embed: { type: string, src: string }, t
     let hls: any = null;
     const isM3U8 = embed.src.toLowerCase().includes('.m3u8');
 
-    // MP4 Normal
     if (!isM3U8) {
       video.src = embed.src;
       video.play().catch(() => {});
       return;
     }
 
-    // iPhone, iPad, Apple TV, Safari (Sistema Nativo da Apple)
     if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = embed.src;
       video.play().catch(() => console.log('Autoplay retido pelo iOS.'));
     } 
-    // Chrome, Android, Windows (Tradutor HLS.JS)
     else if (hlsReady && (window as any).Hls) {
       const Hls = (window as any).Hls;
       if (Hls.isSupported()) {
@@ -839,7 +844,6 @@ function VideoPlayer({ embed, title }: { embed: { type: string, src: string }, t
           video.play().catch(() => console.log('Autoplay retido pelo navegador.'));
         });
 
-        // Auto-Reconexão
         hls.on(Hls.Events.ERROR, (event: any, data: any) => {
           if (data.fatal) {
             if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
@@ -854,7 +858,6 @@ function VideoPlayer({ embed, title }: { embed: { type: string, src: string }, t
       }
     }
 
-    // Limpeza de memória ao sair do canal (previne travamentos)
     return () => {
       if (hls) hls.destroy();
       video.removeAttribute('src');
@@ -874,7 +877,6 @@ function VideoPlayer({ embed, title }: { embed: { type: string, src: string }, t
         autoPlay 
         muted 
         playsInline 
-        // Esse pôster invisível IMPEDE que o celular mostre o ícone de imagem quebrada!
         poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
         data-testid="video-player" 
         style={{ width: '100%', height: '100%', backgroundColor: '#000' }} 
@@ -942,7 +944,6 @@ function PlayerPage() {
   
   return <div className="content-wrap page-main"><button className="quiet-button focus-tv" onClick={() => setLocation('/catalogo')} data-testid="button-back-catalog"><ArrowLeft size={16} />Voltar ao catálogo</button><div className="player-stage" style={{ marginTop: 17 }}><div className="player-box">
     
-    {/* COMPONENTE ISOLADO DE VÍDEO (Resolve travamento React) */}
     <VideoPlayer embed={embed} title={video.titulo} />
 
   </div><div className="player-details"><div><div className="eyebrow">{video.genero || video.categoria || 'CineVito'} {video.ano ? ` / ${video.ano}` : ''}{episodioInfo ? ` · Ep. ${episodioInfo.episodio.numero}` : ''}</div><h1 className="section-title" style={{ marginTop: 7 }} data-testid="text-player-title">{video.titulo}</h1><p>{video.descricao || 'Este título faz parte do catálogo CineVito.'}</p></div><div className="player-actions"><button className={`secondary-button focus-tv ${saved ? 'active' : ''}`} onClick={toggle} data-testid="button-player-favorite"><Heart size={15} fill={saved ? 'currentColor' : 'none'} />{saved ? 'Na coleção' : 'Salvar'}</button>{episodioInfo?.proximo && <button className="primary-button focus-tv" onClick={() => setLocation(`/player/${episodioInfo.proximo!.video_id}`)}>Próximo episódio<ChevronRight size={16} /></button>}</div></div>
