@@ -440,7 +440,7 @@ function AuthPage() {
     setError('');
     setNotice('');
     if (!form.email || !form.password || (mode === 'signup' && !form.nome)) {
-      setError('Preencha os campos obrigatórios para continue.');
+      setError('Preencha os campos obrigatórios para continuar.');
       return;
     }
     setBusy(true);
@@ -584,7 +584,7 @@ function ContinueCard({ item, onOpen }: { item: ContinuarAssistindoItem; onOpen:
 }
 
 // ============================================================================
-// NOVA PÁGINA: TV AO VIVO (EXCLUSIVA PARA CANAIS)
+// PÁGINA: TV AO VIVO (EXCLUSIVA PARA CANAIS)
 // ============================================================================
 function LiveTVPage() {
   const [, setLocation] = useLocation();
@@ -595,10 +595,8 @@ function LiveTVPage() {
   const [query, setQuery] = useState('');
   const [favorites, setFavorites] = useState<string[]>(() => JSON.parse(localStorage.getItem('cinevito-favorites') || '[]'));
 
-  // Puxa somente o que for marcado como TV no admin
   const liveChannels = useMemo(() => videos.filter(v => v.ao_vivo), [videos]);
   
-  // Cria os botões de filtro dinamicamente com base no que você cadastrar
   const genres = useMemo(() => {
     const list = new Set(liveChannels.map(v => v.genero).filter(Boolean) as string[]);
     return ['Todos os canais', ...Array.from(list)];
@@ -657,7 +655,6 @@ function CatalogPage() {
   const [query, setQuery] = useState('');
   const [favorites, setFavorites] = useState<string[]>(() => JSON.parse(localStorage.getItem('cinevito-favorites') || '[]'));
   
-  // O FILTRO DE FILMES AGORA ESCONDE O QUE FOR MARCADO COMO "AO VIVO" (Para não misturar)
   const filtered = useMemo(() => videos.filter((video) => {
     const text = `${video.titulo} ${video.descricao || ''} ${video.genero || ''}`.toLowerCase();
     const selectedGenre = normalizeCatalogLabel(genre);
@@ -666,7 +663,7 @@ function CatalogPage() {
       && (genre === 'Todos os gêneros' || videoGenre === selectedGenre || videoGenre.includes(selectedGenre))
       && videoBelongsToShelf(video, shelf)
       && !episodioVideoIds.has(video.id)
-      && !video.ao_vivo; // Esconde os canais de TV daqui
+      && !video.ao_vivo; 
   }), [videos, query, genre, shelf, episodioVideoIds]);
 
   const filteredSeries = useMemo(() => series.filter((serie) => {
@@ -745,14 +742,7 @@ function CatalogPage() {
       <div className="video-grid">{secaoVideos.map((video) => <Poster key={video.id} video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} />)}</div>
     </section>;
   }
-  function renderAoVivoSection(item: LayoutItem, key: string) {
-    const secaoVideos = videos.filter((video) => video.ao_vivo);
-    if (!secaoVideos.length) return null;
-    return <section className="shelf" key={key} style={{ marginTop: 22 }}>
-      <div className="shelf-heading"><h2 className="section-title">{item.titulo || 'Ao vivo / Esportes'}</h2><div className="section-rule" /></div>
-      <div className="video-grid">{secaoVideos.map((video) => <Poster key={video.id} video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} subtitle="Transmissão ao vivo" />)}</div>
-    </section>;
-  }
+
   return <div className="content-wrap page-main">
     <PageHeader eyebrow="A sua sala de cinema" title={`Olá, ${titleCaseName(user)}.`} description="Escolha algo para assistir. O catálogo se adapta à sua tela, do celular à Smart TV." action={<Link href="/assinatura" className="primary-button focus-tv" data-testid="link-subscription"><Sparkles size={16} />Ver planos</Link>} />
     {!hasRuntimeConfig && <div className="notice notice-cyan" data-testid="status-runtime-demo"><Info size={17} color="#00c8ff" /><span><strong>Modo de demonstração.</strong> O ambiente ainda não está conectado ao Supabase; os dados desta sessão ficam apenas neste aparelho.</span></div>}
@@ -776,7 +766,6 @@ function CatalogPage() {
       if (item.tipo === 'top10') return renderTop10Section(item, item.id);
       if (item.tipo === 'elenco') return renderElencoSection(item, item.id);
       if (item.tipo === 'categoria') return renderCategoriaSection(item, item.id);
-      if (item.tipo === 'ao_vivo') return renderAoVivoSection(item, item.id);
       return null;
     })}
     {!loading && !error && shelf === 'Início' && layout.length === 0 && <>
@@ -793,7 +782,7 @@ function findVideo(videos: Video[], id: string) {
 }
 
 // ============================================================================
-// PLAYER REESCRITO: COM AUTO-RECONNECT E SEM A IMPACIÊNCIA DO "LOW LATENCY"
+// PLAYER REESCRITO: COM AUTO-RECONNECT INTELIGENTE E COMPATÍVEL COM IPHONE
 // ============================================================================
 function PlayerPage() {
   const params = useParams<{ id: string }>();
@@ -847,72 +836,79 @@ function PlayerPage() {
 
   useEffect(() => {
     let hlsInstance: any = null;
+    const videoElement = videoRef.current;
 
-    if (embed.type === 'file' && embed.src.includes('.m3u8') && videoRef.current) {
-      const videoElement = videoRef.current;
+    // Apenas aplica lógica avançada se for um arquivo de vídeo (MP4 ou M3U8)
+    if (videoElement && embed.type === 'file') {
       
-      const startHls = () => {
-        const Hls = (window as any).Hls;
-        if (Hls && Hls.isSupported()) {
-          // Destrói instância antiga se a pessoa trocar de canal rápido
-          if (hlsInstance) {
-            hlsInstance.destroy();
-          }
-
-          // Versão pacil e auto-recuperável (Sem lowLatencyMode)
-          hlsInstance = new Hls({
-            enableWorker: true,
-            backBufferLength: 90,
-            maxBufferLength: 30, // Mais tempo de buffer para não engasgar
-            manifestLoadingTimeOut: 10000,
-            manifestLoadingMaxRetry: 5,
-            levelLoadingTimeOut: 10000,
-            levelLoadingMaxRetry: 5,
-          });
-          
-          hlsInstance.loadSource(embed.src);
-          hlsInstance.attachMedia(videoElement);
-          
-          hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
-            videoElement.play().catch((e: any) => {
-               console.log("Autoplay retido. O usuário precisa clicar no play da tela.");
-            });
-          });
-
-          // Reconexão inteligente
-          hlsInstance.on(Hls.Events.ERROR, (event: any, data: any) => {
-            if (data.fatal) {
-              switch (data.type) {
-                case Hls.ErrorTypes.NETWORK_ERROR:
-                  // Se o servidor negar a primeira tentativa, ele espera 2 segundos e tenta de novo sozinho
-                  setTimeout(() => {
-                      if(hlsInstance) hlsInstance.startLoad();
-                  }, 2000); 
-                  break;
-                case Hls.ErrorTypes.MEDIA_ERROR:
-                  if(hlsInstance) hlsInstance.recoverMediaError();
-                  break;
-                default:
-                  if(hlsInstance) hlsInstance.destroy();
-                  break;
-              }
+      // 1. Tratamento nativo para iPhones, iPads e Safari no Mac (Apple não suporta hls.js)
+      if (videoElement.canPlayType('application/vnd.apple.mpegurl') && embed.src.includes('.m3u8')) {
+        videoElement.src = embed.src;
+        // Não forçamos o play automático no iOS aqui para não dar erro
+      } 
+      // 2. Tratamento para Chrome, Android, Windows (usando HLS.js)
+      else if (embed.src.includes('.m3u8')) {
+        const startHls = () => {
+          const Hls = (window as any).Hls;
+          if (Hls && Hls.isSupported()) {
+            if (hlsInstance) {
+              hlsInstance.destroy();
             }
-          });
-        } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
-          // Fallback para Safari/Apple TVs nativas
-          videoElement.src = embed.src;
-          videoElement.play().catch(() => {});
-        }
-      };
 
-      if (!(window as any).Hls) {
-        const script = document.createElement('script');
-        // Usa uma versão minificada e cravada para não dar bugs
-        script.src = 'https://cdn.jsdelivr.net/npm/hls.js@1.3.5/dist/hls.min.js'; 
-        script.onload = startHls;
-        document.head.appendChild(script);
-      } else {
-        startHls();
+            // Configuração para estabilidade em canais gratuitos
+            hlsInstance = new Hls({
+              enableWorker: true,
+              backBufferLength: 90,
+              maxBufferLength: 30, 
+              manifestLoadingTimeOut: 10000,
+              manifestLoadingMaxRetry: 5,
+              levelLoadingTimeOut: 10000,
+              levelLoadingMaxRetry: 5,
+            });
+            
+            hlsInstance.loadSource(embed.src);
+            hlsInstance.attachMedia(videoElement);
+            
+            // Quando carregar com sucesso, tenta tocar (pode ser bloqueado pelo celular se não estiver mutado)
+            hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+              videoElement.play().catch(() => {
+                 console.log("O celular bloqueou o Auto-Play. O usuário precisa apertar o Play na tela.");
+              });
+            });
+
+            // Tenta reconectar a TV sozinho se der erro na internet
+            hlsInstance.on(Hls.Events.ERROR, (event: any, data: any) => {
+              if (data.fatal) {
+                switch (data.type) {
+                  case Hls.ErrorTypes.NETWORK_ERROR:
+                    setTimeout(() => {
+                        if(hlsInstance) hlsInstance.startLoad();
+                    }, 2000); 
+                    break;
+                  case Hls.ErrorTypes.MEDIA_ERROR:
+                    if(hlsInstance) hlsInstance.recoverMediaError();
+                    break;
+                  default:
+                    if(hlsInstance) hlsInstance.destroy();
+                    break;
+                }
+              }
+            });
+          }
+        };
+
+        if (!(window as any).Hls) {
+          const script = document.createElement('script');
+          script.src = 'https://cdn.jsdelivr.net/npm/hls.js@1.3.5/dist/hls.min.js'; 
+          script.onload = startHls;
+          document.head.appendChild(script);
+        } else {
+          startHls();
+        }
+      } 
+      // 3. Arquivos MP4 comuns
+      else {
+         videoElement.src = embed.src;
       }
     }
 
@@ -928,9 +924,18 @@ function PlayerPage() {
   
   return <div className="content-wrap page-main"><button className="quiet-button focus-tv" onClick={() => setLocation('/catalogo')} data-testid="button-back-catalog"><ArrowLeft size={16} />Voltar ao catálogo</button><div className="player-stage" style={{ marginTop: 17 }}><div className="player-box">
     
-    {/* PLAYER NATIVO (IPTV E ARQUIVOS) */}
-    {embed.type === 'file' && <video ref={videoRef} src={embed.src.includes('.m3u8') ? undefined : embed.src} controls autoPlay playsInline data-testid="video-player" style={{ width: '100%', height: '100%', backgroundColor: '#000' }} />}
+    {/* PLAYER NATIVO - Ajustado para rodar em iPhones (playsInline) */}
+    {embed.type === 'file' && (
+      <video 
+        ref={videoRef} 
+        controls 
+        playsInline 
+        data-testid="video-player" 
+        style={{ width: '100%', height: '100%', backgroundColor: '#000' }} 
+      />
+    )}
     
+    {/* PLAYER DE IFRAME */}
     {embed.type === 'embed' && <iframe src={embed.src} title={video.titulo} allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowFullScreen style={{ width: '100%', height: '100%', border: 0 }} data-testid="video-player" />}
     
     {embed.type === 'none' && <div className="player-idle"><Play size={38} /><strong>Pronto para assistir</strong><span>Este título ainda não tem um link de vídeo cadastrado.</span></div>}
