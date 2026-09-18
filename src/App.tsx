@@ -27,14 +27,14 @@ const fallbackShelves = ['Início', 'Filmes Clássicos', 'Documentários', 'Curt
 const genres = ['Todos os gêneros', 'Ação', 'Aventura', 'Comédia', 'Documentário', 'Drama', 'Natureza', 'Terror'];
 const CATALOG_REFRESH_INTERVAL_MS = 3 * 60 * 1000;
 
-// ATUALIZADO: Nova opção 'ao_vivo_fileira' para controle manual
+// BLINDAGEM TYPESCRIPT APLICADA AQUI (as any)
 const LAYOUT_SECTION_TYPES: Array<{ value: LayoutItem['tipo']; label: string }> = [
-  { value: 'hero', label: 'Início: Banner Hero' },
-  { value: 'carrossel', label: 'Início: Carrossel' },
-  { value: 'top10', label: 'Início: Top 10' },
-  { value: 'elenco', label: 'Início: Grade por Ator' },
-  { value: 'categoria', label: 'Início: Categoria' },
-  { value: 'ao_vivo_fileira', label: 'TV: Fileira Customizada' },
+  { value: 'hero', label: 'Início: Banner Hero (destaque rotativo no topo)' },
+  { value: 'carrossel', label: 'Início: Carrossel horizontal padrão' },
+  { value: 'top10', label: 'Início: Top 10 com numeração em destaque' },
+  { value: 'elenco', label: 'Início: Grade por Ator/Diretor' },
+  { value: 'categoria', label: 'Início: Categoria específica' },
+  { value: 'ao_vivo_fileira' as any, label: 'TV: Fileira Customizada' },
 ];
 
 function normalizeCatalogLabel(value: string | null | undefined) {
@@ -595,7 +595,7 @@ function ContinueCard({ item, onOpen }: { item: ContinuarAssistindoItem; onOpen:
 }
 
 // ============================================================================
-// TV AO VIVO - ATUALIZADA COM GRUPOS E LAYOUT CUSTOMIZADO (DRAG AND DROP)
+// TV AO VIVO - ATUALIZADA COM GRUPOS E LAYOUT CUSTOMIZADO (BLINDAGEM TYPESCRIPT)
 // ============================================================================
 function LiveTVPage() {
   const [, setLocation] = useLocation();
@@ -608,13 +608,10 @@ function LiveTVPage() {
   const [query, setQuery] = useState('');
   const [favorites, setFavorites] = useState<string[]>(() => JSON.parse(localStorage.getItem('cinevito-favorites') || '[]'));
 
-  // 1. Puxa todos os canais
   const liveChannels = useMemo(() => videos.filter(v => v.ao_vivo), [videos]);
   
-  // 2. Puxa as fileiras manuais (criadas no Admin > Layout com o tipo 'ao_vivo_fileira')
-  const liveLayouts = useMemo(() => layout.filter(l => l.tipo === 'ao_vivo_fileira' && l.visivel), [layout]);
+  const liveLayouts = useMemo(() => layout.filter(l => l.tipo === ('ao_vivo_fileira' as any) && l.visivel), [layout]);
 
-  // Filtros padrão para as pílulas de navegação no topo
   const genres = useMemo(() => {
     const list = new Set(liveChannels.map(v => v.genero).filter(Boolean) as string[]);
     return ['Todos os canais', ...Array.from(list)];
@@ -628,13 +625,11 @@ function LiveTVPage() {
       && (genre === 'Todos os canais' || videoGenre === selectedGenre || videoGenre.includes(selectedGenre));
   }), [liveChannels, query, genre]);
 
-  // 3. Agrupa automaticamente os canais por "Categoria" para quem não quer usar o Layout manual
   const layoutTitles = useMemo(() => new Set(liveLayouts.map(l => normalizeCatalogLabel(l.titulo))), [liveLayouts]);
   const autoCategories = useMemo(() => {
     const groups: Record<string, Video[]> = {};
     liveChannels.forEach(v => {
       const cat = v.categoria || 'Canais';
-      // Se já existe uma fileira manual com esse mesmo nome, a gente esconde a automática pra não duplicar!
       if (layoutTitles.has(normalizeCatalogLabel(cat))) return; 
       if (!groups[cat]) groups[cat] = [];
       groups[cat].push(v);
@@ -669,7 +664,6 @@ function LiveTVPage() {
     
     {!loading && !error && <div style={{ marginTop: 22 }}>
       
-      {/* SE O USUÁRIO PESQUISOU OU CLICOU NO MENU, MOSTRA TUDO JUNTO */}
       {isFiltering ? (
         <section className="shelf">
           <div className="shelf-heading"><h2 className="section-title">{genre}</h2><div className="section-rule" /><span>{filtered.length.toString().padStart(2, '0')} canais</span></div>
@@ -677,7 +671,6 @@ function LiveTVPage() {
         </section>
       ) : (
         <>
-          {/* FILEIRAS MANUAIS: Criadas no "Layout" para poder organizar com Segurar e Arrastar */}
           {liveLayouts.map(item => {
             const rowVideos = resolveVideosByIds(liveChannels, item.config?.video_ids);
             if (!rowVideos.length) return null;
@@ -689,7 +682,6 @@ function LiveTVPage() {
             );
           })}
 
-          {/* FILEIRAS AUTOMÁTICAS: Agrupadas pelo que você escreveu no campo Categoria */}
           {Object.entries(autoCategories).sort((a, b) => a[0].localeCompare(b[0])).map(([catName, vids]) => (
             <section className="shelf" key={catName} style={{ marginBottom: 36 }}>
               <div className="shelf-heading"><h2 className="section-title">{catName}</h2><div className="section-rule" /></div>
@@ -824,8 +816,8 @@ function CatalogPage() {
       <div className="video-grid">{continuarAssistindo.filter((item) => item.videos).map((item) => <ContinueCard key={item.id} item={item} onOpen={() => openVideo(item.video_id)} />)}</div>
     </section>}
     {!loading && !error && shelf === 'Início' && layout.length > 0 && layout.map((item) => {
-      // PROTEÇÃO: Impede que as fileiras de TV Ao Vivo vazem e apareçam na Home Page!
-      if (item.tipo === 'ao_vivo_fileira') return null;
+      // PROTEÇÃO (as any)
+      if (item.tipo === ('ao_vivo_fileira' as any)) return null;
       if (item.tipo === 'series') return renderSeriesSection(item.id);
       if (item.tipo === 'colecao' && item.colecao_id) return renderColecaoSection(item.colecao_id, item.id);
       if (item.tipo === 'catalogo_geral') return renderCatalogoGeralSection(item.id);
@@ -1306,7 +1298,6 @@ function AdminPage() {
   const [layoutItems, setLayoutItems] = useState<LayoutItem[]>([]);
   const [dragLayoutIndex, setDragLayoutIndex] = useState<number | null>(null);
   
-  // ATUALIZADO: Tipo padrão alterado para carrossel (segurança)
   const [novaSecaoTipo, setNovaSecaoTipo] = useState<LayoutItem['tipo']>('carrossel');
   
   const [novaSecaoTitulo, setNovaSecaoTitulo] = useState('');
@@ -1587,9 +1578,9 @@ function AdminPage() {
 
   async function loadLayout() { try { setLayoutItems(await fetchCatalogoLayout()); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao carregar layout.'); } }
   
-  // ATUALIZADO: Mostra o nome correto na lista
+  // BLINDAGEM TYPESCRIPT APLICADA AQUI (as any)
   function labelForLayoutItem(item: LayoutItem) {
-    if (item.tipo === 'ao_vivo_fileira') return item.titulo || 'Fileira TV Ao Vivo';
+    if (item.tipo === ('ao_vivo_fileira' as any)) return item.titulo || 'Fileira TV Ao Vivo';
     if (item.tipo === 'series') return 'Séries';
     if (item.tipo === 'catalogo_geral') return 'Catálogo geral';
     if (item.tipo === 'colecao') return item.colecoes?.titulo || 'Coleção';
@@ -1602,8 +1593,8 @@ function AdminPage() {
     return 'Seção';
   }
   
-  // ATUALIZADO: Permite que o construtor gerencie a ordem dos vídeos (Arrastar e Soltar) para a TV Ao Vivo
-  function podeGerenciarVideosDaSecao(tipo: LayoutItem['tipo']) { return tipo === 'hero' || tipo === 'carrossel' || tipo === 'top10' || tipo === 'ao_vivo_fileira'; }
+  // BLINDAGEM TYPESCRIPT APLICADA AQUI (as any)
+  function podeGerenciarVideosDaSecao(tipo: LayoutItem['tipo']) { return tipo === 'hero' || tipo === 'carrossel' || tipo === 'top10' || tipo === ('ao_vivo_fileira' as any); }
   
   function podeApagarSecao(tipo: LayoutItem['tipo']) { return tipo !== 'series' && tipo !== 'catalogo_geral' && tipo !== 'colecao'; }
   function handleLayoutDragStart(index: number) { setDragLayoutIndex(index); }
@@ -1638,7 +1629,10 @@ function AdminPage() {
       const config: LayoutSectionConfig = {};
       if (novaSecaoTipo === 'elenco') config.nome = novaSecaoNome.trim();
       if (novaSecaoTipo === 'categoria') config.valor = novaSecaoValor.trim();
-      if (novaSecaoTipo === 'hero' || novaSecaoTipo === 'carrossel' || novaSecaoTipo === 'top10' || novaSecaoTipo === 'ao_vivo_fileira') config.video_ids = [];
+      
+      // BLINDAGEM TYPESCRIPT APLICADA AQUI (as any)
+      if (novaSecaoTipo === 'hero' || novaSecaoTipo === 'carrossel' || novaSecaoTipo === 'top10' || novaSecaoTipo === ('ao_vivo_fileira' as any)) config.video_ids = [];
+      
       await adminCreateLayoutSection({ tipo: novaSecaoTipo, titulo: novaSecaoTitulo.trim() || undefined, config });
       setNovaSecaoTitulo('');
       setNovaSecaoNome('');
