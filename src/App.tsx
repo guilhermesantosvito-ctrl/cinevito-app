@@ -1899,7 +1899,7 @@ function AdminPage() {
     {tab === 'clientes' && <section className="panel panel-pad">
       <div className="eyebrow">Gestão</div><h2 className="panel-title" style={{ marginTop: 8 }}>Clientes e Acessos</h2>
       <div className="admin-list" style={{ marginTop: 16 }}>{clients.map((c) => {
-        const sub = c.assinaturas?.[0];
+        const sub = (c as any).assinatura?.[0] || (c as any).assinaturas?.[0] || (c as any).assinatura;
         const status = !sub ? 'Sem acesso' : sub.status === 'ativa' ? 'Ativo' : sub.status === 'trial' ? 'Trial' : sub.status === 'pendente' ? 'Pendente' : 'Inativo';
         return <div className="result-row" key={c.id} style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
