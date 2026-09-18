@@ -26,13 +26,15 @@ const MP_PUBLIC_KEY = 'APP_USR-471c3a9b-ff0f-4743-a417-e54b9f13e902';
 const fallbackShelves = ['Início', 'Filmes Clássicos', 'Documentários', 'Curtas-Metragens'];
 const genres = ['Todos os gêneros', 'Ação', 'Aventura', 'Comédia', 'Documentário', 'Drama', 'Natureza', 'Terror'];
 const CATALOG_REFRESH_INTERVAL_MS = 3 * 60 * 1000;
+
+// ATUALIZADO: Nova opção 'ao_vivo_fileira' para controle manual
 const LAYOUT_SECTION_TYPES: Array<{ value: LayoutItem['tipo']; label: string }> = [
-  { value: 'hero', label: 'Banner Hero (destaque rotativo no topo)' },
-  { value: 'carrossel', label: 'Carrossel horizontal padrão' },
-  { value: 'top10', label: 'Top 10 com numeração em destaque' },
-  { value: 'elenco', label: 'Grade por Ator/Diretor' },
-  { value: 'categoria', label: 'Categoria específica' },
-  { value: 'ao_vivo', label: 'Ao vivo / Esportes' },
+  { value: 'hero', label: 'Início: Banner Hero' },
+  { value: 'carrossel', label: 'Início: Carrossel' },
+  { value: 'top10', label: 'Início: Top 10' },
+  { value: 'elenco', label: 'Início: Grade por Ator' },
+  { value: 'categoria', label: 'Início: Categoria' },
+  { value: 'ao_vivo_fileira', label: 'TV: Fileira Customizada' },
 ];
 
 function normalizeCatalogLabel(value: string | null | undefined) {
@@ -592,17 +594,27 @@ function ContinueCard({ item, onOpen }: { item: ContinuarAssistindoItem; onOpen:
   return <article className="video-card reveal"><div className="poster focus-tv" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen()} style={style}><div className="poster-art" style={video.url_capa ? { backgroundImage: `url(${video.url_capa})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}><span className="poster-meta">CONTINUAR</span><strong className="poster-word">{item.series?.titulo || video.titulo}</strong></div></div><div className="video-info"><div><h3 className="video-title">{item.series?.titulo || video.titulo}</h3><p className="video-subtitle">{subtitle || 'Continuar assistindo'}</p></div><Play size={14} color="#00c8ff" /></div></article>;
 }
 
+// ============================================================================
+// TV AO VIVO - ATUALIZADA COM GRUPOS E LAYOUT CUSTOMIZADO (DRAG AND DROP)
+// ============================================================================
 function LiveTVPage() {
   const [, setLocation] = useLocation();
   const user = useAuth();
   const access = useCatalogAccess(user);
   const { videos, loading, error } = useVideos();
+  const layout = useCatalogLayoutPublico();
+  
   const [genre, setGenre] = useState('Todos os canais');
   const [query, setQuery] = useState('');
   const [favorites, setFavorites] = useState<string[]>(() => JSON.parse(localStorage.getItem('cinevito-favorites') || '[]'));
 
+  // 1. Puxa todos os canais
   const liveChannels = useMemo(() => videos.filter(v => v.ao_vivo), [videos]);
   
+  // 2. Puxa as fileiras manuais (criadas no Admin > Layout com o tipo 'ao_vivo_fileira')
+  const liveLayouts = useMemo(() => layout.filter(l => l.tipo === 'ao_vivo_fileira' && l.visivel), [layout]);
+
+  // Filtros padrão para as pílulas de navegação no topo
   const genres = useMemo(() => {
     const list = new Set(liveChannels.map(v => v.genero).filter(Boolean) as string[]);
     return ['Todos os canais', ...Array.from(list)];
@@ -616,6 +628,20 @@ function LiveTVPage() {
       && (genre === 'Todos os canais' || videoGenre === selectedGenre || videoGenre.includes(selectedGenre));
   }), [liveChannels, query, genre]);
 
+  // 3. Agrupa automaticamente os canais por "Categoria" para quem não quer usar o Layout manual
+  const layoutTitles = useMemo(() => new Set(liveLayouts.map(l => normalizeCatalogLabel(l.titulo))), [liveLayouts]);
+  const autoCategories = useMemo(() => {
+    const groups: Record<string, Video[]> = {};
+    liveChannels.forEach(v => {
+      const cat = v.categoria || 'Canais';
+      // Se já existe uma fileira manual com esse mesmo nome, a gente esconde a automática pra não duplicar!
+      if (layoutTitles.has(normalizeCatalogLabel(cat))) return; 
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(v);
+    });
+    return groups;
+  }, [liveChannels, layoutTitles]);
+
   function toggleFavorite(id: string) {
     const next = favorites.includes(id) ? favorites.filter((value) => value !== id) : [...favorites, id];
     setFavorites(next);
@@ -624,6 +650,8 @@ function LiveTVPage() {
   function openVideo(id: string) {
     setLocation(access ? `/player/${id}` : '/assinatura');
   }
+
+  const isFiltering = query.length > 0 || genre !== 'Todos os canais';
 
   return <div className="content-wrap page-main">
     <PageHeader eyebrow="Programação 24h" title="TV Ao Vivo" description="Canais de esportes, notícias e entretenimento rodando sem parar." />
@@ -636,13 +664,45 @@ function LiveTVPage() {
     
     {genres.length > 1 && <div className="chip-row" aria-label="Filtrar por gênero">{genres.map((item) => <button key={item} className={`chip focus-tv ${genre === item ? 'active' : ''}`} onClick={() => setGenre(item)}>{item}</button>)}</div>}
     
-    {loading && <div className="video-grid">{Array.from({ length: 5 }).map((_, index) => <div className="skeleton" style={{ aspectRatio: '2/3' }} key={index} />)}</div>}
-    {error && <div className="notice notice-orange" role="alert"><CircleAlert size={17} color="#ff8275" /><span>{error}</span><button className="quiet-button focus-tv" onClick={() => window.location.reload()}><RefreshCw size={15} />Tentar de novo</button></div>}
+    {loading && <div className="video-grid" style={{ marginTop: 22 }}>{Array.from({ length: 5 }).map((_, index) => <div className="skeleton" style={{ aspectRatio: '2/3' }} key={index} />)}</div>}
+    {error && <div className="notice notice-orange" role="alert" style={{ marginTop: 22 }}><CircleAlert size={17} color="#ff8275" /><span>{error}</span><button className="quiet-button focus-tv" onClick={() => window.location.reload()}><RefreshCw size={15} />Tentar de novo</button></div>}
     
-    {!loading && !error && <section className="shelf" style={{ marginTop: 22 }}>
-      <div className="shelf-heading"><h2 className="section-title">{genre}</h2><div className="section-rule" /><span>{filtered.length.toString().padStart(2, '0')} canais</span></div>
-      {filtered.length ? <div className="video-grid">{filtered.map((video) => <Poster key={video.id} video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} subtitle="Transmissão ao vivo" />)}</div> : <div className="empty-state"><Radio size={25} /><h3>Nenhum canal encontrado</h3><p>Tente buscar por outro nome ou limpe os filtros.</p></div>}
-    </section>}
+    {!loading && !error && <div style={{ marginTop: 22 }}>
+      
+      {/* SE O USUÁRIO PESQUISOU OU CLICOU NO MENU, MOSTRA TUDO JUNTO */}
+      {isFiltering ? (
+        <section className="shelf">
+          <div className="shelf-heading"><h2 className="section-title">{genre}</h2><div className="section-rule" /><span>{filtered.length.toString().padStart(2, '0')} canais</span></div>
+          {filtered.length ? <div className="video-grid">{filtered.map((video) => <Poster key={video.id} video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} subtitle="Transmissão ao vivo" />)}</div> : <div className="empty-state"><Radio size={25} /><h3>Nenhum canal encontrado</h3><p>Tente buscar por outro nome ou limpe os filtros.</p></div>}
+        </section>
+      ) : (
+        <>
+          {/* FILEIRAS MANUAIS: Criadas no "Layout" para poder organizar com Segurar e Arrastar */}
+          {liveLayouts.map(item => {
+            const rowVideos = resolveVideosByIds(liveChannels, item.config?.video_ids);
+            if (!rowVideos.length) return null;
+            return (
+              <section className="shelf" key={item.id} style={{ marginBottom: 36 }}>
+                <div className="shelf-heading"><h2 className="section-title">{item.titulo || 'Canais em Destaque'}</h2><div className="section-rule" /></div>
+                <div className="video-grid">{rowVideos.map(video => <Poster key={video.id} video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} subtitle="Transmissão ao vivo" />)}</div>
+              </section>
+            );
+          })}
+
+          {/* FILEIRAS AUTOMÁTICAS: Agrupadas pelo que você escreveu no campo Categoria */}
+          {Object.entries(autoCategories).sort((a, b) => a[0].localeCompare(b[0])).map(([catName, vids]) => (
+            <section className="shelf" key={catName} style={{ marginBottom: 36 }}>
+              <div className="shelf-heading"><h2 className="section-title">{catName}</h2><div className="section-rule" /></div>
+              <div className="video-grid">{vids.map(video => <Poster key={video.id} video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} subtitle="Transmissão ao vivo" />)}</div>
+            </section>
+          ))}
+
+          {!liveLayouts.length && Object.keys(autoCategories).length === 0 && (
+            <div className="empty-state"><Radio size={25} /><h3>Nenhum canal encontrado</h3><p>Os canais aparecerão aqui quando cadastrados.</p></div>
+          )}
+        </>
+      )}
+    </div>}
   </div>;
 }
 
@@ -764,6 +824,8 @@ function CatalogPage() {
       <div className="video-grid">{continuarAssistindo.filter((item) => item.videos).map((item) => <ContinueCard key={item.id} item={item} onOpen={() => openVideo(item.video_id)} />)}</div>
     </section>}
     {!loading && !error && shelf === 'Início' && layout.length > 0 && layout.map((item) => {
+      // PROTEÇÃO: Impede que as fileiras de TV Ao Vivo vazem e apareçam na Home Page!
+      if (item.tipo === 'ao_vivo_fileira') return null;
       if (item.tipo === 'series') return renderSeriesSection(item.id);
       if (item.tipo === 'colecao' && item.colecao_id) return renderColecaoSection(item.colecao_id, item.id);
       if (item.tipo === 'catalogo_geral') return renderCatalogoGeralSection(item.id);
@@ -1243,7 +1305,10 @@ function AdminPage() {
   const [novoEpisodioDescricao, setNovoEpisodioDescricao] = useState('');
   const [layoutItems, setLayoutItems] = useState<LayoutItem[]>([]);
   const [dragLayoutIndex, setDragLayoutIndex] = useState<number | null>(null);
+  
+  // ATUALIZADO: Tipo padrão alterado para carrossel (segurança)
   const [novaSecaoTipo, setNovaSecaoTipo] = useState<LayoutItem['tipo']>('carrossel');
+  
   const [novaSecaoTitulo, setNovaSecaoTitulo] = useState('');
   const [novaSecaoNome, setNovaSecaoNome] = useState('');
   const [novaSecaoValor, setNovaSecaoValor] = useState('');
@@ -1521,7 +1586,10 @@ function AdminPage() {
   }
 
   async function loadLayout() { try { setLayoutItems(await fetchCatalogoLayout()); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao carregar layout.'); } }
+  
+  // ATUALIZADO: Mostra o nome correto na lista
   function labelForLayoutItem(item: LayoutItem) {
+    if (item.tipo === 'ao_vivo_fileira') return item.titulo || 'Fileira TV Ao Vivo';
     if (item.tipo === 'series') return 'Séries';
     if (item.tipo === 'catalogo_geral') return 'Catálogo geral';
     if (item.tipo === 'colecao') return item.colecoes?.titulo || 'Coleção';
@@ -1533,7 +1601,10 @@ function AdminPage() {
     if (item.tipo === 'ao_vivo') return item.titulo || 'Ao vivo';
     return 'Seção';
   }
-  function podeGerenciarVideosDaSecao(tipo: LayoutItem['tipo']) { return tipo === 'hero' || tipo === 'carrossel' || tipo === 'top10'; }
+  
+  // ATUALIZADO: Permite que o construtor gerencie a ordem dos vídeos (Arrastar e Soltar) para a TV Ao Vivo
+  function podeGerenciarVideosDaSecao(tipo: LayoutItem['tipo']) { return tipo === 'hero' || tipo === 'carrossel' || tipo === 'top10' || tipo === 'ao_vivo_fileira'; }
+  
   function podeApagarSecao(tipo: LayoutItem['tipo']) { return tipo !== 'series' && tipo !== 'catalogo_geral' && tipo !== 'colecao'; }
   function handleLayoutDragStart(index: number) { setDragLayoutIndex(index); }
   function handleLayoutDragOver(event: DragEvent) { event.preventDefault(); }
@@ -1567,7 +1638,7 @@ function AdminPage() {
       const config: LayoutSectionConfig = {};
       if (novaSecaoTipo === 'elenco') config.nome = novaSecaoNome.trim();
       if (novaSecaoTipo === 'categoria') config.valor = novaSecaoValor.trim();
-      if (novaSecaoTipo === 'hero' || novaSecaoTipo === 'carrossel' || novaSecaoTipo === 'top10') config.video_ids = [];
+      if (novaSecaoTipo === 'hero' || novaSecaoTipo === 'carrossel' || novaSecaoTipo === 'top10' || novaSecaoTipo === 'ao_vivo_fileira') config.video_ids = [];
       await adminCreateLayoutSection({ tipo: novaSecaoTipo, titulo: novaSecaoTitulo.trim() || undefined, config });
       setNovaSecaoTitulo('');
       setNovaSecaoNome('');
@@ -1852,7 +1923,7 @@ function AdminPage() {
 
     {tab === 'layout' && <section className="panel panel-pad">
       <div className="eyebrow">Aparência</div><h2 className="panel-title" style={{ marginTop: 8 }}>Construtor de Catálogo</h2>
-      <p className="muted" style={{ marginBottom: 16 }}>A ordem destas seções define como os usuários veem a tela "Início".</p>
+      <p className="muted" style={{ marginBottom: 16 }}>A ordem destas seções define como os usuários veem as fileiras.</p>
       <div className="field"><label>Nova Seção</label><select className="input focus-tv" value={novaSecaoTipo} onChange={(e) => setNovaSecaoTipo(e.target.value as LayoutItem['tipo'])}>{LAYOUT_SECTION_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
       <div className="field"><label>Título da Seção (Opcional)</label><input className="input focus-tv" value={novaSecaoTitulo} onChange={(e) => setNovaSecaoTitulo(e.target.value)} placeholder="Ex.: Lançamentos da Semana" /></div>
       {novaSecaoTipo === 'elenco' && <div className="field"><label>Nome do Ator/Diretor</label><input className="input focus-tv" value={novaSecaoNome} onChange={(e) => setNovaSecaoNome(e.target.value)} placeholder="Ex.: Wagner Moura" /></div>}
