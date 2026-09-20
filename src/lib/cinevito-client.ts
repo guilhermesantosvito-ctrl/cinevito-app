@@ -707,3 +707,19 @@ export async function fetchMySubscription(): Promise<MinhaAssinatura | null> {
   );
   return rows[0] || null;
 }
+
+// ================= CONTADOR DE VISUALIZAÇÕES =================
+
+export async function registrarVisualizacao(videoId: string) {
+  if (!hasRuntimeConfig) return;
+  try {
+    await request('/rest/v1/rpc/incrementar_visualizacao', {
+      method: 'POST',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ video_id: videoId }),
+    });
+  } catch (error) {
+    // Ignora o erro silenciosamente para não travar o site do usuário
+    console.error('Erro no contador:', error);
+  }
+}
