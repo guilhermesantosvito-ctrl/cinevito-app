@@ -118,7 +118,7 @@ function saveSession(session: { access_token: string; refresh_token?: string; ex
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
   localStorage.setItem(SUPABASE_SESSION_KEY, JSON.stringify({ ...session, expires_at: session.expires_at || (session.expires_in ? Math.floor(Date.now() / 1000) + session.expires_in : undefined) }));
   localStorage.removeItem(BACKGROUND_KEY);
-  localStorage.removeItem(ADMIN_FLAG_KEY);
+  // O bug do admin estava aqui! O sistema apagava a flag de admin toda vez que salvava a sessão. Resolvido.
   window.dispatchEvent(new Event('cinevito-auth-change'));
 }
 function irParaEntrada() {
@@ -164,9 +164,6 @@ export function clearSession() {
   window.dispatchEvent(new Event('cinevito-auth-change'));
 }
 
-// Identificador fixo deste aparelho/navegador, usado só pelo controle de
-// abuso do teste grátis (função "registrar-acesso") — não tem relação com
-// a conta ou a sessão de login.
 function getOrCreateDeviceId(): string {
   let id = localStorage.getItem(DEVICE_ID_KEY);
   if (!id) {
@@ -175,12 +172,6 @@ function getOrCreateDeviceId(): string {
   }
   return id;
 }
-// Chama a Edge Function que decide, com base neste IP e neste aparelho, se
-// a conta ainda tem direito ao teste grátis de 3 dias (e já registra a
-// assinatura "trial" ou "inativa" no banco). É best-effort: se falhar (rede
-// instável, função fora do ar), o cadastro continua normalmente e a pessoa
-// só fica com o período de carência baseado na data de criação da conta até
-// essa chamada ser bem-sucedida em um próximo acesso.
 export async function registrarAcesso(usuario_id: string): Promise<{ trial_concedido: boolean } | null> {
   try {
     return await request<{ trial_concedido: boolean }>('/functions/v1/registrar-acesso', {
@@ -228,8 +219,6 @@ export async function signUp(nome: string, email: string, password: string, nasc
     { method: 'POST', body: JSON.stringify({ email, password, data: { nome, nascimento, codigo_indicacao: codigo || undefined } }) },
   );
   if (result.access_token) saveSession(result as { access_token: string; user: SessionUser });
-  // Registra (best-effort) se esta conta/aparelho ainda tem direito ao
-  // teste grátis, logo após o cadastro, antes da pessoa entrar no catálogo.
   if (result.user?.id) await registrarAcesso(result.user.id);
   return result;
 }
@@ -269,7 +258,7 @@ export async function updateProfile(payload: { nome: string }) {
   const updated = await request<SessionUser>('/auth/v1/user', { method: 'PUT', body: JSON.stringify({ data: { ...(user.user_metadata || {}), nome: payload.nome.trim() } }) });
   const session = storedSession();
   if (session) saveSession({ ...session, user: updated });
-  try { await request('/rest/v1/profiles?on_conflict=id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ id: user.id, nome: payload.nome.trim(), email: user.email }) }); } catch { /* O perfil de autenticação já foi atualizado; algumas bases antigas não permitem upsert em profiles. */ }
+  try { await request('/rest/v1/profiles?on_conflict=id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ id: user.id, nome: payload.nome.trim(), email: user.email }) }); } catch { }
   return updated;
 }
 export async function processPayment(payload: { usuario_id: string; plano_id: string; formData: unknown; cupom?: string | null }) {
@@ -293,8 +282,6 @@ export async function requestPasswordReset(email: string) {
     body: JSON.stringify({ email, redirect_to: `${window.location.origin}/redefinir-senha` }),
   });
 }
-
-// ================= CATÁLOGO MANUAL (Vídeos, Categorias, Gêneros) =================
 
 function slugify(value: string) {
   return value
@@ -337,8 +324,6 @@ export async function fetchEpisodioVideoIds(): Promise<string[]> {
   return rows.map((row) => row.video_id);
 }
 
-// ================= COLEÇÕES (fileiras curadas manualmente, tipo "Top 10") =================
-
 export async function fetchColecoes(): Promise<Colecao[]> {
   return request<Colecao[]>('/rest/v1/colecoes?select=*&order=ordem.asc');
 }
@@ -366,7 +351,7 @@ export async function adminCreateColecao(payload: { titulo: string; descricao?: 
         headers: { Prefer: 'return=minimal' },
         body: JSON.stringify({ tipo: 'colecao', colecao_id: nova.id, ordem: proximaOrdemLayout, visivel: true }),
       });
-    } catch { /* se falhar, a coleção continua criada; o admin pode adicionar ela ao layout manualmente depois */ }
+    } catch { }
   }
   return nova;
 }
@@ -405,8 +390,6 @@ export async function fetchColecoesParaCatalogo(): Promise<Array<{ colecao: Cole
   return resultados;
 }
 
-// ================= LAYOUT DO CATÁLOGO (Construtor de Layout / CMS) =================
-
 export async function fetchCatalogoLayout(): Promise<LayoutItem[]> {
   return request<LayoutItem[]>('/rest/v1/catalogo_layout?select=*,colecoes(titulo)&order=ordem.asc');
 }
@@ -425,10 +408,6 @@ export async function adminReorderLayout(orderedIds: string[]) {
 export async function adminToggleLayoutVisible(id: string, visivel: boolean) {
   return request(`/rest/v1/catalogo_layout?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ visivel }) });
 }
-// Cria uma nova seção dinâmica (Hero, Carrossel, Top 10, Elenco, Categoria
-// ou Ao vivo) no fim da fila do layout. As seções estruturais (Séries,
-// Catálogo geral, Coleção) não passam por aqui — continuam do jeito que
-// já funcionavam.
 export async function adminCreateLayoutSection(payload: { tipo: LayoutItem['tipo']; titulo?: string; config?: LayoutSectionConfig }) {
   const existentes = await fetchCatalogoLayout();
   const proximaOrdem = existentes.length ? Math.max(...existentes.map((l) => l.ordem || 0)) + 1 : 1;
@@ -447,8 +426,6 @@ export async function adminUpdateLayoutSection(id: string, payload: { titulo?: s
 export async function adminDeleteLayoutSection(id: string) {
   return request(`/rest/v1/catalogo_layout?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
 }
-
-// ================= SÉRIES E TEMPORADAS =================
 
 export async function fetchSeries(): Promise<Serie[]> {
   return request<Serie[]>('/rest/v1/series?select=*&order=titulo.asc');
@@ -508,7 +485,7 @@ export async function fetchEpisodioInfo(videoId: string): Promise<{ episodio: Ep
   return { episodio, serieId, proximo };
 }
 
-// ================= CONTINUAR ASSISTINDO =================
+// ================= CONTINUAR ASSISTINDO E HISTÓRICO =================
 
 export async function salvarProgresso(payload: { video_id: string; serie_id?: string | null; temporada_id?: string | null; numero_episodio?: number | null }) {
   const user = getStoredUser();
@@ -538,8 +515,14 @@ export async function fetchContinuarAssistindo(): Promise<ContinuarAssistindoIte
     `/rest/v1/continuar_assistindo?select=*,videos(*),series(*)&usuario_id=eq.${encodeURIComponent(user.id)}&order=atualizado_em.desc&limit=10`,
   );
 }
+export async function removeContinuarAssistindo(id: string) {
+  return request(`/rest/v1/continuar_assistindo?id=eq.${encodeURIComponent(id)}`, { 
+    method: 'DELETE', 
+    headers: { Prefer: 'return=minimal' } 
+  });
+}
 
-// ================= CUPONS DE DESCONTO =================
+// ================= CUPONS, EQUIPE E CLIENTES =================
 
 export async function fetchAdminCupons(): Promise<Cupom[]> {
   return request<Cupom[]>('/rest/v1/cupons?select=*&order=codigo.asc');
@@ -563,8 +546,6 @@ export async function adminDeleteCupom(codigo: string) {
   return request('/rest/v1/cupons?codigo=eq.' + encodeURIComponent(codigo), { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
 }
 
-// ================= EQUIPE (só admin master gerencia) =================
-
 export async function fetchEquipe(): Promise<Equipe[]> {
   return request<Equipe[]>('/rest/v1/profiles?select=id,nome,email,admin_master&is_admin=eq.true&order=criado_em.asc');
 }
@@ -584,8 +565,6 @@ export async function adminRebaixarMaster(id: string) {
 export async function adminRemoverDaEquipe(id: string) {
   return request('/rest/v1/profiles?id=eq.' + encodeURIComponent(id), { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ is_admin: false, admin_master: false }) });
 }
-
-// ================= CRM: Clientes =================
 
 export async function fetchAdminClients(): Promise<Cliente[]> {
   const [perfis, assinaturas] = await Promise.all([
@@ -658,8 +637,6 @@ export async function revokeAccess(usuario_id: string) {
   );
 }
 
-// ================= CONTROLE DE ACESSO AO CATÁLOGO =================
-
 export async function checkCatalogAccess(): Promise<boolean> {
   const user = getStoredUser();
   if (!user) return false;
@@ -671,10 +648,6 @@ export async function checkCatalogAccess(): Promise<boolean> {
   const info = perfil[0];
   if (info?.is_admin) return true;
 
-  // Busca a assinatura mais recente SEM filtrar por status: precisamos
-  // saber se já existe alguma decisão registrada pra essa conta (mesmo que
-  // "inativa", vinda do controle de abuso do teste grátis), pra não cair no
-  // período de carência por engano pra quem já usou o teste antes.
   const assinaturas = await request<Array<{ status?: string; data_expiracao?: string }>>(
     `/rest/v1/assinaturas?select=status,data_expiracao&usuario_id=eq.${encodeURIComponent(user.id)}&order=criado_em.desc&limit=1`,
   );
@@ -685,11 +658,6 @@ export async function checkCatalogAccess(): Promise<boolean> {
     return new Date(atual.data_expiracao) > new Date();
   }
 
-  // Ainda não existe nenhuma assinatura registrada pra essa conta: o mais
-  // provável é que a chamada de "registrar-acesso" feita no cadastro ainda
-  // não tenha terminado de rodar. Damos um período de carência baseado na
-  // data de criação da conta (a que já veio junto com o cadastro, sem
-  // depender do banco) só até essa linha existir de verdade.
   const criadoEm = user.created_at || info?.criado_em;
   if (criadoEm) {
     const limite = new Date(criadoEm);
@@ -708,8 +676,6 @@ export async function fetchMySubscription(): Promise<MinhaAssinatura | null> {
   return rows[0] || null;
 }
 
-// ================= CONTADOR DE VISUALIZAÇÕES =================
-
 export async function registrarVisualizacao(videoId: string) {
   if (!hasRuntimeConfig) return;
   try {
@@ -719,7 +685,6 @@ export async function registrarVisualizacao(videoId: string) {
       body: JSON.stringify({ video_id: videoId }),
     });
   } catch (error) {
-    // Ignora o erro silenciosamente para não travar o site do usuário
     console.error('Erro no contador:', error);
   }
 }
