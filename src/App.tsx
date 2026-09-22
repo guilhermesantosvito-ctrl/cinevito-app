@@ -14,7 +14,7 @@ import {
   adminAddEpisodio, adminAddToEquipe, adminAddVideoToColecao, adminCreateCategoria, adminCreateColecao, adminCreateCupom, adminCreateGenero, adminCreateLayoutSection, adminCreatePlano, adminCreateSerie, adminCreateTemporada, adminCreateVideo,
   adminDeleteColecao, adminDeleteCupom, adminDeleteLayoutSection, adminDeletePlano, adminDeleteSerie, adminDeleteTemporada, adminDeleteVideo, adminPromoverMaster, adminRebaixarMaster, adminRemoveEpisodio, adminRemoveVideoFromColecao, adminRemoverDaEquipe, adminReorderColecaoVideos, adminReorderLayout, adminToggleCupom, adminToggleLayoutVisible, adminUpdateLayoutSection, adminUpdatePlano, adminUpdateVideo,
   checkCatalogAccess, clearSession, fetchAdminClients, fetchAdminCupons, fetchAdminPlans, fetchAdminVideos, fetchCategorias, fetchCatalogoLayout, fetchCatalogoLayoutPublico, fetchColecaoVideos, fetchColecoes, fetchColecoesParaCatalogo, fetchContinuarAssistindo, fetchEpisodioInfo, fetchEpisodioVideoIds, fetchEpisodios, fetchEquipe, fetchGenerosList, fetchMySubscription, fetchPlans, fetchProfile, fetchSerieCompleta, fetchSeries, fetchTemporadas, fetchVideos, getAccessToken, getStoredUser, grantAccess, hasRuntimeConfig,
-  processPayment, requestPasswordReset, revokeAccess, salvarProgresso, signIn, signUp, submitSuggestion, updatePlanActive, registrarVisualizacao, type Categoria, type Cliente, type Colecao, type ContinuarAssistindoItem, type Cupom, type Episodio, type Equipe, type Genero, type LayoutItem, type LayoutSectionConfig, type MinhaAssinatura, type Plan, type SessionUser, type Serie, type Temporada, type Video,
+  processPayment, requestPasswordReset, revokeAccess, salvarProgresso, signIn, signUp, submitSuggestion, updatePlanActive, registrarVisualizacao, removeContinuarAssistindo, type Categoria, type Cliente, type Colecao, type ContinuarAssistindoItem, type Cupom, type Episodio, type Equipe, type Genero, type LayoutItem, type LayoutSectionConfig, type MinhaAssinatura, type Plan, type SessionUser, type Serie, type Temporada, type Video,
 } from '@/lib/cinevito-client';
 
 import { UserUploadPage } from './pages/user-upload';
@@ -24,10 +24,9 @@ import '@/index.css';
 const queryClient = new QueryClient();
 const MP_PUBLIC_KEY = 'APP_USR-471c3a9b-ff0f-4743-a417-e54b9f13e902';
 const fallbackShelves = ['Início', 'Filmes Clássicos', 'Documentários', 'Curtas-Metragens'];
-const genres = ['Todos os gêneros', 'Ação', 'Aventura', 'Comédia', 'Documentário', 'Drama', 'Natureza', 'Terror'];
 const CATALOG_REFRESH_INTERVAL_MS = 3 * 60 * 1000;
 
-// BLINDAGEM TYPESCRIPT APLICADA AQUI (as any)
+// BLINDAGEM TYPESCRIPT
 const LAYOUT_SECTION_TYPES: Array<{ value: LayoutItem['tipo']; label: string }> = [
   { value: 'hero', label: 'Início: Banner Hero (destaque rotativo no topo)' },
   { value: 'carrossel', label: 'Início: Carrossel horizontal padrão' },
@@ -38,12 +37,7 @@ const LAYOUT_SECTION_TYPES: Array<{ value: LayoutItem['tipo']; label: string }> 
 ];
 
 function normalizeCatalogLabel(value: string | null | undefined) {
-  return (value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
+  return (value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
 function videoBelongsToShelf(video: Video, shelf: string) {
@@ -93,9 +87,7 @@ function useCatalogAccess(user: SessionUser | null) {
     if (!user) { setAccess(false); return; }
     let cancelled = false;
     setAccess(null);
-    checkCatalogAccess()
-      .then((value) => { if (!cancelled) setAccess(value); })
-      .catch(() => { if (!cancelled) setAccess(false); });
+    checkCatalogAccess().then((value) => { if (!cancelled) setAccess(value); }).catch(() => { if (!cancelled) setAccess(false); });
     return () => { cancelled = true; };
   }, [user?.id]);
   return access;
@@ -155,13 +147,12 @@ function useEpisodioVideoIds() {
 
 function useContinuarAssistindo(user: SessionUser | null) {
   const [items, setItems] = useState<ContinuarAssistindoItem[]>([]);
-  useEffect(() => {
+  const carregar = () => {
     if (!user || !hasRuntimeConfig) { setItems([]); return; }
-    let cancelled = false;
-    fetchContinuarAssistindo().then((data) => { if (!cancelled) setItems(data); }).catch(() => { if (!cancelled) setItems([]); });
-    return () => { cancelled = true; };
-  }, [user?.id]);
-  return items;
+    fetchContinuarAssistindo().then(setItems).catch(() => setItems([]));
+  };
+  useEffect(() => { carregar(); }, [user?.id]);
+  return { items, recarregar: carregar };
 }
 
 function extractVideoUrl(input: string): string {
@@ -206,7 +197,6 @@ function getEmbedInfo(url?: string | null): { type: 'file' | 'embed' | 'none'; s
 }
 
 type PlataformaInstalacao = 'ios' | 'android' | 'desktop' | 'tv';
-
 function detectarPlataformaInstalacao(): PlataformaInstalacao {
   const ua = navigator.userAgent.toLowerCase();
   const ehTV = /smarttv|smart-tv|googletv|appletv|hbbtv|netcast|viera|aquos|bravia|tizen|web0s|webos|crkey|roku|firetv|aft\b/i.test(ua);
@@ -253,7 +243,7 @@ function useInstallPrompt(user: SessionUser | null) {
   async function install() {
     if (!deferredEvent) return;
     deferredEvent.prompt();
-    try { await deferredEvent.userChoice; } catch { /* ignore */ }
+    try { await deferredEvent.userChoice; } catch { }
     setDeferredEvent(null);
     setVisible(false);
   }
@@ -261,7 +251,6 @@ function useInstallPrompt(user: SessionUser | null) {
 }
 
 type InstallStep = { icon: typeof Share2; title: string; description: string };
-
 function stepsForPlatform(platform: PlataformaInstalacao): InstallStep[] {
   if (platform === 'ios') {
     return [
@@ -281,7 +270,6 @@ function ehChromeAndroid(): boolean {
   if (!/android/.test(ua)) return false;
   return /chrome\//.test(ua) && !/edg\//.test(ua) && !/opr\//.test(ua) && !/samsungbrowser\//.test(ua) && !/firefox\//.test(ua) && !/; wv\)/.test(ua);
 }
-
 function abrirNoChrome() {
   const semProtocolo = window.location.href.replace(/^https?:\/\//, '');
   window.location.href = `intent://${semProtocolo}#Intent;scheme=https;package=com.android.chrome;end`;
@@ -294,31 +282,20 @@ function InstallInstructionsModal({ platform, onClose }: { platform: PlataformaI
     <div role="dialog" aria-modal="true" aria-label="Como instalar o CineVito" onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(6,9,14,.72)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 0 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: '#0f141c', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, padding: '22px 20px 26px', boxShadow: '0 -8px 40px rgba(0,0,0,.5)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Clapperboard size={20} />
-            <strong style={{ fontSize: '1.05rem' }}>Como instalar o CineVito</strong>
-          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Clapperboard size={20} /><strong style={{ fontSize: '1.05rem' }}>Como instalar o CineVito</strong></div>
           <button onClick={onClose} className="icon-button focus-tv" aria-label="Fechar instruções"><X size={18} /></button>
         </div>
         <p className="muted" style={{ fontSize: '.83rem', marginTop: 6, marginBottom: mostrarBotaoChrome ? 12 : 20 }}>
           {platform === 'ios' ? 'Leva só alguns segundos.' : 'Seu navegador não suporta instalação direta, mas você pode salvar na tela inicial com estes passos rápidos:'}
         </p>
         {mostrarBotaoChrome && (
-          <div className="notice notice-cyan" style={{ marginBottom: 20 }}>
-            <Info size={16} />
-            <span>Você não está no Chrome. <button onClick={abrirNoChrome} style={{ background: 'none', border: 'none', textDecoration: 'underline', color: '#00c8ff', cursor: 'pointer', padding: 0, font: 'inherit' }}>Toque aqui pra abrir no Chrome</button>.</span>
-          </div>
+          <div className="notice notice-cyan" style={{ marginBottom: 20 }}><Info size={16} /><span>Você não está no Chrome. <button onClick={abrirNoChrome} style={{ background: 'none', border: 'none', textDecoration: 'underline', color: '#00c8ff', cursor: 'pointer', padding: 0, font: 'inherit' }}>Toque aqui pra abrir no Chrome</button>.</span></div>
         )}
         <div style={{ display: 'grid', gap: 16 }}>
           {steps.map((step, index) => (
             <div key={step.title} style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-              <div style={{ width: 38, height: 38, borderRadius: 12, background: 'linear-gradient(145deg, #ff8228, #2ec4b6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#0b0e14' }}>
-                <step.icon size={19} />
-              </div>
-              <div>
-                <strong style={{ fontSize: '.92rem', display: 'block' }}>{index + 1}. {step.title}</strong>
-                <span className="muted" style={{ fontSize: '.82rem', lineHeight: 1.5 }}>{step.description}</span>
-              </div>
+              <div style={{ width: 38, height: 38, borderRadius: 12, background: 'linear-gradient(145deg, #ff8228, #2ec4b6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#0b0e14' }}><step.icon size={19} /></div>
+              <div><strong style={{ fontSize: '.92rem', display: 'block' }}>{index + 1}. {step.title}</strong><span className="muted" style={{ fontSize: '.82rem', lineHeight: 1.5 }}>{step.description}</span></div>
             </div>
           ))}
         </div>
@@ -335,17 +312,9 @@ function InstallBanner({ user }: { user: SessionUser | null }) {
   return (
     <>
       <div style={{ width: '100%', background: '#0d121a', borderBottom: '1px solid rgba(0,200,255,.18)', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'nowrap', overflow: 'hidden' }}>
-        <div style={{ width: 26, height: 26, borderRadius: 8, background: 'linear-gradient(145deg, #ff8228, #2ec4b6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <Download size={14} color="#0b0e14" />
-        </div>
+        <div style={{ width: 26, height: 26, borderRadius: 8, background: 'linear-gradient(145deg, #ff8228, #2ec4b6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Download size={14} color="#0b0e14" /></div>
         <span style={{ flex: 1, minWidth: 0, fontSize: '.82rem', fontWeight: 500, color: '#dbe2ea', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Instale o CineVito na sua tela inicial</span>
-        <button
-          className="secondary-button focus-tv"
-          style={{ padding: '6px 14px', fontSize: '.78rem', flexShrink: 0 }}
-          onClick={canInstallDirectly ? install : () => setShowInstructions(true)}
-        >
-          {canInstallDirectly ? 'Instalar agora' : 'Como instalar'}
-        </button>
+        <button className="secondary-button focus-tv" style={{ padding: '6px 14px', fontSize: '.78rem', flexShrink: 0 }} onClick={canInstallDirectly ? install : () => setShowInstructions(true)}>{canInstallDirectly ? 'Instalar agora' : 'Como instalar'}</button>
         <button onClick={dismiss} aria-label="Fechar aviso de instalação" className="icon-button focus-tv" style={{ flexShrink: 0 }}><X size={16} /></button>
       </div>
       {showInstructions && <InstallInstructionsModal platform={platform} onClose={() => setShowInstructions(false)} />}
@@ -373,22 +342,15 @@ function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user || !hasRuntimeConfig) { setIsAdmin(false); return; }
     let cancelled = false;
-    fetchProfile()
-      .then((profile) => { if (!cancelled) setIsAdmin(Boolean((profile as { is_admin?: boolean } | null)?.is_admin)); })
-      .catch(() => { if (!cancelled) setIsAdmin(false); });
+    fetchProfile().then((profile) => { if (!cancelled) setIsAdmin(Boolean((profile as { is_admin?: boolean } | null)?.is_admin)); }).catch(() => { if (!cancelled) setIsAdmin(false); });
     return () => { cancelled = true; };
   }, [user]);
   useEffect(() => {
-    if (!user && location !== '/' && location !== '/index.html') {
-      setLocation('/');
-    }
+    if (!user && location !== '/' && location !== '/index.html') setLocation('/');
   }, [user, location]);
   const isHome = location === '/' || location === '/index.html';
   const active = (href: string) => location === href || location === `${href}.html` || (href === '/catalogo' && location.startsWith('/player'));
-  async function logout() {
-    clearSession();
-    setLocation('/');
-  }
+  async function logout() { clearSession(); setLocation('/'); }
   if (isHome) return <>{children}</>;
   return (
     <div className="app-frame">
@@ -417,9 +379,7 @@ function AppShell({ children }: { children: ReactNode }) {
 function AuthPage() {
   const [, setLocation] = useLocation();
   const user = useAuth();
-  useEffect(() => {
-    if (user) setLocation('/catalogo');
-  }, [user]);
+  useEffect(() => { if (user) setLocation('/catalogo'); }, [user]);
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -428,61 +388,35 @@ function AuthPage() {
   const [form, setForm] = useState({ nome: '', email: '', password: '', nascimento: '', codigo: '', lembrar: false });
   useEffect(() => {
     const ref = new URLSearchParams(window.location.search).get('ref');
-    if (ref) {
-      setMode('signup');
-      setForm((current) => ({ ...current, codigo: ref.toUpperCase() }));
-    }
+    if (ref) { setMode('signup'); setForm((current) => ({ ...current, codigo: ref.toUpperCase() })); }
   }, []);
-  function update(field: keyof typeof form, value: string | boolean) {
-    setForm((current) => ({ ...current, [field]: value }));
-    setError('');
-  }
+  function update(field: keyof typeof form, value: string | boolean) { setForm((current) => ({ ...current, [field]: value })); setError(''); }
   async function submit(event: FormEvent) {
     event.preventDefault();
-    setError('');
-    setNotice('');
-    if (!form.email || !form.password || (mode === 'signup' && !form.nome)) {
-      setError('Preencha os campos obrigatórios para continuar.');
-      return;
-    }
+    setError(''); setNotice('');
+    if (!form.email || !form.password || (mode === 'signup' && !form.nome)) { setError('Preencha os campos obrigatórios para continuar.'); return; }
     setBusy(true);
     try {
       if (mode === 'login') {
         if (hasRuntimeConfig) await signIn(form.email, form.password);
-        else {
-          localStorage.setItem('cinevito-demo-user', form.email);
-          window.dispatchEvent(new Event('cinevito-auth-change'));
-        }
+        else { localStorage.setItem('cinevito-demo-user', form.email); window.dispatchEvent(new Event('cinevito-auth-change')); }
         setLocation('/catalogo');
       } else {
         if (hasRuntimeConfig) {
           const result = await signUp(form.nome, form.email, form.password, form.nascimento, form.codigo);
-          if (!result.access_token) {
-            setNotice('Conta criada. Verifique seu e-mail para confirmar o acesso.');
-            setMode('login');
-          } else setLocation('/catalogo');
-        } else {
-          localStorage.setItem('cinevito-demo-user', form.email);
-          window.dispatchEvent(new Event('cinevito-auth-change'));
-          setLocation('/catalogo');
-        }
+          if (!result.access_token) { setNotice('Conta criada. Verifique seu e-mail para confirmar o acesso.'); setMode('login'); } else setLocation('/catalogo');
+        } else { localStorage.setItem('cinevito-demo-user', form.email); window.dispatchEvent(new Event('cinevito-auth-change')); setLocation('/catalogo'); }
       }
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'Não foi possível concluir. Tente novamente.');
-    } finally {
-      setBusy(false);
-    }
+    } finally { setBusy(false); }
   }
   return (
     <div className="home-shell">
       <div className="auth-layout reveal">
         <section className="auth-aside">
           <Brand />
-          <div className="auth-aside-copy">
-            <div className="eyebrow">Cinema brasileiro, do seu jeito</div>
-            <h1>Seu próximo<br /><span>filme.</span></h1>
-            <p>Um catálogo para assistir no celular, no computador ou na sala. Sem pressa, com curadoria e controle sobre a sua sessão.</p>
-          </div>
+          <div className="auth-aside-copy"><div className="eyebrow">Cinema brasileiro, do seu jeito</div><h1>Seu próximo<br /><span>filme.</span></h1><p>Um catálogo para assistir no celular, no computador ou na sala. Sem pressa, com curadoria e controle sobre a sua sessão.</p></div>
           <div className="auth-aside-meta"><i /> PWA para todas as telas</div>
         </section>
         <section className="auth-panel">
@@ -518,13 +452,7 @@ function Poster({ video, favorite, onFavorite, onOpen, subtitle }: { video: Vide
   const tvGradient = { '--poster': 'linear-gradient(145deg, #1e293b, #0f172a 80%)' } as CSSProperties;
   const fallbackGradient = { '--poster': 'linear-gradient(145deg, #0d596c, #172532 50%, #e58d49)' } as CSSProperties;
   const posterStyle = video.url_capa && !video.ao_vivo ? undefined : (video.ao_vivo ? tvGradient : fallbackGradient);
-  const artStyle = video.url_capa ? { 
-    backgroundImage: `url(${video.url_capa})`, 
-    backgroundSize: video.ao_vivo ? '75%' : 'cover', 
-    backgroundPosition: 'center', 
-    backgroundRepeat: 'no-repeat' 
-  } : undefined;
-
+  const artStyle = video.url_capa ? { backgroundImage: `url(${video.url_capa})`, backgroundSize: video.ao_vivo ? '75%' : 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' } : undefined;
   return <article className="video-card reveal" data-testid={`card-video-${video.id}`}><div className="poster focus-tv" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen()} style={posterStyle}><div className="poster-art" style={artStyle}><span className="poster-meta">{video.ao_vivo ? 'AO VIVO' : (video.ano || 'CINEVITO')}</span><strong className="poster-word">{video.titulo}</strong></div>{video.premium && <span className="premium-badge">Premium</span>}<button className={`poster-favorite focus-tv ${favorite ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); onFavorite(); }} aria-label={favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'} data-testid={`button-favorite-${video.id}`}><Heart size={15} fill={favorite ? 'currentColor' : 'none'} /></button></div><div className="video-info"><div><h3 className="video-title" data-testid={`text-video-title-${video.id}`}>{video.titulo}</h3><p className="video-subtitle">{subtitle || video.genero || video.categoria || 'Catálogo CineVito'}</p></div><Play size={14} color="#00c8ff" /></div></article>;
 }
 
@@ -586,17 +514,24 @@ function useVideos() {
   return { videos, loading, error };
 }
 
-function ContinueCard({ item, onOpen }: { item: ContinuarAssistindoItem; onOpen: () => void }) {
+function ContinueCard({ item, onOpen, onRemove }: { item: ContinuarAssistindoItem; onOpen: () => void; onRemove: () => void }) {
   const video = item.videos;
   if (!video) return null;
   const subtitle = item.series ? `${item.series.titulo}${item.numero_episodio ? ` · Ep. ${item.numero_episodio}` : ''}` : undefined;
   const style = video.url_capa ? undefined : ({ '--poster': 'linear-gradient(145deg, #0d596c, #172532 50%, #e58d49)' } as CSSProperties);
-  return <article className="video-card reveal"><div className="poster focus-tv" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen()} style={style}><div className="poster-art" style={video.url_capa ? { backgroundImage: `url(${video.url_capa})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}><span className="poster-meta">CONTINUAR</span><strong className="poster-word">{item.series?.titulo || video.titulo}</strong></div></div><div className="video-info"><div><h3 className="video-title">{item.series?.titulo || video.titulo}</h3><p className="video-subtitle">{subtitle || 'Continuar assistindo'}</p></div><Play size={14} color="#00c8ff" /></div></article>;
+  return <article className="video-card reveal" style={{ position: 'relative' }}>
+    <button onClick={(e) => { e.stopPropagation(); onRemove(); }} style={{ position: 'absolute', top: 6, right: 6, zIndex: 10, background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%', padding: 4, cursor: 'pointer', color: '#fff' }} title="Remover do histórico" aria-label="Remover">
+      <X size={14} />
+    </button>
+    <div className="poster focus-tv" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen()} style={style}>
+      <div className="poster-art" style={video.url_capa ? { backgroundImage: `url(${video.url_capa})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}>
+        <span className="poster-meta">CONTINUAR</span><strong className="poster-word">{item.series?.titulo || video.titulo}</strong>
+      </div>
+    </div>
+    <div className="video-info"><div><h3 className="video-title">{item.series?.titulo || video.titulo}</h3><p className="video-subtitle">{subtitle || 'Continuar assistindo'}</p></div><Play size={14} color="#00c8ff" /></div>
+  </article>;
 }
 
-// ============================================================================
-// TV AO VIVO - ATUALIZADA COM GRUPOS E LAYOUT CUSTOMIZADO (BLINDAGEM TYPESCRIPT)
-// ============================================================================
 function LiveTVPage() {
   const [, setLocation] = useLocation();
   const user = useAuth();
@@ -604,70 +539,63 @@ function LiveTVPage() {
   const { videos, loading, error } = useVideos();
   const layout = useCatalogLayoutPublico();
   
-  const [genre, setGenre] = useState('Todos os canais');
+  const [genre, setGenre] = useState('Todos');
   const [query, setQuery] = useState('');
   const [favorites, setFavorites] = useState<string[]>(() => JSON.parse(localStorage.getItem('cinevito-favorites') || '[]'));
 
   const liveChannels = useMemo(() => videos.filter(v => v.ao_vivo), [videos]);
-  
   const liveLayouts = useMemo(() => layout.filter(l => l.tipo === ('ao_vivo_fileira' as any) && l.visivel), [layout]);
 
-  const genres = useMemo(() => {
-    const list = new Set(liveChannels.map(v => v.genero).filter(Boolean) as string[]);
-    return ['Todos os canais', ...Array.from(list)];
+  // Cria a lista de Categorias Reais (Esportes, Notícias, etc) dinamicamente
+  const categories = useMemo(() => {
+    const list = new Set(liveChannels.map(v => v.categoria || 'Canais').filter(Boolean));
+    return ['Todos', ...Array.from(list)];
   }, [liveChannels]);
 
   const filtered = useMemo(() => liveChannels.filter((video) => {
     const text = `${video.titulo} ${video.descricao || ''} ${video.genero || ''}`.toLowerCase();
-    const selectedGenre = normalizeCatalogLabel(genre);
-    const videoGenre = normalizeCatalogLabel(video.genero);
-    return (!query || text.includes(query.toLowerCase()))
-      && (genre === 'Todos os canais' || videoGenre === selectedGenre || videoGenre.includes(selectedGenre));
+    const selectedCategory = normalizeCatalogLabel(genre);
+    const videoCategory = normalizeCatalogLabel(video.categoria || 'Canais');
+    const matchesSearch = !query || text.includes(query.toLowerCase());
+    return matchesSearch && (genre === 'Todos' || videoCategory === selectedCategory);
   }), [liveChannels, query, genre]);
 
-  const layoutTitles = useMemo(() => new Set(liveLayouts.map(l => normalizeCatalogLabel(l.titulo))), [liveLayouts]);
   const autoCategories = useMemo(() => {
     const groups: Record<string, Video[]> = {};
     liveChannels.forEach(v => {
       const cat = v.categoria || 'Canais';
-      if (layoutTitles.has(normalizeCatalogLabel(cat))) return; 
       if (!groups[cat]) groups[cat] = [];
       groups[cat].push(v);
     });
     return groups;
-  }, [liveChannels, layoutTitles]);
+  }, [liveChannels]);
 
   function toggleFavorite(id: string) {
     const next = favorites.includes(id) ? favorites.filter((value) => value !== id) : [...favorites, id];
     setFavorites(next);
     localStorage.setItem('cinevito-favorites', JSON.stringify(next));
   }
-  function openVideo(id: string) {
-    setLocation(access ? `/player/${id}` : '/assinatura');
-  }
-
-  const isFiltering = query.length > 0 || genre !== 'Todos os canais';
+  function openVideo(id: string) { setLocation(access ? `/player/${id}` : '/assinatura'); }
 
   return <div className="content-wrap page-main">
     <PageHeader eyebrow="Programação 24h" title="TV Ao Vivo" description="Canais de esportes, notícias e entretenimento rodando sem parar." />
     {!user && <div className="notice notice-orange"><CircleAlert size={17} color="#ff8228" /><span><strong>Você está navegando como visitante.</strong> Entre para salvar canais favoritos.</span><Link href="/" className="quiet-button focus-tv">Entrar</Link></div>}
     {user && access === false && <div className="notice notice-orange"><CircleAlert size={17} color="#ff8228" /><span><strong>Seu acesso gratuito acabou.</strong> Assine um plano para continuar assistindo.</span><Link href="/assinatura" className="quiet-button focus-tv">Ver planos</Link></div>}
     
-    <div className="catalog-toolbar">
-      <div className="search-wrap"><Search size={16} /><input className="input focus-tv" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar canal..." aria-label="Buscar canal" /></div>
-    </div>
+    <div className="catalog-toolbar"><div className="search-wrap"><Search size={16} /><input className="input focus-tv" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar canal..." aria-label="Buscar canal" /></div></div>
     
-    {genres.length > 1 && <div className="chip-row" aria-label="Filtrar por gênero">{genres.map((item) => <button key={item} className={`chip focus-tv ${genre === item ? 'active' : ''}`} onClick={() => setGenre(item)}>{item}</button>)}</div>}
+    {categories.length > 1 && <div className="chip-row no-scrollbar" aria-label="Filtrar por categoria" style={{ display: 'flex', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 8 }}>
+      {categories.map((item) => <button key={item} className={`chip focus-tv ${genre === item ? 'active' : ''}`} style={{ flexShrink: 0 }} onClick={() => setGenre(item)}>{item}</button>)}
+    </div>}
     
     {loading && <div className="video-grid" style={{ marginTop: 22 }}>{Array.from({ length: 5 }).map((_, index) => <div className="skeleton" style={{ aspectRatio: '2/3' }} key={index} />)}</div>}
     {error && <div className="notice notice-orange" role="alert" style={{ marginTop: 22 }}><CircleAlert size={17} color="#ff8275" /><span>{error}</span><button className="quiet-button focus-tv" onClick={() => window.location.reload()}><RefreshCw size={15} />Tentar de novo</button></div>}
     
     {!loading && !error && <div style={{ marginTop: 22 }}>
-      
-      {isFiltering ? (
+      {query || genre !== 'Todos' ? (
         <section className="shelf">
-          <div className="shelf-heading"><h2 className="section-title">{genre}</h2><div className="section-rule" /><span>{filtered.length.toString().padStart(2, '0')} canais</span></div>
-          {filtered.length ? <div className="video-grid">{filtered.map((video) => <Poster key={video.id} video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} subtitle="Transmissão ao vivo" />)}</div> : <div className="empty-state"><Radio size={25} /><h3>Nenhum canal encontrado</h3><p>Tente buscar por outro nome ou limpe os filtros.</p></div>}
+          <div className="shelf-heading"><h2 className="section-title">{query ? 'Resultados' : genre}</h2><div className="section-rule" /><span>{filtered.length.toString().padStart(2, '0')} canais</span></div>
+          {filtered.length ? <div className="video-grid">{filtered.map((video) => <Poster key={video.id} video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} subtitle="Transmissão ao vivo" />)}</div> : <div className="empty-state"><Radio size={25} /><h3>Nenhum canal encontrado</h3></div>}
         </section>
       ) : (
         <>
@@ -677,21 +605,21 @@ function LiveTVPage() {
             return (
               <section className="shelf" key={item.id} style={{ marginBottom: 36 }}>
                 <div className="shelf-heading"><h2 className="section-title">{item.titulo || 'Canais em Destaque'}</h2><div className="section-rule" /></div>
-                <div className="video-grid">{rowVideos.map(video => <Poster key={video.id} video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} subtitle="Transmissão ao vivo" />)}</div>
+                <div className="video-grid horizontal-scroll" style={{ display: 'flex', overflowX: 'auto', gap: 16, paddingBottom: 16, scrollSnapType: 'x mandatory' }}>
+                  {rowVideos.map(video => <div key={video.id} style={{ width: 160, flexShrink: 0, scrollSnapAlign: 'start' }}><Poster video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} subtitle="Transmissão ao vivo" /></div>)}
+                </div>
               </section>
             );
           })}
-
           {Object.entries(autoCategories).sort((a, b) => a[0].localeCompare(b[0])).map(([catName, vids]) => (
             <section className="shelf" key={catName} style={{ marginBottom: 36 }}>
               <div className="shelf-heading"><h2 className="section-title">{catName}</h2><div className="section-rule" /></div>
-              <div className="video-grid">{vids.map(video => <Poster key={video.id} video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} subtitle="Transmissão ao vivo" />)}</div>
+              <div className="video-grid horizontal-scroll" style={{ display: 'flex', overflowX: 'auto', gap: 16, paddingBottom: 16, scrollSnapType: 'x mandatory' }}>
+                {vids.map(video => <div key={video.id} style={{ width: 160, flexShrink: 0, scrollSnapAlign: 'start' }}><Poster video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} subtitle="Transmissão ao vivo" /></div>)}
+              </div>
             </section>
           ))}
-
-          {!liveLayouts.length && Object.keys(autoCategories).length === 0 && (
-            <div className="empty-state"><Radio size={25} /><h3>Nenhum canal encontrado</h3><p>Os canais aparecerão aqui quando cadastrados.</p></div>
-          )}
+          {!liveLayouts.length && Object.keys(autoCategories).length === 0 && <div className="empty-state"><Radio size={25} /><h3>Nenhum canal cadastrado</h3></div>}
         </>
       )}
     </div>}
@@ -707,11 +635,19 @@ function CatalogPage() {
   const series = useSeriesDoCatalogo();
   const layout = useCatalogLayoutPublico();
   const episodioVideoIds = useEpisodioVideoIds();
-  const continuarAssistindo = useContinuarAssistindo(user);
+  const { items: continuarAssistindo, recarregar: recarregarContinuar } = useContinuarAssistindo(user);
+  
   const [shelf, setShelf] = useState('Início');
   const [genre, setGenre] = useState('Todos os gêneros');
   const [query, setQuery] = useState('');
   const [favorites, setFavorites] = useState<string[]>(() => JSON.parse(localStorage.getItem('cinevito-favorites') || '[]'));
+
+  // Geração dinâmica de gêneros a partir do banco de dados real
+  const dynamicGenres = useMemo(() => {
+    const list = new Set<string>();
+    videos.forEach(v => { if (v.genero && !v.ao_vivo) { v.genero.split(',').forEach(g => list.add(g.trim())); } });
+    return ['Todos os gêneros', ...Array.from(list).sort()];
+  }, [videos]);
   
   const filtered = useMemo(() => videos.filter((video) => {
     const text = `${video.titulo} ${video.descricao || ''} ${video.genero || ''}`.toLowerCase();
@@ -735,14 +671,19 @@ function CatalogPage() {
     setFavorites(next);
     localStorage.setItem('cinevito-favorites', JSON.stringify(next));
   }
-  function openVideo(id: string) {
-    setLocation(access ? `/player/${id}` : '/assinatura');
+  function openVideo(id: string) { setLocation(access ? `/player/${id}` : '/assinatura'); }
+  async function handleRemoveContinuar(id: string) {
+    await removeContinuarAssistindo(id);
+    recarregarContinuar();
   }
+
   function renderSeriesSection(key: string) {
     if (!filteredSeries.length) return null;
     return <section className="shelf" key={key} style={{ marginTop: 22 }}>
       <div className="shelf-heading"><h2 className="section-title">Séries</h2><div className="section-rule" /></div>
-      <div className="video-grid">{filteredSeries.map((serie) => <SerieCard key={serie.id} serie={serie} onOpen={() => setLocation(`/serie/${serie.id}`)} />)}</div>
+      <div className="video-grid horizontal-scroll" style={{ display: 'flex', overflowX: 'auto', gap: 16, paddingBottom: 16, scrollSnapType: 'x mandatory' }}>
+        {filteredSeries.map((serie) => <div key={serie.id} style={{ width: 160, flexShrink: 0, scrollSnapAlign: 'start' }}><SerieCard serie={serie} onOpen={() => setLocation(`/serie/${serie.id}`)} /></div>)}
+      </div>
     </section>;
   }
   function renderColecaoSection(colecaoId: string, key: string) {
@@ -750,15 +691,51 @@ function CatalogPage() {
     if (!found || !found.videos.length) return null;
     return <section className="shelf" key={key} style={{ marginTop: 22 }}>
       <div className="shelf-heading"><h2 className="section-title">{found.colecao.titulo}</h2><div className="section-rule" /></div>
-      <div className="video-grid">{found.videos.map((video) => <Poster key={video.id} video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} />)}</div>
+      <div className="video-grid horizontal-scroll" style={{ display: 'flex', overflowX: 'auto', gap: 16, paddingBottom: 16, scrollSnapType: 'x mandatory' }}>
+        {found.videos.map((video) => <div key={video.id} style={{ width: 160, flexShrink: 0, scrollSnapAlign: 'start' }}><Poster video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} /></div>)}
+      </div>
     </section>;
   }
+  
   function renderCatalogoGeralSection(key: string) {
-    return <section className="shelf" key={key} style={{ marginTop: 22 }}>
-      <div className="shelf-heading"><h2 className="section-title">{shelf === 'Início' ? 'Filmes em destaque' : shelf}</h2><div className="section-rule" /><span>{filtered.length.toString().padStart(2, '0')} títulos</span></div>
-      {filtered.length ? <div className="video-grid">{filtered.map((video) => <Poster key={video.id} video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} />)}</div> : <div className="empty-state" data-testid="status-catalog-empty"><Search size={25} /><h3>{videos.length ? 'Nenhum título encontrado' : 'Catálogo ainda vazio'}</h3><p>{videos.length ? 'Tente outro termo ou limpe os filtros para voltar ao catálogo.' : 'Os títulos aparecem aqui assim que forem cadastrados no painel administrativo.'}</p>{videos.length > 0 && <button className="quiet-button focus-tv" onClick={() => { setQuery(''); setGenre('Todos os gêneros'); setShelf('Início'); }} data-testid="button-clear-catalog-filters">Limpar filtros</button>}</div>}
-    </section>;
+    // Se o usuário selecionou um gênero específico ou buscou, mostra o grid plano normal
+    if (genre !== 'Todos os gêneros' || query.length > 0) {
+      return <section className="shelf" key={key} style={{ marginTop: 22 }}>
+        <div className="shelf-heading"><h2 className="section-title">{query ? 'Resultados' : genre}</h2><div className="section-rule" /><span>{filtered.length.toString().padStart(2, '0')} títulos</span></div>
+        {filtered.length ? <div className="video-grid">{filtered.map((video) => <Poster key={video.id} video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} />)}</div> : <div className="empty-state"><Search size={25} /><h3>Nenhum título encontrado</h3><button className="quiet-button focus-tv" onClick={() => { setQuery(''); setGenre('Todos os gêneros'); }}>Limpar filtros</button></div>}
+      </section>;
+    }
+
+    // Se estiver em "Todos", constrói as fileiras no estilo Netflix baseadas no gênero
+    const grouped: Record<string, Video[]> = {};
+    filtered.forEach(v => {
+      const gList = v.genero ? v.genero.split(',').map(s=>s.trim()) : ['Sem Gênero'];
+      gList.forEach(g => {
+        if (!grouped[g]) grouped[g] = [];
+        grouped[g].push(v);
+      });
+    });
+
+    return <div key={key}>
+      {Object.entries(grouped).sort((a,b) => a[0].localeCompare(b[0])).map(([gName, vids]) => (
+        <section className="shelf" key={gName} style={{ marginTop: 22 }}>
+          <div className="shelf-heading">
+            <h2 className="section-title">{gName}</h2>
+            <div className="section-rule" />
+            {vids.length > 8 && <button className="quiet-button focus-tv" onClick={() => setGenre(gName)}>Ver todos</button>}
+          </div>
+          <div className="video-grid horizontal-scroll" style={{ display: 'flex', overflowX: 'auto', gap: 16, paddingBottom: 16, scrollSnapType: 'x mandatory' }}>
+            {vids.slice(0, 15).map((video) => (
+              <div key={video.id} style={{ width: 160, flexShrink: 0, scrollSnapAlign: 'start' }}>
+                <Poster video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} />
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>;
   }
+
   function renderHeroSection(item: LayoutItem, key: string) {
     const heroVideos = resolveVideosByIds(videos, item.config?.video_ids);
     if (!heroVideos.length) return null;
@@ -769,7 +746,9 @@ function CatalogPage() {
     if (!secaoVideos.length) return null;
     return <section className="shelf" key={key} style={{ marginTop: 22 }}>
       <div className="shelf-heading"><h2 className="section-title">{item.titulo || 'Carrossel'}</h2><div className="section-rule" /></div>
-      <div className="video-grid">{secaoVideos.map((video) => <Poster key={video.id} video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} />)}</div>
+      <div className="video-grid horizontal-scroll" style={{ display: 'flex', overflowX: 'auto', gap: 16, paddingBottom: 16, scrollSnapType: 'x mandatory' }}>
+        {secaoVideos.map((video) => <div key={video.id} style={{ width: 160, flexShrink: 0, scrollSnapAlign: 'start' }}><Poster video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} /></div>)}
+      </div>
     </section>;
   }
   function renderTop10Section(item: LayoutItem, key: string) {
@@ -777,7 +756,9 @@ function CatalogPage() {
     if (!secaoVideos.length) return null;
     return <section className="shelf" key={key} style={{ marginTop: 22 }}>
       <div className="shelf-heading"><h2 className="section-title">{item.titulo || 'Top 10'}</h2><div className="section-rule" /></div>
-      <div className="video-grid">{secaoVideos.map((video, index) => <RankedPoster key={video.id} video={video} rank={index + 1} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} />)}</div>
+      <div className="video-grid horizontal-scroll" style={{ display: 'flex', overflowX: 'auto', gap: 16, paddingBottom: 16, scrollSnapType: 'x mandatory', paddingLeft: 16 }}>
+        {secaoVideos.map((video, index) => <div key={video.id} style={{ width: 160, flexShrink: 0, scrollSnapAlign: 'start' }}><RankedPoster video={video} rank={index + 1} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} /></div>)}
+      </div>
     </section>;
   }
   function renderElencoSection(item: LayoutItem, key: string) {
@@ -787,7 +768,9 @@ function CatalogPage() {
     if (!secaoVideos.length) return null;
     return <section className="shelf" key={key} style={{ marginTop: 22 }}>
       <div className="shelf-heading"><h2 className="section-title">{item.titulo || `Coleção ${item.config?.nome}`}</h2><div className="section-rule" /></div>
-      <div className="video-grid">{secaoVideos.map((video) => <Poster key={video.id} video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} />)}</div>
+      <div className="video-grid horizontal-scroll" style={{ display: 'flex', overflowX: 'auto', gap: 16, paddingBottom: 16, scrollSnapType: 'x mandatory' }}>
+        {secaoVideos.map((video) => <div key={video.id} style={{ width: 160, flexShrink: 0, scrollSnapAlign: 'start' }}><Poster video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} /></div>)}
+      </div>
     </section>;
   }
   function renderCategoriaSection(item: LayoutItem, key: string) {
@@ -797,7 +780,9 @@ function CatalogPage() {
     if (!secaoVideos.length) return null;
     return <section className="shelf" key={key} style={{ marginTop: 22 }}>
       <div className="shelf-heading"><h2 className="section-title">{item.titulo || item.config?.valor}</h2><div className="section-rule" /></div>
-      <div className="video-grid">{secaoVideos.map((video) => <Poster key={video.id} video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} />)}</div>
+      <div className="video-grid horizontal-scroll" style={{ display: 'flex', overflowX: 'auto', gap: 16, paddingBottom: 16, scrollSnapType: 'x mandatory' }}>
+        {secaoVideos.map((video) => <div key={video.id} style={{ width: 160, flexShrink: 0, scrollSnapAlign: 'start' }}><Poster video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} /></div>)}
+      </div>
     </section>;
   }
 
@@ -806,15 +791,26 @@ function CatalogPage() {
     {!hasRuntimeConfig && <div className="notice notice-cyan" data-testid="status-runtime-demo"><Info size={17} color="#00c8ff" /><span><strong>Modo de demonstração.</strong> O ambiente ainda não está conectado ao Supabase; os dados desta sessão ficam apenas neste aparelho.</span></div>}
     {!user && <div className="notice notice-orange" data-testid="status-catalog-auth"><CircleAlert size={17} color="#ff8228" /><span><strong>Você está navegando como visitante.</strong> Entre para salvar favoritos e continuar assistindo em outros dispositivos.</span><Link href="/" className="quiet-button focus-tv" data-testid="link-catalog-login">Entrar</Link></div>}
     {user && access === false && <div className="notice notice-orange" data-testid="status-catalog-locked"><CircleAlert size={17} color="#ff8228" /><span><strong>Seu acesso gratuito acabou.</strong> Assine um plano para continuar assistindo ao catálogo completo.</span><Link href="/assinatura" className="quiet-button focus-tv">Ver planos</Link></div>}
+    
     <div className="catalog-toolbar"><div className="search-wrap"><Search size={16} /><input className="input focus-tv" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar no catálogo" aria-label="Buscar no catálogo" data-testid="input-search-catalog" /></div><Link href="/colecao" className="secondary-button focus-tv" data-testid="link-open-collection"><Heart size={15} />Minha coleção</Link></div>
-    <div className="chip-row" role="tablist" aria-label="Categorias do catálogo">{fallbackShelves.map((item) => <button key={item} className={`chip focus-tv ${shelf === item ? 'active' : ''}`} onClick={() => { setShelf(item); setGenre('Todos os gêneros'); setQuery(''); }} role="tab" aria-selected={shelf === item} data-testid={`tab-shelf-${item.toLowerCase().replaceAll(' ', '-')}`}>{item}</button>)}</div>
-    <div className="chip-row" aria-label="Filtrar por gênero">{genres.map((item) => <button key={item} className={`chip focus-tv ${genre === item ? 'active' : ''}`} onClick={() => setGenre(item)} data-testid={`button-genre-${item.toLowerCase().replaceAll(' ', '-')}`}>{item}</button>)}</div>
+    
+    <div className="chip-row no-scrollbar" role="tablist" aria-label="Categorias do catálogo" style={{ display: 'flex', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 8 }}>
+      {fallbackShelves.map((item) => <button key={item} className={`chip focus-tv ${shelf === item ? 'active' : ''}`} style={{ flexShrink: 0 }} onClick={() => { setShelf(item); setGenre('Todos os gêneros'); setQuery(''); }} role="tab" aria-selected={shelf === item} data-testid={`tab-shelf-${item.toLowerCase().replaceAll(' ', '-')}`}>{item}</button>)}
+    </div>
+    <div className="chip-row no-scrollbar" aria-label="Filtrar por gênero" style={{ display: 'flex', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 8 }}>
+      {dynamicGenres.map((item) => <button key={item} className={`chip focus-tv ${genre === item ? 'active' : ''}`} style={{ flexShrink: 0 }} onClick={() => setGenre(item)} data-testid={`button-genre-${item.toLowerCase().replaceAll(' ', '-')}`}>{item}</button>)}
+    </div>
+    
     {loading && <div className="video-grid" data-testid="status-catalog-loading">{Array.from({ length: 5 }).map((_, index) => <div className="skeleton" style={{ aspectRatio: '2/3' }} key={index} />)}</div>}
     {error && <div className="notice notice-orange" role="alert" data-testid="status-catalog-error"><CircleAlert size={17} color="#ff8275" /><span>{error}</span><button className="quiet-button focus-tv" onClick={() => window.location.reload()} data-testid="button-retry-catalog"><RefreshCw size={15} />Tentar de novo</button></div>}
+    
     {!loading && !error && shelf === 'Início' && continuarAssistindo.length > 0 && <section className="shelf" style={{ marginTop: 22 }}>
       <div className="shelf-heading"><h2 className="section-title">Continuar assistindo</h2><div className="section-rule" /></div>
-      <div className="video-grid">{continuarAssistindo.filter((item) => item.videos).map((item) => <ContinueCard key={item.id} item={item} onOpen={() => openVideo(item.video_id)} />)}</div>
+      <div className="video-grid horizontal-scroll" style={{ display: 'flex', overflowX: 'auto', gap: 16, paddingBottom: 16, scrollSnapType: 'x mandatory' }}>
+        {continuarAssistindo.filter((item) => item.videos).map((item) => <div key={item.id} style={{ width: 160, flexShrink: 0, scrollSnapAlign: 'start' }}><ContinueCard item={item} onOpen={() => openVideo(item.video_id)} onRemove={() => handleRemoveContinuar(item.id)} /></div>)}
+      </div>
     </section>}
+    
     {!loading && !error && shelf === 'Início' && layout.length > 0 && layout.map((item) => {
       // PROTEÇÃO (as any)
       if (item.tipo === ('ao_vivo_fileira' as any)) return null;
@@ -842,10 +838,7 @@ function VideoPlayer({ embed, title }: { embed: { type: string, src: string }, t
   const [hlsReady, setHlsReady] = useState(!!(window as any).Hls);
 
   useEffect(() => {
-    if ((window as any).Hls) {
-      setHlsReady(true);
-      return;
-    }
+    if ((window as any).Hls) { setHlsReady(true); return; }
     const scriptId = 'hls-js-library';
     let script = document.getElementById(scriptId) as HTMLScriptElement;
     if (!script) {
@@ -867,11 +860,7 @@ function VideoPlayer({ embed, title }: { embed: { type: string, src: string }, t
     let hls: any = null;
     const isM3U8 = embed.src.toLowerCase().includes('.m3u8');
 
-    if (!isM3U8) {
-      video.src = embed.src;
-      video.play().catch(() => {});
-      return;
-    }
+    if (!isM3U8) { video.src = embed.src; video.play().catch(() => {}); return; }
 
     if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = embed.src;
@@ -880,55 +869,34 @@ function VideoPlayer({ embed, title }: { embed: { type: string, src: string }, t
     else if (hlsReady && (window as any).Hls) {
       const Hls = (window as any).Hls;
       if (Hls.isSupported()) {
-        hls = new Hls({
-          maxBufferLength: 30,
-          maxMaxBufferLength: 60,
-        });
+        hls = new Hls({ maxBufferLength: 30, maxMaxBufferLength: 60 });
         hls.loadSource(embed.src);
         hls.attachMedia(video);
-        
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          video.play().catch(() => console.log('Autoplay retido pelo navegador.'));
-        });
-
+        hls.on(Hls.Events.MANIFEST_PARSED, () => { video.play().catch(() => {}); });
         hls.on(Hls.Events.ERROR, (event: any, data: any) => {
           if (data.fatal) {
-            if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-              hls.startLoad();
-            } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-              hls.recoverMediaError();
-            } else {
-              hls.destroy();
-            }
+            if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
+            else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
+            else hls.destroy();
           }
         });
       }
     }
-
-    return () => {
-      if (hls) hls.destroy();
-      video.removeAttribute('src');
-      video.load();
-    };
+    return () => { if (hls) hls.destroy(); video.removeAttribute('src'); video.load(); };
   }, [embed.src, embed.type, hlsReady]);
 
   if (embed.type === 'embed') {
-    return <iframe src={embed.src} title={title} allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowFullScreen style={{ width: '100%', height: '100%', border: 0 }} data-testid="video-player" />;
+    return (
+      <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+        {/* ESCUDO DE CLIQUE PARA BLOQUEAR LOGO E COMPARTILHAR NO TOPO DO IFRAME */}
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '65px', zIndex: 10 }} title="O player foi protegido." />
+        <iframe src={embed.src} title={title} allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowFullScreen style={{ width: '100%', height: '100%', border: 0 }} data-testid="video-player" />
+      </div>
+    );
   }
 
   if (embed.type === 'file') {
-    return (
-      <video 
-        ref={videoRef} 
-        controls 
-        autoPlay 
-        muted 
-        playsInline 
-        poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
-        data-testid="video-player" 
-        style={{ width: '100%', height: '100%', backgroundColor: '#000' }} 
-      />
-    );
+    return <video ref={videoRef} controls autoPlay muted playsInline poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-testid="video-player" style={{ width: '100%', height: '100%', backgroundColor: '#000' }} />;
   }
 
   return <div className="player-idle"><Play size={38} /><strong>Pronto para assistir</strong><span>Este título ainda não tem um link de vídeo cadastrado.</span></div>;
@@ -959,10 +927,7 @@ function PlayerPage() {
     let cancelled = false;
     (async () => {
       try {
-        // --- GATILHO INVISÍVEL DE VIEW ---
         registrarVisualizacao(video.id).catch(() => {});
-        // ---------------------------------
-
         const info = await fetchEpisodioInfo(video.id);
         if (cancelled) return;
         if (info) {
@@ -975,7 +940,7 @@ function PlayerPage() {
           setEpisodiosDaTemporada([]);
           if (user) await salvarProgresso({ video_id: video.id });
         }
-      } catch { /* salvar progresso é best-effort */ }
+      } catch { }
     })();
     return () => { cancelled = true; };
   }, [video?.id, access, user?.id]);
@@ -994,9 +959,7 @@ function PlayerPage() {
   if (!video) return <div className="content-wrap page-main"><div className="empty-state"><CircleAlert size={26} /><h3>Vídeo não encontrado</h3><p>Esse título não está mais disponível no catálogo.</p><Link href="/catalogo" className="primary-button focus-tv">Voltar ao catálogo</Link></div></div>;
   
   return <div className="content-wrap page-main"><button className="quiet-button focus-tv" onClick={() => setLocation('/catalogo')} data-testid="button-back-catalog"><ArrowLeft size={16} />Voltar ao catálogo</button><div className="player-stage" style={{ marginTop: 17 }}><div className="player-box">
-    
     <VideoPlayer embed={embed} title={video.titulo} />
-
   </div><div className="player-details"><div><div className="eyebrow">{video.genero || video.categoria || 'CineVito'} {video.ano ? ` / ${video.ano}` : ''}{episodioInfo ? ` · Ep. ${episodioInfo.episodio.numero}` : ''}</div><h1 className="section-title" style={{ marginTop: 7 }} data-testid="text-player-title">{video.titulo}</h1><p>{video.descricao || 'Este título faz parte do catálogo CineVito.'}</p></div><div className="player-actions"><button className={`secondary-button focus-tv ${saved ? 'active' : ''}`} onClick={toggle} data-testid="button-player-favorite"><Heart size={15} fill={saved ? 'currentColor' : 'none'} />{saved ? 'Na coleção' : 'Salvar'}</button>{episodioInfo?.proximo && <button className="primary-button focus-tv" onClick={() => setLocation(`/player/${episodioInfo.proximo!.video_id}`)}>Próximo episódio<ChevronRight size={16} /></button>}</div></div>
   {episodiosDaTemporada.length > 1 && <div style={{ marginTop: 20 }}>
     <h3 className="section-title" style={{ fontSize: '1rem' }}>Episódios desta temporada</h3>
@@ -1021,16 +984,14 @@ function SeriePage() {
     fetchSerieCompleta(params.id).then((result) => { if (!cancelled) setData(result); }).catch(() => { if (!cancelled) setData({ serie: null, temporadas: [] }); });
     return () => { cancelled = true; };
   }, [params.id]);
-  function openEpisodio(videoId: string) {
-    setLocation(access ? `/player/${videoId}` : '/assinatura');
-  }
+  function openEpisodio(videoId: string) { setLocation(access ? `/player/${videoId}` : '/assinatura'); }
   if (!data) return <div className="content-wrap page-main"><div className="skeleton" style={{ height: 200 }} /></div>;
   if (!data.serie) return <div className="content-wrap page-main"><div className="empty-state"><CircleAlert size={26} /><h3>Série não encontrada</h3><Link href="/catalogo" className="primary-button focus-tv" style={{ marginTop: 12 }}>Voltar ao catálogo</Link></div></div>;
   const atual = data.temporadas[activeTemporada];
   return <div className="content-wrap page-main">
     <button className="quiet-button focus-tv" onClick={() => setLocation('/catalogo')}><ArrowLeft size={16} />Voltar ao catálogo</button>
     <PageHeader eyebrow="Série" title={data.serie.titulo} description={data.serie.descricao || undefined} />
-    {data.temporadas.length > 0 && <div className="chip-row" role="tablist">{data.temporadas.map((item, index) => <button key={item.temporada.id} className={'chip focus-tv ' + (activeTemporada === index ? 'active' : '')} onClick={() => setActiveTemporada(index)} role="tab" aria-selected={activeTemporada === index}>{item.temporada.titulo || `Temporada ${item.temporada.numero}`}</button>)}</div>}
+    {data.temporadas.length > 0 && <div className="chip-row no-scrollbar" role="tablist" style={{ display: 'flex', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 8 }}>{data.temporadas.map((item, index) => <button key={item.temporada.id} className={'chip focus-tv ' + (activeTemporada === index ? 'active' : '')} style={{ flexShrink: 0 }} onClick={() => setActiveTemporada(index)} role="tab" aria-selected={activeTemporada === index}>{item.temporada.titulo || `Temporada ${item.temporada.numero}`}</button>)}</div>}
     {atual && <div className="admin-list" style={{ marginTop: 18 }}>{atual.episodios.length ? atual.episodios.map((ep) => <div className="result-row" key={ep.id} role="button" tabIndex={0} onClick={() => openEpisodio(ep.video_id)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && openEpisodio(ep.video_id)} style={{ cursor: 'pointer' }}><span><strong>Ep. {ep.numero}</strong> — {ep.titulo || ep.videos?.titulo}</span><Play size={16} color="#00c8ff" /></div>) : <p className="muted">Nenhum episódio cadastrado nesta temporada ainda.</p>}</div>}
     {!data.temporadas.length && <p className="muted" style={{ marginTop: 18 }}>Nenhuma temporada cadastrada ainda.</p>}
   </div>;
@@ -1048,9 +1009,7 @@ function CollectionPage() {
     setFavorites(next);
     localStorage.setItem('cinevito-favorites', JSON.stringify(next));
   }
-  function openVideo(id: string) {
-    setLocation(access ? `/player/${id}` : '/assinatura');
-  }
+  function openVideo(id: string) { setLocation(access ? `/player/${id}` : '/assinatura'); }
   return <div className="content-wrap page-main"><PageHeader eyebrow="O que você guardou" title="Minha coleção" description="Seus títulos favoritos em um só lugar, prontos para a próxima sessão." />{collection.length ? <div className="video-grid">{collection.map((video) => <Poster key={video.id} video={video} favorite onFavorite={() => remove(video.id)} onOpen={() => openVideo(video.id)} />)}</div> : <div className="empty-state" data-testid="status-collection-empty"><Heart size={27} /><h3>Ainda está vazio</h3><p>Use o coração nos títulos do catálogo para montar sua coleção.</p><Link href="/catalogo" className="primary-button focus-tv" data-testid="link-collection-catalog">Explorar catálogo</Link></div>}</div>;
 }
 
@@ -1092,15 +1051,11 @@ function ProfilePage() {
           {subscription ? <><p><strong>{subscription.plano || 'Plano'}</strong> · {status}</p><p className="muted" style={{ fontSize: '.8rem' }}>{origem}</p>{subscription.data_expiracao && <p className="muted" style={{ fontSize: '.8rem' }}>Válido até {new Date(subscription.data_expiracao).toLocaleDateString('pt-BR')}</p>}</> : <p>{user ? 'Você ainda não tem nenhuma assinatura registrada.' : 'Entre para consultar sua assinatura.'}</p>}
           <Link href="/assinatura" className="primary-button focus-tv" style={{ width: 'fit-content', marginTop: 7 }} data-testid="link-profile-subscription">Ver assinatura</Link>
         </div>
-
         <div className="status-card" style={{ marginTop: 14 }}>
           <h3>Envie seus vídeos</h3>
           <p className="muted" style={{ fontSize: '.8rem' }}>Quer enviar um filme ou curta para o CineVito? Faça sua submissão por aqui.</p>
-          <Link href="/upload" className="primary-button focus-tv" style={{ width: 'fit-content', marginTop: 7, display: 'inline-flex', textDecoration: 'none', alignItems: 'center', justifyContent: 'center' }}>
-            Enviar novo vídeo
-          </Link>
+          <Link href="/upload" className="primary-button focus-tv" style={{ width: 'fit-content', marginTop: 7, display: 'inline-flex', textDecoration: 'none', alignItems: 'center', justifyContent: 'center' }}>Enviar novo vídeo</Link>
         </div>
-
         {installState.platform !== 'tv' && !installState.alreadyInstalled && <div className="status-card" style={{ marginTop: 14 }}>
           <h3>Instalar o app</h3>
           <p className="muted" style={{ fontSize: '.8rem' }}>Adicione o CineVito à tela do seu aparelho pra abrir direto, como um app.</p>
@@ -1152,7 +1107,7 @@ function SubscriptionPage() {
   useEffect(() => {
     setPix(null);
     setCheckoutMessage('');
-    if (brickRef.current) { try { brickRef.current.unmount(); } catch { /* ignore */ } brickRef.current = null; }
+    if (brickRef.current) { try { brickRef.current.unmount(); } catch { } brickRef.current = null; }
     const container = document.getElementById('payment-brick-container');
     if (container) container.innerHTML = '';
     if (!selectedPlan || !user || !hasRuntimeConfig) { setCheckoutStatus('idle'); return; }
@@ -1166,59 +1121,35 @@ function SubscriptionPage() {
         const MercadoPagoCtor = (window as unknown as { MercadoPago: new (key: string, opts: { locale: string }) => { bricks: () => { create: (type: string, containerId: string, settings: unknown) => Promise<{ unmount: () => void }> } } }).MercadoPago;
         const mp = new MercadoPagoCtor(MP_PUBLIC_KEY, { locale: 'pt-BR' });
         const brick = await mp.bricks().create('payment', 'payment-brick-container', {
-          initialization: {
-            amount: Number(selectedPlan.preco) || 0,
-            payer: { email: user.email || '' },
-          },
-          customization: {
-            paymentMethods: { creditCard: 'all', debitCard: 'all', bankTransfer: 'all' },
-          },
+          initialization: { amount: Number(selectedPlan.preco) || 0, payer: { email: user.email || '' } },
+          customization: { paymentMethods: { creditCard: 'all', debitCard: 'all', bankTransfer: 'all' } },
           callbacks: {
             onReady: () => { if (!cancelled) setCheckoutStatus('ready'); },
             onError: () => { if (!cancelled) { setCheckoutStatus('error'); setCheckoutMessage('Não foi possível carregar o checkout.'); } },
             onSubmit: ({ formData }: { formData: unknown }) => new Promise<void>((resolve, reject) => {
-              setCheckoutStatus('submitting');
-              setCheckoutMessage('');
+              setCheckoutStatus('submitting'); setCheckoutMessage('');
               processPayment({ usuario_id: user.id, plano_id: selectedPlan.id, formData, cupom: cupom.trim() || null })
                 .then((result) => {
-                  if (result.status === 'approved') {
-                    setCheckoutStatus('approved');
-                    setCheckoutMessage('Pagamento aprovado! Sua assinatura já está ativa.');
-                  } else if (result.status === 'pending') {
-                    setCheckoutStatus('pending');
-                    setPix({ copiaCola: result.pix_copia_cola, qrBase64: result.pix_qr_base64 });
-                    setCheckoutMessage('Pagamento em análise.');
-                  } else {
-                    setCheckoutStatus('rejected');
-                    setCheckoutMessage(result.motivo || 'Pagamento recusado.');
-                  }
+                  if (result.status === 'approved') { setCheckoutStatus('approved'); setCheckoutMessage('Pagamento aprovado! Sua assinatura já está ativa.'); }
+                  else if (result.status === 'pending') { setCheckoutStatus('pending'); setPix({ copiaCola: result.pix_copia_cola, qrBase64: result.pix_qr_base64 }); setCheckoutMessage('Pagamento em análise.'); }
+                  else { setCheckoutStatus('rejected'); setCheckoutMessage(result.motivo || 'Pagamento recusado.'); }
                   resolve();
                 })
-                .catch((error) => {
-                  setCheckoutStatus('error');
-                  setCheckoutMessage(error instanceof Error ? error.message : 'Não foi possível processar o pagamento.');
-                  reject(error);
-                });
+                .catch((error) => { setCheckoutStatus('error'); setCheckoutMessage(error instanceof Error ? error.message : 'Não foi possível processar o pagamento.'); reject(error); });
             }),
           },
         });
         if (cancelled) { brick.unmount(); return; }
         brickRef.current = brick;
       } catch (error) {
-        if (!cancelled) {
-          setCheckoutStatus('error');
-          setCheckoutMessage(error instanceof Error ? error.message : 'Não foi possível carregar o checkout.');
-        }
+        if (!cancelled) { setCheckoutStatus('error'); setCheckoutMessage(error instanceof Error ? error.message : 'Não foi possível carregar o checkout.'); }
       }
     })();
 
-    return () => {
-      cancelled = true;
-      if (brickRef.current) { try { brickRef.current.unmount(); } catch { /* ignore */ } brickRef.current = null; }
-    };
+    return () => { cancelled = true; if (brickRef.current) { try { brickRef.current.unmount(); } catch { } brickRef.current = null; } };
   }, [selectedPlan?.id, user?.id]);
 
-  return <div className="content-wrap page-main"><PageHeader eyebrow="Escolha o seu acesso" title="Assine o CineVito" description="Assista ao catálogo completo em seus dispositivos." /><div className="two-col"><section className="panel panel-pad"><h2 className="panel-title">Planos disponíveis</h2>{loading ? <div className="plan-list">{[1, 2].map((n) => <div className="skeleton" style={{ height: 94 }} key={n} />)}</div> : plans.length ? <><div className="chip-row" role="tablist">{categories.map((item) => <button key={item} className={'chip focus-tv ' + (category === item ? 'active' : '')} onClick={() => { setCategory(item); setSelected(''); }} role="tab" aria-selected={category === item}>{item}</button>)}</div><div className="plan-list">{visiblePlans.map((plan) => <div className={'plan-card ' + (selected === plan.id ? 'selected' : '')} key={plan.id} onClick={() => setSelected(plan.id)}><div><h3>{plan.nome}</h3><p>{plan.descricao || ((plan.dispositivos || 1) + ' dispositivo(s) · ' + duration(plan))}</p></div><div style={{ display: 'grid', justifyItems: 'end', gap: 8 }}><strong className="plan-price">{typeof plan.preco === 'number' ? 'R$ ' + plan.preco.toFixed(2).replace('.', ',') : 'Consultar'}</strong><button className="primary-button focus-tv" onClick={(event) => { event.stopPropagation(); setSelected(plan.id); }} data-testid={'button-select-plan-' + plan.id}>{selected === plan.id ? 'Selecionado' : 'Escolher'}</button></div></div>)}</div></> : <div className="empty-state"><Settings size={24} /><h3>Planos em configuração</h3><p>Quando os planos estiverem publicados, eles aparecerão aqui.</p></div>}</section><aside className="panel panel-pad"><div className="eyebrow">Pagamento seguro</div><h2 className="panel-title" style={{ marginTop: 9 }}>Checkout protegido</h2><p className="muted" style={{ fontSize: '.82rem', lineHeight: 1.65 }}>Pagamento seguro direto pelo CineVito.</p>
+  return <div className="content-wrap page-main"><PageHeader eyebrow="Escolha o seu acesso" title="Assine o CineVito" description="Assista ao catálogo completo em seus dispositivos." /><div className="two-col"><section className="panel panel-pad"><h2 className="panel-title">Planos disponíveis</h2>{loading ? <div className="plan-list">{[1, 2].map((n) => <div className="skeleton" style={{ height: 94 }} key={n} />)}</div> : plans.length ? <><div className="chip-row no-scrollbar" role="tablist" style={{ display: 'flex', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 8 }}>{categories.map((item) => <button key={item} className={'chip focus-tv ' + (category === item ? 'active' : '')} style={{ flexShrink: 0 }} onClick={() => { setCategory(item); setSelected(''); }} role="tab" aria-selected={category === item}>{item}</button>)}</div><div className="plan-list">{visiblePlans.map((plan) => <div className={'plan-card ' + (selected === plan.id ? 'selected' : '')} key={plan.id} onClick={() => setSelected(plan.id)}><div><h3>{plan.nome}</h3><p>{plan.descricao || ((plan.dispositivos || 1) + ' dispositivo(s) · ' + duration(plan))}</p></div><div style={{ display: 'grid', justifyItems: 'end', gap: 8 }}><strong className="plan-price">{typeof plan.preco === 'number' ? 'R$ ' + plan.preco.toFixed(2).replace('.', ',') : 'Consultar'}</strong><button className="primary-button focus-tv" onClick={(event) => { event.stopPropagation(); setSelected(plan.id); }} data-testid={'button-select-plan-' + plan.id}>{selected === plan.id ? 'Selecionado' : 'Escolher'}</button></div></div>)}</div></> : <div className="empty-state"><Settings size={24} /><h3>Planos em configuração</h3><p>Quando os planos estiverem publicados, eles aparecerão aqui.</p></div>}</section><aside className="panel panel-pad"><div className="eyebrow">Pagamento seguro</div><h2 className="panel-title" style={{ marginTop: 9 }}>Checkout protegido</h2><p className="muted" style={{ fontSize: '.82rem', lineHeight: 1.65 }}>Pagamento seguro direto pelo CineVito.</p>
     {!user && <div className="notice notice-orange" style={{ marginTop: 16 }}><Info size={16} color="#ff8228" /><span>Entre na sua conta para continuar.</span><Link href="/" className="quiet-button focus-tv">Entrar</Link></div>}
     {user && !selectedPlan && <div className="notice notice-orange" style={{ marginTop: 16 }}><Info size={16} color="#ff8228" /><span>Selecione um plano para continuar.</span></div>}
     {user && selectedPlan && checkoutStatus !== 'approved' && <>
@@ -1239,16 +1170,13 @@ function SuggestionPage() {
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!form.titulo.trim()) return;
-    setState('loading');
-    setErrorMessage('');
+    setState('loading'); setErrorMessage('');
     try {
       if (hasRuntimeConfig) await submitSuggestion({ titulo: form.titulo.trim(), genero: form.genero.trim() || undefined, ano_lancamento: form.ano ? Number(form.ano) : undefined });
       else localStorage.setItem('cinevito-last-suggestion', JSON.stringify(form));
-      setState('success');
-      setForm({ titulo: '', genero: '', ano: '' });
+      setState('success'); setForm({ titulo: '', genero: '', ano: '' });
     } catch (error) {
-      setState('error');
-      setErrorMessage(error instanceof Error ? error.message : 'Não foi possível enviar agora.');
+      setState('error'); setErrorMessage(error instanceof Error ? error.message : 'Não foi possível enviar agora.');
     }
   }
   return <div className="content-wrap page-main"><PageHeader eyebrow="Ajude a curadoria" title="Sugira um filme" description="Conte para a gente qual título deveria entrar no CineVito." /><div className="two-col"><form className="panel panel-pad" onSubmit={submit}><h2 className="panel-title">Sua sugestão</h2><div className="field"><label htmlFor="suggestion-title">Nome do filme/vídeo</label><input id="suggestion-title" className="input focus-tv" value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} placeholder="Digite o nome do título" /></div><div className="field"><label htmlFor="suggestion-genero">Gênero (opcional)</label><input id="suggestion-genero" className="input focus-tv" value={form.genero} onChange={(e) => setForm({ ...form, genero: e.target.value })} placeholder="Ex.: Ação, Comédia..." /></div><div className="field"><label htmlFor="suggestion-ano">Ano de lançamento (opcional)</label><input id="suggestion-ano" type="number" className="input focus-tv" value={form.ano} onChange={(e) => setForm({ ...form, ano: e.target.value })} placeholder="Ex.: 2023" /></div>{state === 'success' && <p className="form-success">Sugestão enviada com sucesso!</p>}{state === 'error' && <p className="form-error">{errorMessage}</p>}<button className="primary-button focus-tv" type="submit" disabled={state === 'loading'}><Send size={16} />{state === 'loading' ? 'Enviando...' : 'Enviar sugestão'}</button></form><aside className="panel panel-pad"><div className="eyebrow">Como funciona</div><h2 className="panel-title" style={{ marginTop: 9 }}>Curadoria viva</h2><p className="muted" style={{ fontSize: '.82rem', lineHeight: 1.65 }}>As sugestões ajudam a orientar os próximos títulos do catálogo.</p><Link href="/faq" className="secondary-button focus-tv" style={{ marginTop: 10 }}>Ir para perguntas frequentes <ArrowLeft size={15} className="rotate-180" /></Link></aside></div></div>;
@@ -1301,9 +1229,7 @@ function AdminPage() {
   const [novoEpisodioDescricao, setNovoEpisodioDescricao] = useState('');
   const [layoutItems, setLayoutItems] = useState<LayoutItem[]>([]);
   const [dragLayoutIndex, setDragLayoutIndex] = useState<number | null>(null);
-  
   const [novaSecaoTipo, setNovaSecaoTipo] = useState<LayoutItem['tipo']>('carrossel');
-  
   const [novaSecaoTitulo, setNovaSecaoTitulo] = useState('');
   const [novaSecaoNome, setNovaSecaoNome] = useState('');
   const [novaSecaoValor, setNovaSecaoValor] = useState('');
@@ -1323,17 +1249,14 @@ function AdminPage() {
   const [grantForm, setGrantForm] = useState<{ quantidade: number; unidade: 'dias' | 'meses'; motivo: string }>({ quantidade: 30, unidade: 'dias', motivo: '' });
   const [grantBusy, setGrantBusy] = useState(false);
   const [revokeBusyId, setRevokeBusyId] = useState<string | null>(null);
+  
   useEffect(() => { if (!user || !hasRuntimeConfig) return; fetchProfile().then((value) => setProfile(value as { is_admin?: boolean; admin_master?: boolean })).catch(() => setProfile(null)).finally(() => setLoading(false)); }, [user]);
 
   async function loadVideos() { try { setVideos(await fetchAdminVideos()); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao carregar vídeos.'); } }
   async function loadCategoriasEGeneros() {
     try { const [cats, gens] = await Promise.all([fetchCategorias(), fetchGenerosList()]); setCategorias(cats); setGeneros(gens); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao carregar categorias.'); }
   }
-  useEffect(() => {
-    if (!profile?.is_admin) return;
-    loadVideos();
-    loadCategoriasEGeneros();
-  }, [profile?.is_admin]);
+  useEffect(() => { if (!profile?.is_admin) return; loadVideos(); loadCategoriasEGeneros(); }, [profile?.is_admin]);
 
   async function handleCreateCategoria() {
     if (!novaCategoria.trim()) return;
@@ -1351,86 +1274,43 @@ function AdminPage() {
   function editVideo(video: Video) {
     setEditingVideoId(video.id);
     setVideoForm({
-      url_video: video.url_video || '',
-      titulo: video.titulo || '',
-      descricao: video.descricao || '',
-      categoria_id: video.categoria_id || '',
-      genero: video.genero || '',
-      url_capa: video.url_capa || '',
-      licenca: video.licenca || '',
-      ano: video.ano ? String(video.ano) : '',
-      elenco: video.elenco || '',
-      ao_vivo: Boolean(video.ao_vivo),
+      url_video: video.url_video || '', titulo: video.titulo || '', descricao: video.descricao || '',
+      categoria_id: video.categoria_id || '', genero: video.genero || '', url_capa: video.url_capa || '',
+      licenca: video.licenca || '', ano: video.ano ? String(video.ano) : '', elenco: video.elenco || '', ao_vivo: Boolean(video.ao_vivo),
     });
   }
   async function saveVideo() {
     setMessage('');
-    if (!videoForm.url_video.trim() || !videoForm.titulo.trim()) {
-      setMessage('Preencha ao menos o link do vídeo e o título.');
-      return;
-    }
+    if (!videoForm.url_video.trim() || !videoForm.titulo.trim()) { setMessage('Preencha ao menos o link do vídeo e o título.'); return; }
     setSavingVideo(true);
     const payload: Partial<Video> = {
-      url_video: extractVideoUrl(videoForm.url_video),
-      titulo: videoForm.titulo.trim(),
-      descricao: videoForm.descricao.trim() || null,
-      categoria_id: videoForm.categoria_id || null,
-      genero: videoForm.genero || null,
-      url_capa: videoForm.url_capa.trim() || null,
-      licenca: videoForm.licenca.trim() || null,
-      ano: videoForm.ano ? Number(videoForm.ano) : null,
-      elenco: videoForm.elenco.trim() || null,
-      ao_vivo: videoForm.ao_vivo,
-      fonte: 'Cadastrado manualmente',
+      url_video: extractVideoUrl(videoForm.url_video), titulo: videoForm.titulo.trim(), descricao: videoForm.descricao.trim() || null,
+      categoria_id: videoForm.categoria_id || null, genero: videoForm.genero || null, url_capa: videoForm.url_capa.trim() || null,
+      licenca: videoForm.licenca.trim() || null, ano: videoForm.ano ? Number(videoForm.ano) : null, elenco: videoForm.elenco.trim() || null,
+      ao_vivo: videoForm.ao_vivo, fonte: 'Cadastrado manualmente',
     };
     try {
-      if (editingVideoId) await adminUpdateVideo(editingVideoId, payload);
-      else await adminCreateVideo(payload);
-      resetVideoForm();
-      await loadVideos();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Erro ao salvar vídeo.');
-    } finally {
-      setSavingVideo(false);
-    }
+      if (editingVideoId) await adminUpdateVideo(editingVideoId, payload); else await adminCreateVideo(payload);
+      resetVideoForm(); await loadVideos();
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao salvar vídeo.'); } finally { setSavingVideo(false); }
   }
   async function deleteVideo(id: string) {
     if (!window.confirm('Apagar este vídeo do catálogo?')) return;
     setDeletingVideoId(id);
-    try {
-      await adminDeleteVideo(id);
-      await loadVideos();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Erro ao apagar.');
-    } finally {
-      setDeletingVideoId(null);
-    }
+    try { await adminDeleteVideo(id); await loadVideos(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao apagar.'); } finally { setDeletingVideoId(null); }
   }
 
   async function loadColecoes() { try { setColecoes(await fetchColecoes()); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao carregar coleções.'); } }
   async function createColecao() {
     if (!novaColecaoTitulo.trim()) { setMessage('Dê um título para a coleção.'); return; }
     setCriandoColecao(true);
-    try {
-      await adminCreateColecao({ titulo: novaColecaoTitulo.trim(), descricao: novaColecaoDescricao.trim() || undefined });
-      setNovaColecaoTitulo('');
-      setNovaColecaoDescricao('');
-      await loadColecoes();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Erro ao criar.');
-    } finally {
-      setCriandoColecao(false);
-    }
+    try { await adminCreateColecao({ titulo: novaColecaoTitulo.trim(), descricao: novaColecaoDescricao.trim() || undefined }); setNovaColecaoTitulo(''); setNovaColecaoDescricao(''); await loadColecoes(); } 
+    catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao criar.'); } finally { setCriandoColecao(false); }
   }
   async function deleteColecaoHandler(id: string) {
     if (!window.confirm('Apagar esta coleção?')) return;
-    try {
-      await adminDeleteColecao(id);
-      if (selectedColecao?.id === id) { setSelectedColecao(null); setColecaoVideos([]); }
-      await loadColecoes();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Erro ao apagar.');
-    }
+    try { await adminDeleteColecao(id); if (selectedColecao?.id === id) { setSelectedColecao(null); setColecaoVideos([]); } await loadColecoes(); } 
+    catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao apagar.'); }
   }
   async function selectColecao(colecao: Colecao) {
     setSelectedColecao(colecao);
@@ -1438,36 +1318,21 @@ function AdminPage() {
   }
   async function addVideoToColecaoHandler(videoId: string) {
     if (!selectedColecao || !videoId) return;
-    try {
-      await adminAddVideoToColecao(selectedColecao.id, videoId);
-      setColecaoVideos(await fetchColecaoVideos(selectedColecao.id));
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Erro ao adicionar vídeo.');
-    }
+    try { await adminAddVideoToColecao(selectedColecao.id, videoId); setColecaoVideos(await fetchColecaoVideos(selectedColecao.id)); } 
+    catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao adicionar vídeo.'); }
   }
   async function removeVideoFromColecaoHandler(videoId: string) {
     if (!selectedColecao) return;
-    try {
-      await adminRemoveVideoFromColecao(selectedColecao.id, videoId);
-      setColecaoVideos((current) => current.filter((item) => item.video_id !== videoId));
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Erro ao remover.');
-    }
+    try { await adminRemoveVideoFromColecao(selectedColecao.id, videoId); setColecaoVideos((current) => current.filter((item) => item.video_id !== videoId)); } 
+    catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao remover.'); }
   }
   function handleDragStart(index: number) { setDragIndex(index); }
   function handleDragOver(event: DragEvent) { event.preventDefault(); }
   async function handleDrop(targetIndex: number) {
     if (dragIndex === null || dragIndex === targetIndex || !selectedColecao) { setDragIndex(null); return; }
-    const reordered = [...colecaoVideos];
-    const [moved] = reordered.splice(dragIndex, 1);
-    reordered.splice(targetIndex, 0, moved);
-    setColecaoVideos(reordered);
-    setDragIndex(null);
-    try {
-      await adminReorderColecaoVideos(selectedColecao.id, reordered.map((item) => item.video_id));
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Erro ao reordenar.');
-    }
+    const reordered = [...colecaoVideos]; const [moved] = reordered.splice(dragIndex, 1); reordered.splice(targetIndex, 0, moved);
+    setColecaoVideos(reordered); setDragIndex(null);
+    try { await adminReorderColecaoVideos(selectedColecao.id, reordered.map((item) => item.video_id)); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao reordenar.'); }
   }
 
   async function loadSeries() { try { setSeries(await fetchSeries()); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao carregar séries.'); } }
@@ -1475,63 +1340,30 @@ function AdminPage() {
     if (!novaSerieTitulo.trim()) { setMessage('Dê um título para a série.'); return; }
     setCriandoSerie(true);
     try {
-      await adminCreateSerie({
-        titulo: novaSerieTitulo.trim(),
-        descricao: novaSerieDescricao.trim() || undefined,
-        categoria_id: novaSerieCategoriaId || undefined,
-        genero: novaSerieGenero || undefined,
-        capa_url: novaSerieCapa.trim() || undefined,
-      });
-      setNovaSerieTitulo('');
-      setNovaSerieDescricao('');
-      setNovaSerieCategoriaId('');
-      setNovaSerieGenero('');
-      setNovaSerieCapa('');
-      await loadSeries();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Erro ao criar série.');
-    } finally {
-      setCriandoSerie(false);
-    }
+      await adminCreateSerie({ titulo: novaSerieTitulo.trim(), descricao: novaSerieDescricao.trim() || undefined, categoria_id: novaSerieCategoriaId || undefined, genero: novaSerieGenero || undefined, capa_url: novaSerieCapa.trim() || undefined });
+      setNovaSerieTitulo(''); setNovaSerieDescricao(''); setNovaSerieCategoriaId(''); setNovaSerieGenero(''); setNovaSerieCapa(''); await loadSeries();
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao criar série.'); } finally { setCriandoSerie(false); }
   }
   async function deleteSerieHandler(id: string) {
     if (!window.confirm('Apagar esta série inteira?')) return;
-    try {
-      await adminDeleteSerie(id);
-      if (selectedSerie?.id === id) { setSelectedSerie(null); setTemporadas([]); setSelectedTemporada(null); setEpisodios([]); }
-      await loadSeries();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Erro ao apagar.');
-    }
+    try { await adminDeleteSerie(id); if (selectedSerie?.id === id) { setSelectedSerie(null); setTemporadas([]); setSelectedTemporada(null); setEpisodios([]); } await loadSeries(); } 
+    catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao apagar.'); }
   }
   async function selectSerie(serie: Serie) {
-    setSelectedSerie(serie);
-    setSelectedTemporada(null);
-    setEpisodios([]);
+    setSelectedSerie(serie); setSelectedTemporada(null); setEpisodios([]);
     try { setTemporadas(await fetchTemporadas(serie.id)); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao carregar temporadas.'); }
   }
   async function createTemporada() {
     if (!selectedSerie) return;
     const numero = Number(novaTemporadaNumero) || 1;
-    try {
-      await adminCreateTemporada(selectedSerie.id, numero, novaTemporadaTitulo.trim() || undefined);
-      setNovaTemporadaNumero(String(numero + 1));
-      setNovaTemporadaTitulo('');
-      setTemporadas(await fetchTemporadas(selectedSerie.id));
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Erro ao criar temporada.');
-    }
+    try { await adminCreateTemporada(selectedSerie.id, numero, novaTemporadaTitulo.trim() || undefined); setNovaTemporadaNumero(String(numero + 1)); setNovaTemporadaTitulo(''); setTemporadas(await fetchTemporadas(selectedSerie.id)); } 
+    catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao criar temporada.'); }
   }
   async function deleteTemporadaHandler(id: string) {
     if (!selectedSerie) return;
     if (!window.confirm('Apagar esta temporada?')) return;
-    try {
-      await adminDeleteTemporada(id);
-      if (selectedTemporada?.id === id) { setSelectedTemporada(null); setEpisodios([]); }
-      setTemporadas(await fetchTemporadas(selectedSerie.id));
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Erro ao apagar.');
-    }
+    try { await adminDeleteTemporada(id); if (selectedTemporada?.id === id) { setSelectedTemporada(null); setEpisodios([]); } setTemporadas(await fetchTemporadas(selectedSerie.id)); } 
+    catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao apagar.'); }
   }
   async function selectTemporada(temporada: Temporada) {
     setSelectedTemporada(temporada);
@@ -1544,45 +1376,21 @@ function AdminPage() {
     try {
       let videoId = novoEpisodioVideoId;
       if (!videoId) {
-        if (!novoEpisodioLink.trim() || !novoEpisodioTitulo.trim()) {
-          setMessage('Cole o link do episódio e dê um título.');
-          return;
-        }
-        const novoVideo = await adminCreateVideo({
-          url_video: extractVideoUrl(novoEpisodioLink),
-          titulo: novoEpisodioTitulo.trim(),
-          descricao: novoEpisodioDescricao.trim() || null,
-          categoria_id: selectedSerie?.categoria_id || null,
-          genero: selectedSerie?.genero || null,
-          fonte: 'Episódio de série',
-        });
-        videoId = novoVideo.id;
-        await loadVideos();
+        if (!novoEpisodioLink.trim() || !novoEpisodioTitulo.trim()) { setMessage('Cole o link do episódio e dê um título.'); return; }
+        const novoVideo = await adminCreateVideo({ url_video: extractVideoUrl(novoEpisodioLink), titulo: novoEpisodioTitulo.trim(), descricao: novoEpisodioDescricao.trim() || null, categoria_id: selectedSerie?.categoria_id || null, genero: selectedSerie?.genero || null, fonte: 'Episódio de série' });
+        videoId = novoVideo.id; await loadVideos();
       }
       await adminAddEpisodio(selectedTemporada.id, videoId, numero, novoEpisodioTitulo.trim() || undefined);
-      setNovoEpisodioVideoId('');
-      setNovoEpisodioLink('');
-      setNovoEpisodioTitulo('');
-      setNovoEpisodioDescricao('');
-      setNovoEpisodioNumero(String(numero + 1));
-      setEpisodios(await fetchEpisodios(selectedTemporada.id));
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Erro ao adicionar episódio.');
-    }
+      setNovoEpisodioVideoId(''); setNovoEpisodioLink(''); setNovoEpisodioTitulo(''); setNovoEpisodioDescricao(''); setNovoEpisodioNumero(String(numero + 1)); setEpisodios(await fetchEpisodios(selectedTemporada.id));
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao adicionar episódio.'); }
   }
   async function removeEpisodioHandler(id: string) {
     if (!selectedTemporada) return;
-    try {
-      await adminRemoveEpisodio(id);
-      setEpisodios(await fetchEpisodios(selectedTemporada.id));
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Erro ao remover.');
-    }
+    try { await adminRemoveEpisodio(id); setEpisodios(await fetchEpisodios(selectedTemporada.id)); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao remover.'); }
   }
 
   async function loadLayout() { try { setLayoutItems(await fetchCatalogoLayout()); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao carregar layout.'); } }
   
-  // BLINDAGEM TYPESCRIPT APLICADA AQUI (as any)
   function labelForLayoutItem(item: LayoutItem) {
     if (item.tipo === ('ao_vivo_fileira' as any)) return item.titulo || 'Fileira TV Ao Vivo';
     if (item.tipo === 'series') return 'Séries';
@@ -1597,29 +1405,20 @@ function AdminPage() {
     return 'Seção';
   }
   
-  // BLINDAGEM TYPESCRIPT APLICADA AQUI (as any)
   function podeGerenciarVideosDaSecao(tipo: LayoutItem['tipo']) { return tipo === 'hero' || tipo === 'carrossel' || tipo === 'top10' || tipo === ('ao_vivo_fileira' as any); }
-  
   function podeApagarSecao(tipo: LayoutItem['tipo']) { return tipo !== 'series' && tipo !== 'catalogo_geral' && tipo !== 'colecao'; }
   function handleLayoutDragStart(index: number) { setDragLayoutIndex(index); }
   function handleLayoutDragOver(event: DragEvent) { event.preventDefault(); }
   async function handleLayoutDrop(targetIndex: number) {
     if (dragLayoutIndex === null || dragLayoutIndex === targetIndex) { setDragLayoutIndex(null); return; }
-    const reordered = [...layoutItems];
-    const [moved] = reordered.splice(dragLayoutIndex, 1);
-    reordered.splice(targetIndex, 0, moved);
-    setLayoutItems(reordered);
-    setDragLayoutIndex(null);
+    const reordered = [...layoutItems]; const [moved] = reordered.splice(dragLayoutIndex, 1); reordered.splice(targetIndex, 0, moved);
+    setLayoutItems(reordered); setDragLayoutIndex(null);
     try { await adminReorderLayout(reordered.map((item) => item.id)); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao reordenar layout.'); }
   }
   function moveLayoutSection(index: number, direcao: -1 | 1) {
-    const alvo = index + direcao;
-    if (alvo < 0 || alvo >= layoutItems.length) return;
-    const reordered = [...layoutItems];
-    const [moved] = reordered.splice(index, 1);
-    reordered.splice(alvo, 0, moved);
-    setLayoutItems(reordered);
-    adminReorderLayout(reordered.map((item) => item.id)).catch((error) => setMessage(error instanceof Error ? error.message : 'Erro ao reordenar layout.'));
+    const alvo = index + direcao; if (alvo < 0 || alvo >= layoutItems.length) return;
+    const reordered = [...layoutItems]; const [moved] = reordered.splice(index, 1); reordered.splice(alvo, 0, moved);
+    setLayoutItems(reordered); adminReorderLayout(reordered.map((item) => item.id)).catch((error) => setMessage(error instanceof Error ? error.message : 'Erro ao reordenar layout.'));
   }
   async function toggleLayoutVisibleHandler(item: LayoutItem) {
     try { await adminToggleLayoutVisible(item.id, !item.visivel); await loadLayout(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao atualizar.'); }
@@ -1633,64 +1432,33 @@ function AdminPage() {
       const config: LayoutSectionConfig = {};
       if (novaSecaoTipo === 'elenco') config.nome = novaSecaoNome.trim();
       if (novaSecaoTipo === 'categoria') config.valor = novaSecaoValor.trim();
-      
-      // BLINDAGEM TYPESCRIPT APLICADA AQUI (as any)
       if (novaSecaoTipo === 'hero' || novaSecaoTipo === 'carrossel' || novaSecaoTipo === 'top10' || novaSecaoTipo === ('ao_vivo_fileira' as any)) config.video_ids = [];
-      
       await adminCreateLayoutSection({ tipo: novaSecaoTipo, titulo: novaSecaoTitulo.trim() || undefined, config });
-      setNovaSecaoTitulo('');
-      setNovaSecaoNome('');
-      setNovaSecaoValor('');
-      setNovaSecaoTipo('carrossel');
-      await loadLayout();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Erro ao criar seção.');
-    } finally {
-      setCriandoSecao(false);
-    }
+      setNovaSecaoTitulo(''); setNovaSecaoNome(''); setNovaSecaoValor(''); setNovaSecaoTipo('carrossel'); await loadLayout();
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao criar seção.'); } finally { setCriandoSecao(false); }
   }
-  function selectLayoutSectionForVideos(item: LayoutItem) {
-    setSelectedLayoutSection(item);
-    setSecaoVideoIds(item.config?.video_ids || []);
-  }
+  function selectLayoutSectionForVideos(item: LayoutItem) { setSelectedLayoutSection(item); setSecaoVideoIds(item.config?.video_ids || []); }
   async function persistSecaoVideoIds(newList: string[]) {
     if (!selectedLayoutSection) return;
     setSecaoVideoIds(newList);
     try {
       const novoConfig = { ...selectedLayoutSection.config, video_ids: newList };
       await adminUpdateLayoutSection(selectedLayoutSection.id, { config: novoConfig });
-      setSelectedLayoutSection({ ...selectedLayoutSection, config: novoConfig });
-      await loadLayout();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Erro ao salvar vídeos.');
-    }
+      setSelectedLayoutSection({ ...selectedLayoutSection, config: novoConfig }); await loadLayout();
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao salvar vídeos.'); }
   }
-  function addVideoToSecao(videoId: string) {
-    if (!videoId || secaoVideoIds.includes(videoId)) return;
-    persistSecaoVideoIds([...secaoVideoIds, videoId]);
-  }
-  function removeVideoFromSecao(videoId: string) {
-    persistSecaoVideoIds(secaoVideoIds.filter((id) => id !== videoId));
-  }
+  function addVideoToSecao(videoId: string) { if (!videoId || secaoVideoIds.includes(videoId)) return; persistSecaoVideoIds([...secaoVideoIds, videoId]); }
+  function removeVideoFromSecao(videoId: string) { persistSecaoVideoIds(secaoVideoIds.filter((id) => id !== videoId)); }
   function handleSecaoVideoDragStart(index: number) { setDragSecaoVideoIndex(index); }
   function handleSecaoVideoDragOver(event: DragEvent) { event.preventDefault(); }
   function handleSecaoVideoDrop(targetIndex: number) {
     if (dragSecaoVideoIndex === null || dragSecaoVideoIndex === targetIndex) { setDragSecaoVideoIndex(null); return; }
-    const reordered = [...secaoVideoIds];
-    const [moved] = reordered.splice(dragSecaoVideoIndex, 1);
-    reordered.splice(targetIndex, 0, moved);
-    setDragSecaoVideoIndex(null);
-    persistSecaoVideoIds(reordered);
+    const reordered = [...secaoVideoIds]; const [moved] = reordered.splice(dragSecaoVideoIndex, 1); reordered.splice(targetIndex, 0, moved);
+    setDragSecaoVideoIndex(null); persistSecaoVideoIds(reordered);
   }
   async function deleteLayoutSectionHandler(item: LayoutItem) {
     if (!window.confirm('Apagar esta seção?')) return;
-    try {
-      await adminDeleteLayoutSection(item.id);
-      if (selectedLayoutSection?.id === item.id) { setSelectedLayoutSection(null); setSecaoVideoIds([]); }
-      await loadLayout();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Erro ao apagar.');
-    }
+    try { await adminDeleteLayoutSection(item.id); if (selectedLayoutSection?.id === item.id) { setSelectedLayoutSection(null); setSecaoVideoIds([]); } await loadLayout(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao apagar.'); }
   }
 
   async function loadCupons() { try { setCupons(await fetchAdminCupons()); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao carregar cupons.'); } }
@@ -1700,127 +1468,53 @@ function AdminPage() {
     const desconto = Number(novoCupomDesconto);
     if (!desconto || desconto < 1 || desconto > 100) { setMessage('Desconto inválido.'); return; }
     setCriandoCupom(true);
-    try {
-      await adminCreateCupom({ codigo: novoCupomCodigo, percentual_desconto: desconto, valido_ate: novoCupomValidade || null });
-      setNovoCupomCodigo('');
-      setNovoCupomDesconto('10');
-      setNovoCupomValidade('');
-      await loadCupons();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Erro ao criar cupom.');
-    } finally {
-      setCriandoCupom(false);
-    }
+    try { await adminCreateCupom({ codigo: novoCupomCodigo, percentual_desconto: desconto, valido_ate: novoCupomValidade || null }); setNovoCupomCodigo(''); setNovoCupomDesconto('10'); setNovoCupomValidade(''); await loadCupons(); } 
+    catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao criar cupom.'); } finally { setCriandoCupom(false); }
   }
-  async function toggleCupomHandler(cupom: Cupom) {
-    try { await adminToggleCupom(cupom.codigo, !cupom.ativo); await loadCupons(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao atualizar cupom.'); }
-  }
-  async function deleteCupomHandler(codigo: string) {
-    if (!window.confirm('Apagar cupom?')) return;
-    try { await adminDeleteCupom(codigo); await loadCupons(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao apagar.'); }
-  }
+  async function toggleCupomHandler(cupom: Cupom) { try { await adminToggleCupom(cupom.codigo, !cupom.ativo); await loadCupons(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao atualizar cupom.'); } }
+  async function deleteCupomHandler(codigo: string) { if (!window.confirm('Apagar cupom?')) return; try { await adminDeleteCupom(codigo); await loadCupons(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao apagar.'); } }
 
   async function loadEquipe() { try { setEquipe(await fetchEquipe()); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao carregar equipe.'); } }
   async function addToEquipeHandler() {
     if (!novoEquipeEmail.trim()) return;
     try { await adminAddToEquipe(novoEquipeEmail); setNovoEquipeEmail(''); await loadEquipe(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao adicionar à equipe.'); }
   }
-  async function promoverMasterHandler(id: string) {
-    if (!window.confirm('Tornar admin master?')) return;
-    try { await adminPromoverMaster(id); await loadEquipe(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao promover.'); }
-  }
-  async function rebaixarMasterHandler(id: string) {
-    if (!window.confirm('Tirar acesso de master?')) return;
-    try { await adminRebaixarMaster(id); await loadEquipe(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao rebaixar.'); }
-  }
-  async function removerDaEquipeHandler(id: string) {
-    if (!window.confirm('Remover acesso?')) return;
-    try { await adminRemoverDaEquipe(id); await loadEquipe(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao remover.'); }
-  }
+  async function promoverMasterHandler(id: string) { if (!window.confirm('Tornar admin master?')) return; try { await adminPromoverMaster(id); await loadEquipe(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao promover.'); } }
+  async function rebaixarMasterHandler(id: string) { if (!window.confirm('Tirar acesso de master?')) return; try { await adminRebaixarMaster(id); await loadEquipe(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao rebaixar.'); } }
+  async function removerDaEquipeHandler(id: string) { if (!window.confirm('Remover acesso?')) return; try { await adminRemoverDaEquipe(id); await loadEquipe(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao remover.'); } }
 
   async function loadPlans() { try { setPlans(await fetchAdminPlans()); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao carregar planos.'); } }
-  function resetPlanoForm() {
-    setPlanoForm({ nome: '', categoria: '', descricao: '', preco: '', dispositivos: '1', duracaoQtd: '1', duracaoUnidade: 'meses' });
-    setEditingPlanoId(null);
-  }
-  function editPlano(plan: Plan) {
-    setEditingPlanoId(plan.id);
-    setPlanoForm({
-      nome: plan.nome || '',
-      categoria: plan.categoria || '',
-      descricao: plan.descricao || '',
-      preco: plan.preco != null ? String(plan.preco) : '',
-      dispositivos: String(plan.dispositivos || 1),
-      duracaoQtd: String(plan.duracao_dias || plan.duracao_meses || 1),
-      duracaoUnidade: plan.duracao_dias ? 'dias' : 'meses',
-    });
-  }
+  function resetPlanoForm() { setPlanoForm({ nome: '', categoria: '', descricao: '', preco: '', dispositivos: '1', duracaoQtd: '1', duracaoUnidade: 'meses' }); setEditingPlanoId(null); }
+  function editPlano(plan: Plan) { setEditingPlanoId(plan.id); setPlanoForm({ nome: plan.nome || '', categoria: plan.categoria || '', descricao: plan.descricao || '', preco: plan.preco != null ? String(plan.preco) : '', dispositivos: String(plan.dispositivos || 1), duracaoQtd: String(plan.duracao_dias || plan.duracao_meses || 1), duracaoUnidade: plan.duracao_dias ? 'dias' : 'meses' }); }
   async function savePlano() {
     setMessage('');
     const preco = Number(planoForm.preco);
-    if (!planoForm.nome.trim() || !preco || preco <= 0) {
-      setMessage('Preencha nome e preço válido.');
-      return;
-    }
+    if (!planoForm.nome.trim() || !preco || preco <= 0) { setMessage('Preencha nome e preço válido.'); return; }
     setSavingPlano(true);
     const qtd = Number(planoForm.duracaoQtd) || 1;
-    const payload: Partial<Plan> = {
-      nome: planoForm.nome.trim(),
-      categoria: planoForm.categoria.trim() || planoForm.nome.trim(),
-      descricao: planoForm.descricao.trim() || null,
-      preco,
-      dispositivos: Number(planoForm.dispositivos) || 1,
-      duracao_meses: planoForm.duracaoUnidade === 'meses' ? qtd : 0,
-      duracao_dias: planoForm.duracaoUnidade === 'dias' ? qtd : null,
-    };
+    const payload: Partial<Plan> = { nome: planoForm.nome.trim(), categoria: planoForm.categoria.trim() || planoForm.nome.trim(), descricao: planoForm.descricao.trim() || null, preco, dispositivos: Number(planoForm.dispositivos) || 1, duracao_meses: planoForm.duracaoUnidade === 'meses' ? qtd : 0, duracao_dias: planoForm.duracaoUnidade === 'dias' ? qtd : null };
     try {
       if (editingPlanoId) await adminUpdatePlano(editingPlanoId, payload);
-      else {
-        const proximaOrdem = plans.length ? Math.max(...plans.map((p) => p.ordem || 0)) + 1 : 1;
-        await adminCreatePlano({ ...payload, ordem: proximaOrdem, ativo: true });
-      }
-      resetPlanoForm();
-      await loadPlans();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Erro ao salvar plano.');
-    } finally {
-      setSavingPlano(false);
-    }
+      else { const proximaOrdem = plans.length ? Math.max(...plans.map((p) => p.ordem || 0)) + 1 : 1; await adminCreatePlano({ ...payload, ordem: proximaOrdem, ativo: true }); }
+      resetPlanoForm(); await loadPlans();
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao salvar plano.'); } finally { setSavingPlano(false); }
   }
-  async function deletePlanoHandler(id: string) {
-    if (!window.confirm('Apagar plano?')) return;
-    try { await adminDeletePlano(id); await loadPlans(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao apagar.'); }
-  }
+  async function deletePlanoHandler(id: string) { if (!window.confirm('Apagar plano?')) return; try { await adminDeletePlano(id); await loadPlans(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao apagar.'); } }
+  
   async function loadClients() { try { setClients(await fetchAdminClients()); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao carregar clientes.'); } }
   function openGrant(client: Cliente) { setGrantTarget(client); setGrantForm({ quantidade: 30, unidade: 'dias', motivo: '' }); }
   function closeGrant() { setGrantTarget(null); }
   async function confirmGrant() {
     if (!grantTarget) return;
     setGrantBusy(true);
-    try {
-      await grantAccess({ usuario_id: grantTarget.id, quantidade: grantForm.quantidade, unidade: grantForm.unidade, motivo: grantForm.motivo });
-      setMessage('Acesso concedido com sucesso.');
-      closeGrant();
-      await loadClients();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Erro ao conceder acesso.');
-    } finally {
-      setGrantBusy(false);
-    }
+    try { await grantAccess({ usuario_id: grantTarget.id, quantidade: grantForm.quantidade, unidade: grantForm.unidade, motivo: grantForm.motivo }); setMessage('Acesso concedido com sucesso.'); closeGrant(); await loadClients(); } 
+    catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao conceder acesso.'); } finally { setGrantBusy(false); }
   }
   async function handleRevoke(client: Cliente) {
     const nome = client.nome || client.email || 'cliente';
     if (!window.confirm(`Cancelar acesso de ${nome}?`)) return;
     setRevokeBusyId(client.id);
-    try {
-      await revokeAccess(client.id);
-      setMessage(`Acesso cancelado para ${nome}.`);
-      await loadClients();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Erro ao cancelar.');
-    } finally {
-      setRevokeBusyId(null);
-    }
+    try { await revokeAccess(client.id); setMessage(`Acesso cancelado para ${nome}.`); await loadClients(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao cancelar.'); } finally { setRevokeBusyId(null); }
   }
   async function togglePlan(plan: Plan) { try { await updatePlanActive(plan.id, !plan.ativo); await loadPlans(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao atualizar plano.'); } }
 
@@ -1829,9 +1523,7 @@ function AdminPage() {
   if (loading) return <div className="content-wrap page-main"><PageHeader eyebrow="Administração" title="Verificando acesso" description="Aguarde..." /></div>;
   if (!profile?.is_admin) return <LockedPage title="Acesso restrito" description="Área exclusiva para administradores." />;
 
-  const tabs = profile.admin_master
-    ? ['videos', 'colecoes', 'series', 'layout', 'cupons', 'clientes', 'planos', 'equipe']
-    : ['videos', 'colecoes', 'series', 'layout'];
+  const tabs = profile.admin_master ? ['videos', 'colecoes', 'series', 'layout', 'cupons', 'clientes', 'planos', 'equipe'] : ['videos', 'colecoes', 'series', 'layout'];
   const tabLabels: Record<string, string> = { videos: 'Vídeos', colecoes: 'Coleções', series: 'Séries', layout: 'Layout', cupons: 'Cupons', clientes: 'Clientes', planos: 'Planos', equipe: 'Equipe' };
 
   function onSelectTab(item: string) {
@@ -1873,7 +1565,7 @@ function AdminPage() {
       <div className="field"><label>Nova coleção</label><input className="input focus-tv" value={novaColecaoTitulo} onChange={(e) => setNovaColecaoTitulo(e.target.value)} placeholder="Ex.: Ação Explosiva" /></div>
       <div className="field"><label>Descrição (opcional)</label><input className="input focus-tv" value={novaColecaoDescricao} onChange={(e) => setNovaColecaoDescricao(e.target.value)} placeholder="Descrição da coleção" /></div>
       <button className="primary-button focus-tv" onClick={createColecao} disabled={criandoColecao}>{criandoColecao ? 'Criando...' : 'Criar coleção'}</button>
-      <div className="chip-row" style={{ marginTop: 20 }}>{colecoes.map((c) => <button key={c.id} className={'chip focus-tv ' + (selectedColecao?.id === c.id ? 'active' : '')} onClick={() => selectColecao(c)}>{c.titulo}</button>)}</div>
+      <div className="chip-row no-scrollbar" style={{ display: 'flex', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 8, marginTop: 20 }}>{colecoes.map((c) => <button key={c.id} className={'chip focus-tv ' + (selectedColecao?.id === c.id ? 'active' : '')} style={{ flexShrink: 0 }} onClick={() => selectColecao(c)}>{c.titulo}</button>)}</div>
       {selectedColecao && <div className="admin-list" style={{ marginTop: 16 }}>
         <h3 className="section-title">{selectedColecao.titulo}</h3>
         <p className="muted" style={{ marginBottom: 12 }}>Arraste para reordenar.</p>
@@ -1895,7 +1587,7 @@ function AdminPage() {
       <div className="field"><label>Gênero</label><select className="input focus-tv" value={novaSerieGenero} onChange={(e) => setNovaSerieGenero(e.target.value)}><option value="">Selecione...</option>{generos.map((g) => <option key={g.id} value={g.nome}>{g.nome}</option>)}</select></div>
       <div className="field"><label>URL da Capa</label><input className="input focus-tv" value={novaSerieCapa} onChange={(e) => setNovaSerieCapa(e.target.value)} placeholder="https://..." /></div>
       <button className="primary-button focus-tv" onClick={createSerie} disabled={criandoSerie}>{criandoSerie ? 'Criando...' : 'Criar Série'}</button>
-      <div className="chip-row" style={{ marginTop: 20 }}>{series.map((s) => <button key={s.id} className={'chip focus-tv ' + (selectedSerie?.id === s.id ? 'active' : '')} onClick={() => selectSerie(s)}>{s.titulo}</button>)}</div>
+      <div className="chip-row no-scrollbar" style={{ display: 'flex', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 8, marginTop: 20 }}>{series.map((s) => <button key={s.id} className={'chip focus-tv ' + (selectedSerie?.id === s.id ? 'active' : '')} style={{ flexShrink: 0 }} onClick={() => selectSerie(s)}>{s.titulo}</button>)}</div>
       {selectedSerie && <div className="admin-list" style={{ marginTop: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3 className="section-title">{selectedSerie.titulo}</h3><button className="quiet-button focus-tv" onClick={() => deleteSerieHandler(selectedSerie.id)} style={{ color: '#ff8275' }}>Apagar Série</button>
@@ -1903,7 +1595,7 @@ function AdminPage() {
         <div className="field" style={{ marginTop: 12 }}><label>Nova Temporada (Número)</label><input type="number" className="input focus-tv" value={novaTemporadaNumero} onChange={(e) => setNovaTemporadaNumero(e.target.value)} /></div>
         <div className="field"><label>Título da Temporada (Opcional)</label><input className="input focus-tv" value={novaTemporadaTitulo} onChange={(e) => setNovaTemporadaTitulo(e.target.value)} placeholder="Ex.: 1ª Temporada" /></div>
         <button className="secondary-button focus-tv" onClick={createTemporada}>Adicionar Temporada</button>
-        <div className="chip-row" style={{ marginTop: 20 }}>{temporadas.map((t) => <button key={t.id} className={'chip focus-tv ' + (selectedTemporada?.id === t.id ? 'active' : '')} onClick={() => selectTemporada(t)}>{t.titulo || `Temporada ${t.numero}`}</button>)}</div>
+        <div className="chip-row no-scrollbar" style={{ display: 'flex', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 8, marginTop: 20 }}>{temporadas.map((t) => <button key={t.id} className={'chip focus-tv ' + (selectedTemporada?.id === t.id ? 'active' : '')} style={{ flexShrink: 0 }} onClick={() => selectTemporada(t)}>{t.titulo || `Temporada ${t.numero}`}</button>)}</div>
         {selectedTemporada && <div style={{ marginTop: 16, padding: 12, border: '1px solid rgba(255,255,255,.05)', borderRadius: 8 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <strong>Episódios</strong><button className="quiet-button focus-tv" onClick={() => deleteTemporadaHandler(selectedTemporada.id)} style={{ color: '#ff8275' }}><Trash2 size={15} /></button>
