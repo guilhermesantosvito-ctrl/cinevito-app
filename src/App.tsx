@@ -29,10 +29,10 @@ const MAIN_TABS = ['Início', 'Filmes', 'Séries'];
 // BLINDAGEM TYPESCRIPT
 const LAYOUT_SECTION_TYPES: Array<{ value: LayoutItem['tipo']; label: string }> = [
   { value: 'hero', label: 'Início: Banner Hero (destaque rotativo no topo)' },
-  { value: 'carrossel', label: 'Início: Carrossel horizontal padrão' },
+  { value: 'carrossel', label: 'Início: Carrossel horizontal padrão (Escolha manual)' },
   { value: 'top10', label: 'Início: Top 10 com numeração em destaque' },
   { value: 'elenco', label: 'Início: Grade por Ator/Diretor' },
-  { value: 'categoria', label: 'Início: Categoria específica' },
+  { value: 'categoria', label: 'Início: Categoria ou Gênero (Automático)' },
   { value: 'ao_vivo_fileira' as any, label: 'TV: Fileira Customizada' },
 ];
 
@@ -370,7 +370,8 @@ function AppShell({ children }: { children: ReactNode }) {
             {navigation.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className="nav-link focus-tv" aria-current={active(href) ? 'page' : undefined} data-testid={`link-nav-${label.toLowerCase().replaceAll(' ', '-')}`} tabIndex={0}><Icon size={16} />{label}</Link>)}
           </nav>
           <div className="topbar-actions">
-            {isAdmin && <Link href="/admin" className="nav-link focus-tv" data-testid="link-admin" tabIndex={0}><Settings size={16} />Painel</Link>}{user ? <><Link href="/perfil" className="avatar focus-tv" aria-label="Abrir perfil" data-testid="link-profile-avatar" tabIndex={0}>{initials(user)}</Link><button className="icon-button focus-tv" onClick={logout} title="Sair" aria-label="Sair" data-testid="button-logout" tabIndex={0}><LogOut size={17} /></button></> : <Link href="/" className="secondary-button focus-tv" data-testid="link-login" tabIndex={0}><LogIn size={15} />Entrar</Link>}
+            {isAdmin && <Link href="/admin" className="nav-link focus-tv" data-testid="link-admin" tabIndex={0}><Settings size={16} />Painel</Link>}
+            {user ? <><Link href="/perfil" className="avatar focus-tv" aria-label="Abrir perfil" data-testid="link-profile-avatar" tabIndex={0}>{initials(user)}</Link><button className="icon-button focus-tv" onClick={logout} title="Sair" aria-label="Sair" data-testid="button-logout" tabIndex={0}><LogOut size={17} /></button></> : <Link href="/" className="secondary-button focus-tv" data-testid="link-login" tabIndex={0}><LogIn size={15} />Entrar</Link>}
           </div>
         </div>
       </header>
@@ -649,7 +650,7 @@ function LiveTVPage() {
 }
 
 // ============================================================================
-// CATÁLOGO PRINCIPAL (Padrão Nível Premium)
+// CATÁLOGO PRINCIPAL (O Poder Total de CMS)
 // ============================================================================
 function CatalogPage() {
   const [, setLocation] = useLocation();
@@ -762,12 +763,17 @@ function CatalogPage() {
   function renderCategoriaSection(item: LayoutItem, key: string) {
     const valorAlvo = normalizeCatalogLabel(item.config?.valor);
     if (!valorAlvo) return null;
+    // Puxa tudo (Filmes e Séries) que bater com a categoria que o admin escolheu no CMS!
     const secaoVideos = videos.filter((video) => !episodioVideoIds.has(video.id) && (normalizeCatalogLabel(video.categoria).includes(valorAlvo) || normalizeCatalogLabel(video.genero).includes(valorAlvo)));
-    if (!secaoVideos.length) return null;
+    const secaoSeries = series.filter((serie) => normalizeCatalogLabel(serie.categoria_id).includes(valorAlvo) || normalizeCatalogLabel(serie.genero).includes(valorAlvo));
+    
+    if (!secaoVideos.length && !secaoSeries.length) return null;
+    
     return <section className="shelf" key={key} style={{ marginTop: 22 }}>
       <div className="shelf-heading"><h2 className="section-title">{item.titulo || item.config?.valor}</h2><div className="section-rule" /></div>
       <div className="video-grid horizontal-scroll">
         {secaoVideos.map((video) => <div key={video.id} style={{ width: 160 }}><Poster video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} /></div>)}
+        {secaoSeries.map((serie) => <div key={serie.id} style={{ width: 160 }}><SerieCard serie={serie} onOpen={() => setLocation(`/serie/${serie.id}`)} /></div>)}
       </div>
     </section>;
   }
@@ -921,21 +927,19 @@ function CatalogPage() {
         ) : shelf === 'Séries' ? (
           renderSeries()
         ) : (
-          /* ABA INÍCIO (Layout CMS e Continuar Assistindo) */
+          /* ABA INÍCIO (O PODER TOTAL DO CMS DO ADMIN) */
           <>
             {continuarAssistindo.length > 0 && <section className="shelf" style={{ marginTop: 22 }}>
               <div className="shelf-heading"><h2 className="section-title">Continuar assistindo</h2><div className="section-rule" /></div>
               <div className="video-grid horizontal-scroll">
-                {continuarAssistindo.filter((item) => item.videos).map((item) => <div key={item.id} style={{ width: 160 }}><ContinueCard item={item} onOpen={() => openVideo(item.video_id)} onRemove={() => handleRemoveContinuar(item.id)} /></div>)}
+                {continuarAssistindo.filter((item) => item.videos).map((item) => <div key={item.id} style={{ width: 160, flexShrink: 0, scrollSnapAlign: 'start' }}><ContinueCard item={item} onOpen={() => openVideo(item.video_id)} onRemove={() => handleRemoveContinuar(item.id)} /></div>)}
               </div>
             </section>}
             
             {layout.length > 0 ? (
               layout.map((item) => {
                 if (item.tipo === ('ao_vivo_fileira' as any)) return null;
-                if (item.tipo === 'series') return <div key={item.id}>{renderSeries()}</div>; 
                 if (item.tipo === 'colecao' && item.colecao_id) return renderColecaoSection(item.colecao_id, item.id);
-                if (item.tipo === 'catalogo_geral') return <div key={item.id}>{renderFilmes()}</div>;
                 if (item.tipo === 'hero') return renderHeroSection(item, item.id);
                 if (item.tipo === 'carrossel') return renderCarrosselSection(item, item.id);
                 if (item.tipo === 'top10') return renderTop10Section(item, item.id);
@@ -957,7 +961,7 @@ function CatalogPage() {
 }
 
 // ============================================================================
-// COMPONENTE DO PLAYER (Com escudos de proteção)
+// COMPONENTE DO PLAYER (Com escudos de proteção responsivos)
 // ============================================================================
 function VideoPlayer({ embed, title }: { embed: { type: string, src: string }, title?: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -1017,10 +1021,11 @@ function VideoPlayer({ embed, title }: { embed: { type: string, src: string }, t
         {/* ESCUDO TOPO: Bloqueia links de direcionamento e título */}
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '60px', zIndex: 10 }} title="Cabeçalho protegido" />
         
-        {/* ESCUDO INFERIOR (PERFEITAMENTE CALIBRADO): 
-            Bloqueia Chromecast, PiP, Share, Embed e Logo. 
-            Deixa os últimos 135px (Engrenagem, Mini-player nativo e Fullscreen) totalmente livres! */}
-        <div style={{ position: 'absolute', bottom: 0, right: '135px', width: '250px', height: '50px', zIndex: 10 }} title="Controles protegidos" />
+        {/* ESCUDO INFERIOR (O MAIS PRECISO): 
+            Ele NÃO trava o player inteiro. Ele é um bloco fixo alinhado à direita 
+            que cobre APENAS do Chromecast até a Logo. 
+            Ele termina antes dos últimos 135px da tela, deixando as 3 engrenagens/modos livres. */}
+        <div style={{ position: 'absolute', bottom: 0, right: '135px', width: '140px', height: '50px', zIndex: 10 }} title="Controles protegidos" />
         
         <iframe src={embed.src} title={title} allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowFullScreen style={{ width: '100%', height: '100%', border: 0 }} data-testid="video-player" />
       </div>
@@ -1054,10 +1059,10 @@ function PlayerPage() {
     if (!video || access !== true) return;
     let cancelled = false;
     
-    // GATILHO INDEPENDENTE: Salva a View
+    // GATILHO INDEPENDENTE 1: Salva a View no banco
     registrarVisualizacao(video.id).catch(() => {});
     
-    // HISTÓRICO GARANTIDO: Salva a visita se for um filme (não ao vivo) sem depender de checar episódios
+    // GATILHO INDEPENDENTE 2: Salva o Histórico de Filmes (sem depender da verificação de série)
     if (user && !video.ao_vivo) {
       salvarProgresso({ video_id: video.id }).catch(() => {});
     }
@@ -1071,6 +1076,10 @@ function PlayerPage() {
           setEpisodioInfo(info);
           const lista = await fetchEpisodios(info.episodio.temporada_id);
           if (!cancelled) setEpisodiosDaTemporada(lista);
+          // GATILHO 3: Se for série, regrava o histórico incluindo o número do episódio
+          if (user) {
+            salvarProgresso({ video_id: video.id, serie_id: info.serieId, temporada_id: info.episodio.temporada_id, numero_episodio: info.episodio.numero }).catch(() => {});
+          }
         } else {
           setEpisodioInfo(null);
           setEpisodiosDaTemporada([]);
@@ -1096,10 +1105,10 @@ function PlayerPage() {
   if (!video) return <div className="content-wrap page-main"><div className="empty-state"><CircleAlert size={26} /><h3>Vídeo não encontrado</h3><p>Esse título não está mais disponível no catálogo.</p><Link href="/catalogo" className="primary-button focus-tv" tabIndex={0}>Voltar ao catálogo</Link></div></div>;
   
   // SOLUÇÃO DA TELA DO PLAYER (TAMANHO DE CINEMA)
+  // O maxHeight: '75vh' evita que o vídeo ocupe toda a altura do monitor e esmague a descrição
   return <div className="content-wrap page-main">
     <button className="quiet-button focus-tv" onClick={() => setLocation('/catalogo')} data-testid="button-back-catalog" tabIndex={0}><ArrowLeft size={16} />Voltar ao catálogo</button>
     <div className="player-stage" style={{ marginTop: 17 }}>
-      {/* O Player agora respeita o tamanho da tela e o formato 16:9 sempre! */}
       <div className="player-box" style={{ aspectRatio: '16/9', width: '100%', maxHeight: '75vh', margin: '0 auto', background: '#000', borderRadius: '12px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <VideoPlayer embed={embed} title={video.titulo} />
       </div>
