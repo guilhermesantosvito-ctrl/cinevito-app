@@ -26,7 +26,7 @@ const MP_PUBLIC_KEY = 'APP_USR-471c3a9b-ff0f-4743-a417-e54b9f13e902';
 const CATALOG_REFRESH_INTERVAL_MS = 3 * 60 * 1000;
 const MAIN_TABS = ['Início', 'Filmes', 'Séries'];
 
-// BLINDAGEM TYPESCRIPT APLICADA AQUI (as any)
+// BLINDAGEM TYPESCRIPT
 const LAYOUT_SECTION_TYPES: Array<{ value: LayoutItem['tipo']; label: string }> = [
   { value: 'hero', label: 'Início: Banner Hero (destaque rotativo no topo)' },
   { value: 'carrossel', label: 'Início: Carrossel horizontal padrão' },
@@ -430,19 +430,19 @@ function AuthPage() {
           <h2>{mode === 'login' ? 'Bem-vindo de volta' : 'Crie sua conta'}</h2>
           <p>{mode === 'login' ? 'Entre para continuar assistindo de onde parou.' : 'Comece seu acesso ao catálogo do CineVito.'}</p>
           <div className="auth-tabs" role="tablist">
-            <button className={`auth-tab ${mode === 'login' ? 'active' : ''}`} onClick={() => setMode('login')} role="tab" aria-selected={mode === 'login'} data-testid="tab-login">Entrar</button>
-            <button className={`auth-tab ${mode === 'signup' ? 'active' : ''}`} onClick={() => setMode('signup')} role="tab" aria-selected={mode === 'signup'} data-testid="tab-signup">Criar conta</button>
+            <button className={`auth-tab ${mode === 'login' ? 'active' : ''}`} onClick={() => setMode('login')} role="tab" aria-selected={mode === 'login'} data-testid="tab-login" tabIndex={0}>Entrar</button>
+            <button className={`auth-tab ${mode === 'signup' ? 'active' : ''}`} onClick={() => setMode('signup')} role="tab" aria-selected={mode === 'signup'} data-testid="tab-signup" tabIndex={0}>Criar conta</button>
           </div>
           <form onSubmit={submit}>
-            {mode === 'signup' && <div className="field"><label htmlFor="auth-name">Seu nome</label><input id="auth-name" className="input focus-tv" value={form.nome} onChange={(e) => update('nome', e.target.value)} placeholder="Como quer ser chamado?" autoComplete="name" data-testid="input-signup-name" /></div>}
-            <div className="field"><label htmlFor="auth-email">E-mail</label><input id="auth-email" type="email" className="input focus-tv" value={form.email} onChange={(e) => update('email', e.target.value)} placeholder="voce@exemplo.com" autoComplete="email" data-testid="input-auth-email" /></div>
-            <div className="field"><label htmlFor="auth-password">Senha</label><div className="password-wrap"><input id="auth-password" type={showPassword ? 'text' : 'password'} className="input focus-tv" value={form.password} onChange={(e) => update('password', e.target.value)} placeholder="Sua senha" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} data-testid="input-auth-password" /><button type="button" className="password-toggle focus-tv" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'} data-testid="button-toggle-password">{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></div></div>
-            {mode === 'signup' && <><div className="field"><label htmlFor="auth-birth">Data de nascimento <span className="muted">(opcional)</span></label><input id="auth-birth" type="date" className="input focus-tv" value={form.nascimento} onChange={(e) => update('nascimento', e.target.value)} data-testid="input-signup-birth" /></div><div className="field"><label htmlFor="auth-referral">Código de indicação <span className="muted">(opcional)</span></label><input id="auth-referral" className="input focus-tv" value={form.codigo} onChange={(e) => update('codigo', e.target.value.toUpperCase())} placeholder="Ex.: VITO4X9K" data-testid="input-signup-referral" /></div></>}
-            {mode === 'login' && <label className="check-row"><input type="checkbox" checked={form.lembrar} onChange={(e) => update('lembrar', e.target.checked)} data-testid="checkbox-remember-email" />Lembrar meu e-mail neste aparelho</label>}
+            {mode === 'signup' && <div className="field"><label htmlFor="auth-name">Seu nome</label><input id="auth-name" className="input focus-tv" value={form.nome} onChange={(e) => update('nome', e.target.value)} placeholder="Como quer ser chamado?" autoComplete="name" data-testid="input-signup-name" tabIndex={0} /></div>}
+            <div className="field"><label htmlFor="auth-email">E-mail</label><input id="auth-email" type="email" className="input focus-tv" value={form.email} onChange={(e) => update('email', e.target.value)} placeholder="voce@exemplo.com" autoComplete="email" data-testid="input-auth-email" tabIndex={0} /></div>
+            <div className="field"><label htmlFor="auth-password">Senha</label><div className="password-wrap"><input id="auth-password" type={showPassword ? 'text' : 'password'} className="input focus-tv" value={form.password} onChange={(e) => update('password', e.target.value)} placeholder="Sua senha" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} data-testid="input-auth-password" tabIndex={0} /><button type="button" className="password-toggle focus-tv" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'} data-testid="button-toggle-password" tabIndex={0}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></div></div>
+            {mode === 'signup' && <><div className="field"><label htmlFor="auth-birth">Data de nascimento <span className="muted">(opcional)</span></label><input id="auth-birth" type="date" className="input focus-tv" value={form.nascimento} onChange={(e) => update('nascimento', e.target.value)} data-testid="input-signup-birth" tabIndex={0} /></div><div className="field"><label htmlFor="auth-referral">Código de indicação <span className="muted">(opcional)</span></label><input id="auth-referral" className="input focus-tv" value={form.codigo} onChange={(e) => update('codigo', e.target.value.toUpperCase())} placeholder="Ex.: VITO4X9K" data-testid="input-signup-referral" tabIndex={0} /></div></>}
+            {mode === 'login' && <label className="check-row"><input type="checkbox" checked={form.lembrar} onChange={(e) => update('lembrar', e.target.checked)} data-testid="checkbox-remember-email" tabIndex={0} />Lembrar meu e-mail neste aparelho</label>}
             {error && <p className="form-error" role="alert" data-testid="status-auth-error">{error}</p>}
             {notice && <p className="form-success" role="status" data-testid="status-auth-success">{notice}</p>}
-            <button type="submit" className="primary-button button-wide focus-tv" disabled={busy} data-testid="button-submit-auth">{busy ? 'Aguarde...' : mode === 'login' ? 'Entrar no CineVito' : 'Criar minha conta'}<ArrowLeft size={16} className="rotate-180" /></button>
-            {mode === 'login' && <Link href="/redefinir-senha" className="quiet-button button-wide focus-tv" data-testid="link-forgot-password">Esqueci minha senha</Link>}
+            <button type="submit" className="primary-button button-wide focus-tv" disabled={busy} data-testid="button-submit-auth" tabIndex={0}>{busy ? 'Aguarde...' : mode === 'login' ? 'Entrar no CineVito' : 'Criar minha conta'}<ArrowLeft size={16} className="rotate-180" /></button>
+            {mode === 'login' && <Link href="/redefinir-senha" className="quiet-button button-wide focus-tv" data-testid="link-forgot-password" tabIndex={0}>Esqueci minha senha</Link>}
           </form>
           <p className="auth-footnote">Ao continuar, você concorda com os termos de uso do CineVito.</p>
         </section>
@@ -460,7 +460,7 @@ function Poster({ video, favorite, onFavorite, onOpen, subtitle }: { video: Vide
   const fallbackGradient = { '--poster': 'linear-gradient(145deg, #0d596c, #172532 50%, #e58d49)' } as CSSProperties;
   const posterStyle = video.url_capa && !video.ao_vivo ? undefined : (video.ao_vivo ? tvGradient : fallbackGradient);
   const artStyle = video.url_capa ? { backgroundImage: `url(${video.url_capa})`, backgroundSize: video.ao_vivo ? '75%' : 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' } : undefined;
-  return <article className="video-card reveal" data-testid={`card-video-${video.id}`}><div className="poster focus-tv" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen()} style={posterStyle}><div className="poster-art" style={artStyle}><span className="poster-meta">{video.ao_vivo ? 'AO VIVO' : (video.ano || 'CINEVITO')}</span><strong className="poster-word">{video.titulo}</strong></div>{video.premium && <span className="premium-badge">Premium</span>}<button className={`poster-favorite focus-tv ${favorite ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); onFavorite(); }} aria-label={favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'} data-testid={`button-favorite-${video.id}`}><Heart size={15} fill={favorite ? 'currentColor' : 'none'} /></button></div><div className="video-info"><div><h3 className="video-title" data-testid={`text-video-title-${video.id}`}>{video.titulo}</h3><p className="video-subtitle">{subtitle || video.genero || video.categoria || 'Catálogo CineVito'}</p></div><Play size={14} color="#00c8ff" /></div></article>;
+  return <article className="video-card reveal" data-testid={`card-video-${video.id}`}><div className="poster focus-tv" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen()} style={posterStyle}><div className="poster-art" style={artStyle}><span className="poster-meta">{video.ao_vivo ? 'AO VIVO' : (video.ano || 'CINEVITO')}</span><strong className="poster-word">{video.titulo}</strong></div>{video.premium && <span className="premium-badge">Premium</span>}<button className={`poster-favorite focus-tv ${favorite ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); onFavorite(); }} aria-label={favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'} data-testid={`button-favorite-${video.id}`} tabIndex={0}><Heart size={15} fill={favorite ? 'currentColor' : 'none'} /></button></div><div className="video-info"><div><h3 className="video-title" data-testid={`text-video-title-${video.id}`}>{video.titulo}</h3><p className="video-subtitle">{subtitle || video.genero || video.categoria || 'Catálogo CineVito'}</p></div><Play size={14} color="#00c8ff" /></div></article>;
 }
 
 function RankedPoster({ video, rank, favorite, onFavorite, onOpen }: { video: Video; rank: number; favorite: boolean; onFavorite: () => void; onOpen: () => void }) {
@@ -492,7 +492,7 @@ function HeroBanner({ videos, onOpen }: { videos: Video[]; onOpen: (id: string) 
         <div className="eyebrow" style={{ color: '#00c8ff' }}>Em destaque</div>
         <h2 style={{ fontSize: '1.6rem', margin: '6px 0' }}>{video.titulo}</h2>
         <p className="muted" style={{ maxWidth: 520, fontSize: '.86rem' }}>{video.descricao}</p>
-        <button className="primary-button focus-tv" style={{ marginTop: 8 }} onClick={(e) => { e.stopPropagation(); onOpen(video.id); }}><Play size={15} />Assistir agora</button>
+        <button className="primary-button focus-tv" style={{ marginTop: 8 }} onClick={(e) => { e.stopPropagation(); onOpen(video.id); }} tabIndex={0}><Play size={15} />Assistir agora</button>
       </div>
       {videos.length > 1 && <div style={{ position: 'absolute', right: 16, top: 16, display: 'flex', gap: 6 }}>{videos.map((_, i) => <span key={i} style={{ width: 7, height: 7, borderRadius: '50%', background: i === index ? '#fff' : 'rgba(255,255,255,.35)' }} />)}</div>}
     </div>
@@ -527,7 +527,7 @@ function ContinueCard({ item, onOpen, onRemove }: { item: ContinuarAssistindoIte
   const subtitle = item.series ? `${item.series.titulo}${item.numero_episodio ? ` · Ep. ${item.numero_episodio}` : ''}` : undefined;
   const style = video.url_capa ? undefined : ({ '--poster': 'linear-gradient(145deg, #0d596c, #172532 50%, #e58d49)' } as CSSProperties);
   return <article className="video-card reveal" style={{ position: 'relative' }}>
-    <button onClick={(e) => { e.stopPropagation(); onRemove(); }} style={{ position: 'absolute', top: 6, right: 6, zIndex: 10, background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%', padding: 4, cursor: 'pointer', color: '#fff' }} title="Remover do histórico" aria-label="Remover">
+    <button onClick={(e) => { e.stopPropagation(); onRemove(); }} style={{ position: 'absolute', top: 6, right: 6, zIndex: 10, background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%', padding: 4, cursor: 'pointer', color: '#fff' }} title="Remover do histórico" aria-label="Remover" className="focus-tv" tabIndex={0}>
       <X size={14} />
     </button>
     <div className="poster focus-tv" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen()} style={style}>
@@ -597,17 +597,17 @@ function LiveTVPage() {
 
   return <div className="content-wrap page-main">
     <PageHeader eyebrow="Programação 24h" title="TV Ao Vivo" description="Canais de esportes, notícias e entretenimento rodando sem parar." />
-    {!user && <div className="notice notice-orange"><CircleAlert size={17} color="#ff8228" /><span><strong>Você está navegando como visitante.</strong> Entre para salvar canais favoritos.</span><Link href="/" className="quiet-button focus-tv">Entrar</Link></div>}
-    {user && access === false && <div className="notice notice-orange"><CircleAlert size={17} color="#ff8228" /><span><strong>Seu acesso gratuito acabou.</strong> Assine um plano para continuar assistindo.</span><Link href="/assinatura" className="quiet-button focus-tv">Ver planos</Link></div>}
+    {!user && <div className="notice notice-orange"><CircleAlert size={17} color="#ff8228" /><span><strong>Você está navegando como visitante.</strong> Entre para salvar canais favoritos.</span><Link href="/" className="quiet-button focus-tv" tabIndex={0}>Entrar</Link></div>}
+    {user && access === false && <div className="notice notice-orange"><CircleAlert size={17} color="#ff8228" /><span><strong>Seu acesso gratuito acabou.</strong> Assine um plano para continuar assistindo.</span><Link href="/assinatura" className="quiet-button focus-tv" tabIndex={0}>Ver planos</Link></div>}
     
-    <div className="catalog-toolbar"><div className="search-wrap"><Search size={16} /><input className="input focus-tv" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar canal..." aria-label="Buscar canal" /></div></div>
+    <div className="catalog-toolbar"><div className="search-wrap"><Search size={16} /><input className="input focus-tv" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar canal..." aria-label="Buscar canal" tabIndex={0} /></div></div>
     
     {categories.length > 1 && <div className="chip-row horizontal-scroll" aria-label="Filtrar por categoria">
-      {categories.map((item) => <button key={item} className={`chip focus-tv ${genre === item ? 'active' : ''}`} onClick={() => setGenre(item)}>{item}</button>)}
+      {categories.map((item) => <button key={item} className={`chip focus-tv ${genre === item ? 'active' : ''}`} onClick={() => setGenre(item)} tabIndex={0}>{item}</button>)}
     </div>}
     
     {loading && <div className="video-grid" style={{ marginTop: 22 }}>{Array.from({ length: 5 }).map((_, index) => <div className="skeleton" style={{ aspectRatio: '2/3' }} key={index} />)}</div>}
-    {error && <div className="notice notice-orange" role="alert" style={{ marginTop: 22 }}><CircleAlert size={17} color="#ff8275" /><span>{error}</span><button className="quiet-button focus-tv" onClick={() => window.location.reload()}><RefreshCw size={15} />Tentar de novo</button></div>}
+    {error && <div className="notice notice-orange" role="alert" style={{ marginTop: 22 }}><CircleAlert size={17} color="#ff8275" /><span>{error}</span><button className="quiet-button focus-tv" onClick={() => window.location.reload()} tabIndex={0}><RefreshCw size={15} />Tentar de novo</button></div>}
     
     {!loading && !error && <div style={{ marginTop: 22 }}>
       {query || genre !== 'Todos' ? (
@@ -795,7 +795,7 @@ function CatalogPage() {
           </section>
         )}
         {filteredVideos.length === 0 && filteredSeries.length === 0 && (
-          <div className="empty-state"><Search size={25} /><h3>Nenhum resultado encontrado</h3><button className="quiet-button focus-tv" onClick={() => setQuery('')}>Limpar busca</button></div>
+          <div className="empty-state"><Search size={25} /><h3>Nenhum resultado encontrado</h3><button className="quiet-button focus-tv" onClick={() => setQuery('')} tabIndex={0}>Limpar busca</button></div>
         )}
       </>
     );
@@ -827,7 +827,7 @@ function CatalogPage() {
             <div className="shelf-heading">
               <h2 className="section-title">{gName}</h2>
               <div className="section-rule" />
-              {vids.length > 6 && <button className="quiet-button focus-tv" onClick={() => setGenre(gName)}>Ver todos</button>}
+              {vids.length > 6 && <button className="quiet-button focus-tv" onClick={() => setGenre(gName)} tabIndex={0}>Ver todos</button>}
             </div>
             <div className="video-grid horizontal-scroll">
               {vids.slice(0, 15).map(video => (
@@ -869,7 +869,7 @@ function CatalogPage() {
             <div className="shelf-heading">
               <h2 className="section-title">{gName}</h2>
               <div className="section-rule" />
-              {sList.length > 6 && <button className="quiet-button focus-tv" onClick={() => setGenre(gName)}>Ver todas</button>}
+              {sList.length > 6 && <button className="quiet-button focus-tv" onClick={() => setGenre(gName)} tabIndex={0}>Ver todas</button>}
             </div>
             <div className="video-grid horizontal-scroll">
               {sList.slice(0, 15).map(serie => (
@@ -891,22 +891,22 @@ function CatalogPage() {
     {!user && <div className="notice notice-orange" data-testid="status-catalog-auth"><CircleAlert size={17} color="#ff8228" /><span><strong>Você está navegando como visitante.</strong> Entre para salvar favoritos e continuar assistindo em outros dispositivos.</span><Link href="/" className="quiet-button focus-tv" data-testid="link-catalog-login">Entrar</Link></div>}
     {user && access === false && <div className="notice notice-orange" data-testid="status-catalog-locked"><CircleAlert size={17} color="#ff8228" /><span><strong>Seu acesso gratuito acabou.</strong> Assine um plano para continuar assistindo ao catálogo completo.</span><Link href="/assinatura" className="quiet-button focus-tv">Ver planos</Link></div>}
     
-    <div className="catalog-toolbar"><div className="search-wrap"><Search size={16} /><input className="input focus-tv" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar no catálogo" aria-label="Buscar no catálogo" data-testid="input-search-catalog" /></div><Link href="/colecao" className="secondary-button focus-tv" data-testid="link-open-collection"><Heart size={15} />Minha coleção</Link></div>
+    <div className="catalog-toolbar"><div className="search-wrap"><Search size={16} /><input className="input focus-tv" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar no catálogo" aria-label="Buscar no catálogo" data-testid="input-search-catalog" tabIndex={0} /></div><Link href="/colecao" className="secondary-button focus-tv" data-testid="link-open-collection"><Heart size={15} />Minha coleção</Link></div>
     
     {/* MENU SUPERIOR PREMIUM: Início, Filmes, Séries */}
     <div className="chip-row horizontal-scroll" role="tablist">
-      {MAIN_TABS.map((item) => <button key={item} className={`chip focus-tv ${shelf === item ? 'active' : ''}`} onClick={() => { setShelf(item); setGenre('Por Gênero'); setQuery(''); }} role="tab" aria-selected={shelf === item}>{item}</button>)}
+      {MAIN_TABS.map((item) => <button key={item} className={`chip focus-tv ${shelf === item ? 'active' : ''}`} onClick={() => { setShelf(item); setGenre('Por Gênero'); setQuery(''); }} role="tab" aria-selected={shelf === item} tabIndex={0}>{item}</button>)}
     </div>
     
     {/* BARRA DE GÊNEROS */}
     {!query && shelf !== 'Início' && (
       <div className="chip-row horizontal-scroll" aria-label="Filtrar por gênero">
-        {genreChips.map((item) => <button key={item} className={`chip focus-tv ${genre === item ? 'active' : ''}`} onClick={() => setGenre(item)}>{item}</button>)}
+        {genreChips.map((item) => <button key={item} className={`chip focus-tv ${genre === item ? 'active' : ''}`} onClick={() => setGenre(item)} tabIndex={0}>{item}</button>)}
       </div>
     )}
     
     {loading && <div className="video-grid" data-testid="status-catalog-loading">{Array.from({ length: 5 }).map((_, index) => <div className="skeleton" style={{ aspectRatio: '2/3' }} key={index} />)}</div>}
-    {error && <div className="notice notice-orange" role="alert" data-testid="status-catalog-error"><CircleAlert size={17} color="#ff8275" /><span>{error}</span><button className="quiet-button focus-tv" onClick={() => window.location.reload()} data-testid="button-retry-catalog"><RefreshCw size={15} />Tentar de novo</button></div>}
+    {error && <div className="notice notice-orange" role="alert" data-testid="status-catalog-error"><CircleAlert size={17} color="#ff8275" /><span>{error}</span><button className="quiet-button focus-tv" onClick={() => window.location.reload()} data-testid="button-retry-catalog" tabIndex={0}><RefreshCw size={15} />Tentar de novo</button></div>}
     
     {!loading && !error && (
       <>
@@ -1010,7 +1010,9 @@ function VideoPlayer({ embed, title }: { embed: { type: string, src: string }, t
         {/* ESCUDO TOPO: Bloqueia links de direcionamento e título */}
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '60px', zIndex: 10 }} title="Cabeçalho protegido" />
         
-        {/* ESCUDO INFERIOR: Bloqueia o Musem, Share e Embed. Deixa os 3 botões livres (Engrenagem, PiP e Tela Cheia). */}
+        {/* ESCUDO INFERIOR (CORRIGIDO PARA A ENGRENAGEM E O MODO MINI): 
+            Posicionado exatamente para cobrir Share, Embed e Logo. 
+            Deixa os últimos 135px totalmente livres para clicar na engrenagem, no mini-player e no fullscreen! */}
         <div style={{ position: 'absolute', bottom: 0, right: '135px', width: '140px', height: '50px', zIndex: 10 }} title="Controles protegidos" />
         
         <iframe src={embed.src} title={title} allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowFullScreen style={{ width: '100%', height: '100%', border: 0 }} data-testid="video-player" />
@@ -1087,12 +1089,12 @@ function PlayerPage() {
   const embed = getEmbedInfo(video?.url_video);
 
   if (loading || access === null || access === false) return <div className="content-wrap page-main"><div className="skeleton" style={{ aspectRatio: '16/9' }} /></div>;
-  if (!video) return <div className="content-wrap page-main"><div className="empty-state"><CircleAlert size={26} /><h3>Vídeo não encontrado</h3><p>Esse título não está mais disponível no catálogo.</p><Link href="/catalogo" className="primary-button focus-tv">Voltar ao catálogo</Link></div></div>;
+  if (!video) return <div className="content-wrap page-main"><div className="empty-state"><CircleAlert size={26} /><h3>Vídeo não encontrado</h3><p>Esse título não está mais disponível no catálogo.</p><Link href="/catalogo" className="primary-button focus-tv" tabIndex={0}>Voltar ao catálogo</Link></div></div>;
   
   // SOLUÇÃO DO TAMANHO DA TELA AO VIVO: Controla a altura do player.
   // Se for ao vivo, o playerStage.height continua o mesmo padrão dos filmes em vez de forçar 100vh.
   return <div className="content-wrap page-main">
-    <button className="quiet-button focus-tv" onClick={() => setLocation('/catalogo')} data-testid="button-back-catalog"><ArrowLeft size={16} />Voltar ao catálogo</button>
+    <button className="quiet-button focus-tv" onClick={() => setLocation('/catalogo')} data-testid="button-back-catalog" tabIndex={0}><ArrowLeft size={16} />Voltar ao catálogo</button>
     <div className="player-stage" style={{ marginTop: 17 }}>
       <div className="player-box">
         <VideoPlayer embed={embed} title={video.titulo} />
@@ -1104,8 +1106,8 @@ function PlayerPage() {
           <p>{video.descricao || 'Este título faz parte do catálogo CineVito.'}</p>
         </div>
         <div className="player-actions">
-          <button className={`secondary-button focus-tv ${saved ? 'active' : ''}`} onClick={toggle} data-testid="button-player-favorite"><Heart size={15} fill={saved ? 'currentColor' : 'none'} />{saved ? 'Na coleção' : 'Salvar'}</button>
-          {episodioInfo?.proximo && <button className="primary-button focus-tv" onClick={() => setLocation(`/player/${episodioInfo.proximo!.video_id}`)}>Próximo episódio<ChevronRight size={16} /></button>}
+          <button className={`secondary-button focus-tv ${saved ? 'active' : ''}`} onClick={toggle} data-testid="button-player-favorite" tabIndex={0}><Heart size={15} fill={saved ? 'currentColor' : 'none'} />{saved ? 'Na coleção' : 'Salvar'}</button>
+          {episodioInfo?.proximo && <button className="primary-button focus-tv" onClick={() => setLocation(`/player/${episodioInfo.proximo!.video_id}`)} tabIndex={0}>Próximo episódio<ChevronRight size={16} /></button>}
         </div>
       </div>
       {episodiosDaTemporada.length > 1 && <div style={{ marginTop: 20 }}>
@@ -1134,12 +1136,12 @@ function SeriePage() {
   }, [params.id]);
   function openEpisodio(videoId: string) { setLocation(access ? `/player/${videoId}` : '/assinatura'); }
   if (!data) return <div className="content-wrap page-main"><div className="skeleton" style={{ height: 200 }} /></div>;
-  if (!data.serie) return <div className="content-wrap page-main"><div className="empty-state"><CircleAlert size={26} /><h3>Série não encontrada</h3><Link href="/catalogo" className="primary-button focus-tv" style={{ marginTop: 12 }}>Voltar ao catálogo</Link></div></div>;
+  if (!data.serie) return <div className="content-wrap page-main"><div className="empty-state"><CircleAlert size={26} /><h3>Série não encontrada</h3><Link href="/catalogo" className="primary-button focus-tv" style={{ marginTop: 12 }} tabIndex={0}>Voltar ao catálogo</Link></div></div>;
   const atual = data.temporadas[activeTemporada];
   return <div className="content-wrap page-main">
-    <button className="quiet-button focus-tv" onClick={() => setLocation('/catalogo')}><ArrowLeft size={16} />Voltar ao catálogo</button>
+    <button className="quiet-button focus-tv" onClick={() => setLocation('/catalogo')} tabIndex={0}><ArrowLeft size={16} />Voltar ao catálogo</button>
     <PageHeader eyebrow="Série" title={data.serie.titulo} description={data.serie.descricao || undefined} />
-    {data.temporadas.length > 0 && <div className="chip-row horizontal-scroll" role="tablist">{data.temporadas.map((item, index) => <button key={item.temporada.id} className={'chip focus-tv ' + (activeTemporada === index ? 'active' : '')} onClick={() => setActiveTemporada(index)} role="tab" aria-selected={activeTemporada === index}>{item.temporada.titulo || `Temporada ${item.temporada.numero}`}</button>)}</div>}
+    {data.temporadas.length > 0 && <div className="chip-row horizontal-scroll" role="tablist">{data.temporadas.map((item, index) => <button key={item.temporada.id} className={'chip focus-tv ' + (activeTemporada === index ? 'active' : '')} onClick={() => setActiveTemporada(index)} role="tab" aria-selected={activeTemporada === index} tabIndex={0}>{item.temporada.titulo || `Temporada ${item.temporada.numero}`}</button>)}</div>}
     {atual && <div className="admin-list" style={{ marginTop: 18 }}>{atual.episodios.length ? atual.episodios.map((ep) => <div className="result-row" key={ep.id} role="button" tabIndex={0} onClick={() => openEpisodio(ep.video_id)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && openEpisodio(ep.video_id)} style={{ cursor: 'pointer' }}><span><strong>Ep. {ep.numero}</strong> — {ep.titulo || ep.videos?.titulo}</span><Play size={16} color="#00c8ff" /></div>) : <p className="muted">Nenhum episódio cadastrado nesta temporada ainda.</p>}</div>}
     {!data.temporadas.length && <p className="muted" style={{ marginTop: 18 }}>Nenhuma temporada cadastrada ainda.</p>}
   </div>;
@@ -1158,7 +1160,7 @@ function CollectionPage() {
     localStorage.setItem('cinevito-favorites', JSON.stringify(next));
   }
   function openVideo(id: string) { setLocation(access ? `/player/${id}` : '/assinatura'); }
-  return <div className="content-wrap page-main"><PageHeader eyebrow="O que você guardou" title="Minha coleção" description="Seus títulos favoritos em um só lugar, prontos para a próxima sessão." />{collection.length ? <div className="video-grid">{collection.map((video) => <Poster key={video.id} video={video} favorite onFavorite={() => remove(video.id)} onOpen={() => openVideo(video.id)} />)}</div> : <div className="empty-state" data-testid="status-collection-empty"><Heart size={27} /><h3>Ainda está vazio</h3><p>Use o coração nos títulos do catálogo para montar sua coleção.</p><Link href="/catalogo" className="primary-button focus-tv" data-testid="link-collection-catalog">Explorar catálogo</Link></div>}</div>;
+  return <div className="content-wrap page-main"><PageHeader eyebrow="O que você guardou" title="Minha coleção" description="Seus títulos favoritos em um só lugar, prontos para a próxima sessão." />{collection.length ? <div className="video-grid">{collection.map((video) => <Poster key={video.id} video={video} favorite onFavorite={() => remove(video.id)} onOpen={() => openVideo(video.id)} />)}</div> : <div className="empty-state" data-testid="status-collection-empty"><Heart size={27} /><h3>Ainda está vazio</h3><p>Use o coração nos títulos do catálogo para montar sua coleção.</p><Link href="/catalogo" className="primary-button focus-tv" data-testid="link-collection-catalog" tabIndex={0}>Explorar catálogo</Link></div>}</div>;
 }
 
 function subscriptionLabel(sub: MinhaAssinatura | null): { status: string; origem: string } {
@@ -1197,17 +1199,17 @@ function ProfilePage() {
         <div className="status-card" data-testid="status-profile-subscription">
           <h3>Acesso ao CineVito</h3>
           {subscription ? <><p><strong>{subscription.plano || 'Plano'}</strong> · {status}</p><p className="muted" style={{ fontSize: '.8rem' }}>{origem}</p>{subscription.data_expiracao && <p className="muted" style={{ fontSize: '.8rem' }}>Válido até {new Date(subscription.data_expiracao).toLocaleDateString('pt-BR')}</p>}</> : <p>{user ? 'Você ainda não tem nenhuma assinatura registrada.' : 'Entre para consultar sua assinatura.'}</p>}
-          <Link href="/assinatura" className="primary-button focus-tv" style={{ width: 'fit-content', marginTop: 7 }} data-testid="link-profile-subscription">Ver assinatura</Link>
+          <Link href="/assinatura" className="primary-button focus-tv" style={{ width: 'fit-content', marginTop: 7 }} data-testid="link-profile-subscription" tabIndex={0}>Ver assinatura</Link>
         </div>
         <div className="status-card" style={{ marginTop: 14 }}>
           <h3>Envie seus vídeos</h3>
           <p className="muted" style={{ fontSize: '.8rem' }}>Quer enviar um filme ou curta para o CineVito? Faça sua submissão por aqui.</p>
-          <Link href="/upload" className="primary-button focus-tv" style={{ width: 'fit-content', marginTop: 7, display: 'inline-flex', textDecoration: 'none', alignItems: 'center', justifyContent: 'center' }}>Enviar novo vídeo</Link>
+          <Link href="/upload" className="primary-button focus-tv" style={{ width: 'fit-content', marginTop: 7, display: 'inline-flex', textDecoration: 'none', alignItems: 'center', justifyContent: 'center' }} tabIndex={0}>Enviar novo vídeo</Link>
         </div>
         {installState.platform !== 'tv' && !installState.alreadyInstalled && <div className="status-card" style={{ marginTop: 14 }}>
           <h3>Instalar o app</h3>
           <p className="muted" style={{ fontSize: '.8rem' }}>Adicione o CineVito à tela do seu aparelho pra abrir direto, como um app.</p>
-          <button className="primary-button focus-tv" style={{ width: 'fit-content', marginTop: 7 }} onClick={installState.canInstallDirectly ? installState.install : () => setShowInstallInstructions(true)}>
+          <button className="primary-button focus-tv" style={{ width: 'fit-content', marginTop: 7 }} onClick={installState.canInstallDirectly ? installState.install : () => setShowInstallInstructions(true)} tabIndex={0}>
             <Download size={15} />{installState.canInstallDirectly ? 'Instalar CineVito' : 'Como instalar'}
           </button>
         </div>}
@@ -1215,7 +1217,7 @@ function ProfilePage() {
       </section>
       <section className="panel panel-pad">
         <h2 className="panel-title">Seu código de indicação</h2>
-        {profile?.codigo_indicacao ? <><p className="muted" style={{ fontSize: '.8rem', lineHeight: 1.5 }}>Compartilhe o link. A indicação só é confirmada depois que a pessoa fizer um pagamento.</p><div className="code-box"><code data-testid="text-referral-code">{profile.codigo_indicacao}</code><button className="icon-button focus-tv" onClick={copyReferral} aria-label="Copiar link de indicação" data-testid="button-copy-referral">{copied ? <Check size={16} /> : <Copy size={16} />}</button></div><p className="muted" style={{ fontSize: '.72rem', marginBottom: 0 }}>{copied ? 'Link copiado.' : 'Seu código continua válido.'}</p></> : <div className="notice notice-cyan"><Info size={16} /><span>Seu código aparece aqui depois do primeiro pagamento aprovado.</span></div>}
+        {profile?.codigo_indicacao ? <><p className="muted" style={{ fontSize: '.8rem', lineHeight: 1.5 }}>Compartilhe o link. A indicação só é confirmada depois que a pessoa fizer um pagamento.</p><div className="code-box"><code data-testid="text-referral-code">{profile.codigo_indicacao}</code><button className="icon-button focus-tv" onClick={copyReferral} aria-label="Copiar link de indicação" data-testid="button-copy-referral" tabIndex={0}>{copied ? <Check size={16} /> : <Copy size={16} />}</button></div><p className="muted" style={{ fontSize: '.72rem', marginBottom: 0 }}>{copied ? 'Link copiado.' : 'Seu código continua válido.'}</p></> : <div className="notice notice-cyan"><Info size={16} /><span>Seu código aparece aqui depois do primeiro pagamento aprovado.</span></div>}
       </section>
     </div>
   </div>;
@@ -1297,17 +1299,17 @@ function SubscriptionPage() {
     return () => { cancelled = true; if (brickRef.current) { try { brickRef.current.unmount(); } catch { } brickRef.current = null; } };
   }, [selectedPlan?.id, user?.id]);
 
-  return <div className="content-wrap page-main"><PageHeader eyebrow="Escolha o seu acesso" title="Assine o CineVito" description="Assista ao catálogo completo em seus dispositivos." /><div className="two-col"><section className="panel panel-pad"><h2 className="panel-title">Planos disponíveis</h2>{loading ? <div className="plan-list">{[1, 2].map((n) => <div className="skeleton" style={{ height: 94 }} key={n} />)}</div> : plans.length ? <><div className="chip-row horizontal-scroll" role="tablist">{categories.map((item) => <button key={item} className={'chip focus-tv ' + (category === item ? 'active' : '')} onClick={() => { setCategory(item); setSelected(''); }} role="tab" aria-selected={category === item}>{item}</button>)}</div><div className="plan-list">{visiblePlans.map((plan) => <div className={'plan-card ' + (selected === plan.id ? 'selected' : '')} key={plan.id} onClick={() => setSelected(plan.id)}><div><h3>{plan.nome}</h3><p>{plan.descricao || ((plan.dispositivos || 1) + ' dispositivo(s) · ' + duration(plan))}</p></div><div style={{ display: 'grid', justifyItems: 'end', gap: 8 }}><strong className="plan-price">{typeof plan.preco === 'number' ? 'R$ ' + plan.preco.toFixed(2).replace('.', ',') : 'Consultar'}</strong><button className="primary-button focus-tv" onClick={(event) => { event.stopPropagation(); setSelected(plan.id); }} data-testid={'button-select-plan-' + plan.id}>{selected === plan.id ? 'Selecionado' : 'Escolher'}</button></div></div>)}</div></> : <div className="empty-state"><Settings size={24} /><h3>Planos em configuração</h3><p>Quando os planos estiverem publicados, eles aparecerão aqui.</p></div>}</section><aside className="panel panel-pad"><div className="eyebrow">Pagamento seguro</div><h2 className="panel-title" style={{ marginTop: 9 }}>Checkout protegido</h2><p className="muted" style={{ fontSize: '.82rem', lineHeight: 1.65 }}>Pagamento seguro direto pelo CineVito.</p>
-    {!user && <div className="notice notice-orange" style={{ marginTop: 16 }}><Info size={16} color="#ff8228" /><span>Entre na sua conta para continuar.</span><Link href="/" className="quiet-button focus-tv">Entrar</Link></div>}
+  return <div className="content-wrap page-main"><PageHeader eyebrow="Escolha o seu acesso" title="Assine o CineVito" description="Assista ao catálogo completo em seus dispositivos." /><div className="two-col"><section className="panel panel-pad"><h2 className="panel-title">Planos disponíveis</h2>{loading ? <div className="plan-list">{[1, 2].map((n) => <div className="skeleton" style={{ height: 94 }} key={n} />)}</div> : plans.length ? <><div className="chip-row horizontal-scroll" role="tablist">{categories.map((item) => <button key={item} className={'chip focus-tv ' + (category === item ? 'active' : '')} onClick={() => { setCategory(item); setSelected(''); }} role="tab" aria-selected={category === item} tabIndex={0}>{item}</button>)}</div><div className="plan-list">{visiblePlans.map((plan) => <div className={'plan-card ' + (selected === plan.id ? 'selected' : '')} key={plan.id} onClick={() => setSelected(plan.id)} tabIndex={0}><div><h3>{plan.nome}</h3><p>{plan.descricao || ((plan.dispositivos || 1) + ' dispositivo(s) · ' + duration(plan))}</p></div><div style={{ display: 'grid', justifyItems: 'end', gap: 8 }}><strong className="plan-price">{typeof plan.preco === 'number' ? 'R$ ' + plan.preco.toFixed(2).replace('.', ',') : 'Consultar'}</strong><button className="primary-button focus-tv" onClick={(event) => { event.stopPropagation(); setSelected(plan.id); }} data-testid={'button-select-plan-' + plan.id} tabIndex={0}>{selected === plan.id ? 'Selecionado' : 'Escolher'}</button></div></div>)}</div></> : <div className="empty-state"><Settings size={24} /><h3>Planos em configuração</h3><p>Quando os planos estiverem publicados, eles aparecerão aqui.</p></div>}</section><aside className="panel panel-pad"><div className="eyebrow">Pagamento seguro</div><h2 className="panel-title" style={{ marginTop: 9 }}>Checkout protegido</h2><p className="muted" style={{ fontSize: '.82rem', lineHeight: 1.65 }}>Pagamento seguro direto pelo CineVito.</p>
+    {!user && <div className="notice notice-orange" style={{ marginTop: 16 }}><Info size={16} color="#ff8228" /><span>Entre na sua conta para continuar.</span><Link href="/" className="quiet-button focus-tv" tabIndex={0}>Entrar</Link></div>}
     {user && !selectedPlan && <div className="notice notice-orange" style={{ marginTop: 16 }}><Info size={16} color="#ff8228" /><span>Selecione um plano para continuar.</span></div>}
     {user && selectedPlan && checkoutStatus !== 'approved' && <>
-      <div className="field" style={{ marginTop: 12 }}><label htmlFor="checkout-cupom">Cupom de desconto (opcional)</label><input id="checkout-cupom" className="input focus-tv" value={cupom} onChange={(event) => setCupom(event.target.value.toUpperCase())} placeholder="Ex.: ANIVERSARIO10" /></div>
+      <div className="field" style={{ marginTop: 12 }}><label htmlFor="checkout-cupom">Cupom de desconto (opcional)</label><input id="checkout-cupom" className="input focus-tv" value={cupom} onChange={(event) => setCupom(event.target.value.toUpperCase())} placeholder="Ex.: ANIVERSARIO10" tabIndex={0} /></div>
       {checkoutStatus === 'loading' && <p className="muted" style={{ fontSize: '.8rem', marginTop: 10 }}>Carregando checkout seguro...</p>}
       {checkoutStatus !== 'pending' && <div id="payment-brick-container" style={{ marginTop: 12 }} />}
     </>}
     {checkoutMessage && <div className={checkoutStatus === 'approved' ? 'notice notice-cyan' : checkoutStatus === 'pending' ? 'notice notice-cyan' : 'notice notice-orange'} style={{ marginTop: 16 }}>{checkoutStatus === 'approved' ? <Check size={16} /> : <Info size={16} />}<span>{checkoutMessage}</span></div>}
-    {checkoutStatus === 'pending' && pix?.copiaCola && <div className="notice notice-cyan" style={{ marginTop: 12, display: 'block' }}><strong>Pague com Pix</strong>{pix.qrBase64 && <img src={`data:image/png;base64,${pix.qrBase64}`} alt="QR Code Pix" style={{ width: 180, marginTop: 10, display: 'block' }} />}<p className="muted" style={{ fontSize: '.72rem', marginTop: 8, wordBreak: 'break-all' }}>{pix.copiaCola}</p><button className="secondary-button focus-tv" style={{ marginTop: 8 }} onClick={() => navigator.clipboard?.writeText(pix.copiaCola || '')}>Copiar código Pix</button></div>}
-    {checkoutStatus === 'approved' && <Link href="/catalogo" className="primary-button focus-tv" style={{ marginTop: 12 }}>Ir para o catálogo</Link>}
+    {checkoutStatus === 'pending' && pix?.copiaCola && <div className="notice notice-cyan" style={{ marginTop: 12, display: 'block' }}><strong>Pague com Pix</strong>{pix.qrBase64 && <img src={`data:image/png;base64,${pix.qrBase64}`} alt="QR Code Pix" style={{ width: 180, marginTop: 10, display: 'block' }} />}<p className="muted" style={{ fontSize: '.72rem', marginTop: 8, wordBreak: 'break-all' }}>{pix.copiaCola}</p><button className="secondary-button focus-tv" style={{ marginTop: 8 }} onClick={() => navigator.clipboard?.writeText(pix.copiaCola || '')} tabIndex={0}>Copiar código Pix</button></div>}
+    {checkoutStatus === 'approved' && <Link href="/catalogo" className="primary-button focus-tv" style={{ marginTop: 12 }} tabIndex={0}>Ir para o catálogo</Link>}
   </aside></div></div>;
 }
 
@@ -1327,12 +1329,12 @@ function SuggestionPage() {
       setState('error'); setErrorMessage(error instanceof Error ? error.message : 'Não foi possível enviar agora.');
     }
   }
-  return <div className="content-wrap page-main"><PageHeader eyebrow="Ajude a curadoria" title="Sugira um filme" description="Conte para a gente qual título deveria entrar no CineVito." /><div className="two-col"><form className="panel panel-pad" onSubmit={submit}><h2 className="panel-title">Sua sugestão</h2><div className="field"><label htmlFor="suggestion-title">Nome do filme/vídeo</label><input id="suggestion-title" className="input focus-tv" value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} placeholder="Digite o nome do título" /></div><div className="field"><label htmlFor="suggestion-genero">Gênero (opcional)</label><input id="suggestion-genero" className="input focus-tv" value={form.genero} onChange={(e) => setForm({ ...form, genero: e.target.value })} placeholder="Ex.: Ação, Comédia..." /></div><div className="field"><label htmlFor="suggestion-ano">Ano de lançamento (opcional)</label><input id="suggestion-ano" type="number" className="input focus-tv" value={form.ano} onChange={(e) => setForm({ ...form, ano: e.target.value })} placeholder="Ex.: 2023" /></div>{state === 'success' && <p className="form-success">Sugestão enviada com sucesso!</p>}{state === 'error' && <p className="form-error">{errorMessage}</p>}<button className="primary-button focus-tv" type="submit" disabled={state === 'loading'}><Send size={16} />{state === 'loading' ? 'Enviando...' : 'Enviar sugestão'}</button></form><aside className="panel panel-pad"><div className="eyebrow">Como funciona</div><h2 className="panel-title" style={{ marginTop: 9 }}>Curadoria viva</h2><p className="muted" style={{ fontSize: '.82rem', lineHeight: 1.65 }}>As sugestões ajudam a orientar os próximos títulos do catálogo.</p><Link href="/faq" className="secondary-button focus-tv" style={{ marginTop: 10 }}>Ir para perguntas frequentes <ArrowLeft size={15} className="rotate-180" /></Link></aside></div></div>;
+  return <div className="content-wrap page-main"><PageHeader eyebrow="Ajude a curadoria" title="Sugira um filme" description="Conte para a gente qual título deveria entrar no CineVito." /><div className="two-col"><form className="panel panel-pad" onSubmit={submit}><h2 className="panel-title">Sua sugestão</h2><div className="field"><label htmlFor="suggestion-title">Nome do filme/vídeo</label><input id="suggestion-title" className="input focus-tv" value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} placeholder="Digite o nome do título" tabIndex={0} /></div><div className="field"><label htmlFor="suggestion-genero">Gênero (opcional)</label><input id="suggestion-genero" className="input focus-tv" value={form.genero} onChange={(e) => setForm({ ...form, genero: e.target.value })} placeholder="Ex.: Ação, Comédia..." tabIndex={0} /></div><div className="field"><label htmlFor="suggestion-ano">Ano de lançamento (opcional)</label><input id="suggestion-ano" type="number" className="input focus-tv" value={form.ano} onChange={(e) => setForm({ ...form, ano: e.target.value })} placeholder="Ex.: 2023" tabIndex={0} /></div>{state === 'success' && <p className="form-success">Sugestão enviada com sucesso!</p>}{state === 'error' && <p className="form-error">{errorMessage}</p>}<button className="primary-button focus-tv" type="submit" disabled={state === 'loading'} tabIndex={0}><Send size={16} />{state === 'loading' ? 'Enviando...' : 'Enviar sugestão'}</button></form><aside className="panel panel-pad"><div className="eyebrow">Como funciona</div><h2 className="panel-title" style={{ marginTop: 9 }}>Curadoria viva</h2><p className="muted" style={{ fontSize: '.82rem', lineHeight: 1.65 }}>As sugestões ajudam a orientar os próximos títulos do catálogo.</p><Link href="/faq" className="secondary-button focus-tv" style={{ marginTop: 10 }} tabIndex={0}>Ir para perguntas frequentes <ArrowLeft size={15} className="rotate-180" /></Link></aside></div></div>;
 }
 
 function FaqPage() {
   const faqs = [['Como sugiro um filme?', 'Use a página Sugira um filme.'], ['Como funciona o programa de indicação?', 'Seu código é fixo e aparece no perfil.'], ['Posso assistir em uma Smart TV?', 'Sim, o catálogo funciona no navegador da TV.'], ['Como funciona o teste grátis?', 'Consulte a área de assinatura.'], ['Como redefino minha senha?', 'Use o link Esqueci minha senha na tela de entrada.']];
-  return <div className="content-wrap page-main"><PageHeader eyebrow="CineVito ajuda" title="Perguntas frequentes" description="Respostas rápidas para aproveitar melhor o seu acesso." /><div className="faq-list">{faqs.map(([question, answer], index) => <details className="faq-item" key={question} open={index === 0}><summary>{question}<ChevronDown size={17} /></summary><div className="faq-answer">{answer}</div></details>)}</div></div>;
+  return <div className="content-wrap page-main"><PageHeader eyebrow="CineVito ajuda" title="Perguntas frequentes" description="Respostas rápidas para aproveitar melhor o seu acesso." /><div className="faq-list">{faqs.map(([question, answer], index) => <details className="faq-item" key={question} open={index === 0}><summary tabIndex={0}>{question}<ChevronDown size={17} /></summary><div className="faq-answer">{answer}</div></details>)}</div></div>;
 }
 
 function AdminPage() {
@@ -1687,73 +1689,73 @@ function AdminPage() {
   }
 
   return <div className="content-wrap page-main">
-    <PageHeader eyebrow="Painel protegido" title="Administração" description={profile.admin_master ? 'Controle completo do CineVito.' : 'Acesso ao catálogo.'} action={<Link href="/admin/uploads" className="primary-button focus-tv" style={{ textDecoration: 'none' }}><Film size={16} />Moderação de Uploads</Link>} />
-    <div className="admin-tabs" role="tablist">{tabs.map((item) => <button key={item} className={'admin-tab focus-tv ' + (tab === item ? 'active' : '')} onClick={() => onSelectTab(item)} role="tab" aria-selected={tab === item}>{tabLabels[item]}</button>)}</div>
+    <PageHeader eyebrow="Painel protegido" title="Administração" description={profile.admin_master ? 'Controle completo do CineVito.' : 'Acesso ao catálogo.'} action={<Link href="/admin/uploads" className="primary-button focus-tv" style={{ textDecoration: 'none' }} tabIndex={0}><Film size={16} />Moderação de Uploads</Link>} />
+    <div className="admin-tabs" role="tablist">{tabs.map((item) => <button key={item} className={'admin-tab focus-tv ' + (tab === item ? 'active' : '')} onClick={() => onSelectTab(item)} role="tab" aria-selected={tab === item} tabIndex={0}>{tabLabels[item]}</button>)}</div>
     {message && <div className="notice notice-orange" role="status">{message}</div>}
 
     {tab === 'videos' && <section className="panel panel-pad"><div className="eyebrow">Catálogo manual</div><h2 className="panel-title" style={{ marginTop: 8 }}>{editingVideoId ? 'Editar vídeo' : 'Adicionar vídeo'}</h2>
-      <div className="field"><label htmlFor="v-url">Link do vídeo ou código &lt;iframe&gt;</label><textarea id="v-url" className="input focus-tv" rows={3} value={videoForm.url_video} onChange={(e) => setVideoForm({ ...videoForm, url_video: e.target.value })} placeholder="https://..." /></div>
-      <div className="field"><label htmlFor="v-titulo">Título</label><input id="v-titulo" className="input focus-tv" value={videoForm.titulo} onChange={(e) => setVideoForm({ ...videoForm, titulo: e.target.value })} placeholder="Nome do filme/vídeo" /></div>
-      <div className="field"><label htmlFor="v-descricao">Sinopse</label><input id="v-descricao" className="input focus-tv" value={videoForm.descricao} onChange={(e) => setVideoForm({ ...videoForm, descricao: e.target.value })} placeholder="Sinopse" /></div>
-      <div className="field"><label htmlFor="v-categoria">Categoria</label><select id="v-categoria" className="input focus-tv" value={videoForm.categoria_id} onChange={(e) => setVideoForm({ ...videoForm, categoria_id: e.target.value })}><option value="">Selecione...</option>{categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select><div style={{ display: 'flex', gap: 8, marginTop: 6 }}><input className="input focus-tv" value={novaCategoria} onChange={(e) => setNovaCategoria(e.target.value)} placeholder="Nova categoria..." /><button type="button" className="secondary-button focus-tv" onClick={handleCreateCategoria}>Criar</button></div></div>
-      <div className="field"><label htmlFor="v-genero">Gênero</label><select id="v-genero" className="input focus-tv" value={videoForm.genero} onChange={(e) => setVideoForm({ ...videoForm, genero: e.target.value })}><option value="">Selecione...</option>{generos.map((g) => <option key={g.id} value={g.nome}>{g.nome}</option>)}</select><div style={{ display: 'flex', gap: 8, marginTop: 6 }}><input className="input focus-tv" value={novoGenero} onChange={(e) => setNovoGenero(e.target.value)} placeholder="Novo gênero..." /><button type="button" className="secondary-button focus-tv" onClick={handleCreateGenero}>Criar</button></div></div>
-      <div className="field"><label htmlFor="v-elenco">Elenco (separe os nomes por vírgula)</label><input id="v-elenco" className="input focus-tv" value={videoForm.elenco} onChange={(e) => setVideoForm({ ...videoForm, elenco: e.target.value })} placeholder="Ex.: Gal Gadot, Fernanda Torres" /></div>
-      <label className="check-row"><input type="checkbox" checked={videoForm.ao_vivo} onChange={(e) => setVideoForm({ ...videoForm, ao_vivo: e.target.checked })} />Transmissão ao vivo / esportes (aparece na seção "Ao vivo")</label>
-      <div className="field"><label htmlFor="v-capa">URL da capa (opcional)</label><input id="v-capa" className="input focus-tv" value={videoForm.url_capa} onChange={(e) => setVideoForm({ ...videoForm, url_capa: e.target.value })} placeholder="https://..." /></div>
-      <div className="field"><label htmlFor="v-licenca">Licença</label><input id="v-licenca" className="input focus-tv" value={videoForm.licenca} onChange={(e) => setVideoForm({ ...videoForm, licenca: e.target.value })} placeholder="Ex.: Domínio Público" /></div>
-      <div className="field"><label htmlFor="v-ano">Ano</label><input id="v-ano" type="number" className="input focus-tv" value={videoForm.ano} onChange={(e) => setVideoForm({ ...videoForm, ano: e.target.value })} placeholder="Ex.: 1968" /></div>
-      <button className="primary-button focus-tv" onClick={saveVideo} disabled={savingVideo}>{savingVideo ? 'Salvando...' : editingVideoId ? 'Salvar alterações' : 'Adicionar ao catálogo'}</button>
-      {editingVideoId && <button className="quiet-button focus-tv" style={{ marginLeft: 10 }} onClick={resetVideoForm}>Cancelar</button>}
+      <div className="field"><label htmlFor="v-url">Link do vídeo ou código &lt;iframe&gt;</label><textarea id="v-url" className="input focus-tv" rows={3} value={videoForm.url_video} onChange={(e) => setVideoForm({ ...videoForm, url_video: e.target.value })} placeholder="https://..." tabIndex={0} /></div>
+      <div className="field"><label htmlFor="v-titulo">Título</label><input id="v-titulo" className="input focus-tv" value={videoForm.titulo} onChange={(e) => setVideoForm({ ...videoForm, titulo: e.target.value })} placeholder="Nome do filme/vídeo" tabIndex={0} /></div>
+      <div className="field"><label htmlFor="v-descricao">Sinopse</label><input id="v-descricao" className="input focus-tv" value={videoForm.descricao} onChange={(e) => setVideoForm({ ...videoForm, descricao: e.target.value })} placeholder="Sinopse" tabIndex={0} /></div>
+      <div className="field"><label htmlFor="v-categoria">Categoria</label><select id="v-categoria" className="input focus-tv" value={videoForm.categoria_id} onChange={(e) => setVideoForm({ ...videoForm, categoria_id: e.target.value })} tabIndex={0}><option value="">Selecione...</option>{categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select><div style={{ display: 'flex', gap: 8, marginTop: 6 }}><input className="input focus-tv" value={novaCategoria} onChange={(e) => setNovaCategoria(e.target.value)} placeholder="Nova categoria..." tabIndex={0} /><button type="button" className="secondary-button focus-tv" onClick={handleCreateCategoria} tabIndex={0}>Criar</button></div></div>
+      <div className="field"><label htmlFor="v-genero">Gênero</label><select id="v-genero" className="input focus-tv" value={videoForm.genero} onChange={(e) => setVideoForm({ ...videoForm, genero: e.target.value })} tabIndex={0}><option value="">Selecione...</option>{generos.map((g) => <option key={g.id} value={g.nome}>{g.nome}</option>)}</select><div style={{ display: 'flex', gap: 8, marginTop: 6 }}><input className="input focus-tv" value={novoGenero} onChange={(e) => setNovoGenero(e.target.value)} placeholder="Novo gênero..." tabIndex={0} /><button type="button" className="secondary-button focus-tv" onClick={handleCreateGenero} tabIndex={0}>Criar</button></div></div>
+      <div className="field"><label htmlFor="v-elenco">Elenco (separe os nomes por vírgula)</label><input id="v-elenco" className="input focus-tv" value={videoForm.elenco} onChange={(e) => setVideoForm({ ...videoForm, elenco: e.target.value })} placeholder="Ex.: Gal Gadot, Fernanda Torres" tabIndex={0} /></div>
+      <label className="check-row"><input type="checkbox" checked={videoForm.ao_vivo} onChange={(e) => setVideoForm({ ...videoForm, ao_vivo: e.target.checked })} tabIndex={0} />Transmissão ao vivo / esportes (aparece na seção "Ao vivo")</label>
+      <div className="field"><label htmlFor="v-capa">URL da capa (opcional)</label><input id="v-capa" className="input focus-tv" value={videoForm.url_capa} onChange={(e) => setVideoForm({ ...videoForm, url_capa: e.target.value })} placeholder="https://..." tabIndex={0} /></div>
+      <div className="field"><label htmlFor="v-licenca">Licença</label><input id="v-licenca" className="input focus-tv" value={videoForm.licenca} onChange={(e) => setVideoForm({ ...videoForm, licenca: e.target.value })} placeholder="Ex.: Domínio Público" tabIndex={0} /></div>
+      <div className="field"><label htmlFor="v-ano">Ano</label><input id="v-ano" type="number" className="input focus-tv" value={videoForm.ano} onChange={(e) => setVideoForm({ ...videoForm, ano: e.target.value })} placeholder="Ex.: 1968" tabIndex={0} /></div>
+      <button className="primary-button focus-tv" onClick={saveVideo} disabled={savingVideo} tabIndex={0}>{savingVideo ? 'Salvando...' : editingVideoId ? 'Salvar alterações' : 'Adicionar ao catálogo'}</button>
+      {editingVideoId && <button className="quiet-button focus-tv" style={{ marginLeft: 10 }} onClick={resetVideoForm} tabIndex={0}>Cancelar</button>}
       <h3 style={{ marginTop: 26 }}>Vídeos cadastrados</h3>
-      <div className="admin-list" style={{ marginTop: 10 }}>{videos.length ? videos.map((video) => <div className="result-row" key={video.id}><span><strong>{video.titulo}</strong></span><span style={{ display: 'flex', gap: 8 }}><button className="quiet-button focus-tv" onClick={() => editVideo(video)}>Editar</button><button className="quiet-button focus-tv" onClick={() => deleteVideo(video.id)}>Apagar</button></span></div>) : <p className="muted">Nenhum vídeo cadastrado.</p>}</div>
+      <div className="admin-list" style={{ marginTop: 10 }}>{videos.length ? videos.map((video) => <div className="result-row" key={video.id}><span><strong>{video.titulo}</strong></span><span style={{ display: 'flex', gap: 8 }}><button className="quiet-button focus-tv" onClick={() => editVideo(video)} tabIndex={0}>Editar</button><button className="quiet-button focus-tv" onClick={() => deleteVideo(video.id)} tabIndex={0}>Apagar</button></span></div>) : <p className="muted">Nenhum vídeo cadastrado.</p>}</div>
     </section>}
 
     {tab === 'colecoes' && <section className="panel panel-pad">
       <div className="eyebrow">Organização</div><h2 className="panel-title" style={{ marginTop: 8 }}>Coleções</h2>
-      <div className="field"><label>Nova coleção</label><input className="input focus-tv" value={novaColecaoTitulo} onChange={(e) => setNovaColecaoTitulo(e.target.value)} placeholder="Ex.: Ação Explosiva" /></div>
-      <div className="field"><label>Descrição (opcional)</label><input className="input focus-tv" value={novaColecaoDescricao} onChange={(e) => setNovaColecaoDescricao(e.target.value)} placeholder="Descrição da coleção" /></div>
-      <button className="primary-button focus-tv" onClick={createColecao} disabled={criandoColecao}>{criandoColecao ? 'Criando...' : 'Criar coleção'}</button>
-      <div className="chip-row no-scrollbar" style={{ display: 'flex', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 8, marginTop: 20 }}>{colecoes.map((c) => <button key={c.id} className={'chip focus-tv ' + (selectedColecao?.id === c.id ? 'active' : '')} style={{ flexShrink: 0 }} onClick={() => selectColecao(c)}>{c.titulo}</button>)}</div>
+      <div className="field"><label>Nova coleção</label><input className="input focus-tv" value={novaColecaoTitulo} onChange={(e) => setNovaColecaoTitulo(e.target.value)} placeholder="Ex.: Ação Explosiva" tabIndex={0} /></div>
+      <div className="field"><label>Descrição (opcional)</label><input className="input focus-tv" value={novaColecaoDescricao} onChange={(e) => setNovaColecaoDescricao(e.target.value)} placeholder="Descrição da coleção" tabIndex={0} /></div>
+      <button className="primary-button focus-tv" onClick={createColecao} disabled={criandoColecao} tabIndex={0}>{criandoColecao ? 'Criando...' : 'Criar coleção'}</button>
+      <div className="chip-row no-scrollbar" style={{ display: 'flex', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 8, marginTop: 20 }}>{colecoes.map((c) => <button key={c.id} className={'chip focus-tv ' + (selectedColecao?.id === c.id ? 'active' : '')} style={{ flexShrink: 0 }} onClick={() => selectColecao(c)} tabIndex={0}>{c.titulo}</button>)}</div>
       {selectedColecao && <div className="admin-list" style={{ marginTop: 16 }}>
         <h3 className="section-title">{selectedColecao.titulo}</h3>
         <p className="muted" style={{ marginBottom: 12 }}>Arraste para reordenar.</p>
         {colecaoVideos.map((cv, index) => <div key={cv.video_id} draggable onDragStart={() => handleDragStart(index)} onDragOver={handleDragOver} onDrop={() => handleDrop(index)} className="result-row" style={{ cursor: 'grab' }}>
-          <span><strong>{cv.videos?.titulo}</strong></span><button className="quiet-button focus-tv" onClick={() => removeVideoFromColecaoHandler(cv.video_id)}>Remover</button>
+          <span><strong>{cv.videos?.titulo}</strong></span><button className="quiet-button focus-tv" onClick={() => removeVideoFromColecaoHandler(cv.video_id)} tabIndex={0}>Remover</button>
         </div>)}
         <div style={{ marginTop: 16, display: 'flex', gap: 8, alignItems: 'center' }}>
-          <select className="input focus-tv" onChange={(e) => addVideoToColecaoHandler(e.target.value)} value=""><option value="">Adicionar vídeo...</option>{videos.filter((v) => !colecaoVideos.some((cv) => cv.video_id === v.id)).map((v) => <option key={v.id} value={v.id}>{v.titulo}</option>)}</select>
-          <button className="quiet-button focus-tv" onClick={() => deleteColecaoHandler(selectedColecao.id)} style={{ color: '#ff8275' }}>Apagar Coleção</button>
+          <select className="input focus-tv" onChange={(e) => addVideoToColecaoHandler(e.target.value)} value="" tabIndex={0}><option value="">Adicionar vídeo...</option>{videos.filter((v) => !colecaoVideos.some((cv) => cv.video_id === v.id)).map((v) => <option key={v.id} value={v.id}>{v.titulo}</option>)}</select>
+          <button className="quiet-button focus-tv" onClick={() => deleteColecaoHandler(selectedColecao.id)} style={{ color: '#ff8275' }} tabIndex={0}>Apagar Coleção</button>
         </div>
       </div>}
     </section>}
 
     {tab === 'series' && <section className="panel panel-pad">
       <div className="eyebrow">Organização</div><h2 className="panel-title" style={{ marginTop: 8 }}>Séries e Temporadas</h2>
-      <div className="field"><label>Título da Série</label><input className="input focus-tv" value={novaSerieTitulo} onChange={(e) => setNovaSerieTitulo(e.target.value)} placeholder="Ex.: Breaking Bad" /></div>
-      <div className="field"><label>Sinopse</label><input className="input focus-tv" value={novaSerieDescricao} onChange={(e) => setNovaSerieDescricao(e.target.value)} placeholder="Sinopse da série" /></div>
-      <div className="field"><label>Categoria</label><select className="input focus-tv" value={novaSerieCategoriaId} onChange={(e) => setNovaSerieCategoriaId(e.target.value)}><option value="">Selecione...</option>{categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select></div>
-      <div className="field"><label>Gênero</label><select className="input focus-tv" value={novaSerieGenero} onChange={(e) => setNovaSerieGenero(e.target.value)}><option value="">Selecione...</option>{generos.map((g) => <option key={g.id} value={g.nome}>{g.nome}</option>)}</select></div>
-      <div className="field"><label>URL da Capa</label><input className="input focus-tv" value={novaSerieCapa} onChange={(e) => setNovaSerieCapa(e.target.value)} placeholder="https://..." /></div>
-      <button className="primary-button focus-tv" onClick={createSerie} disabled={criandoSerie}>{criandoSerie ? 'Criando...' : 'Criar Série'}</button>
-      <div className="chip-row no-scrollbar" style={{ display: 'flex', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 8, marginTop: 20 }}>{series.map((s) => <button key={s.id} className={'chip focus-tv ' + (selectedSerie?.id === s.id ? 'active' : '')} style={{ flexShrink: 0 }} onClick={() => selectSerie(s)}>{s.titulo}</button>)}</div>
+      <div className="field"><label>Título da Série</label><input className="input focus-tv" value={novaSerieTitulo} onChange={(e) => setNovaSerieTitulo(e.target.value)} placeholder="Ex.: Breaking Bad" tabIndex={0} /></div>
+      <div className="field"><label>Sinopse</label><input className="input focus-tv" value={novaSerieDescricao} onChange={(e) => setNovaSerieDescricao(e.target.value)} placeholder="Sinopse da série" tabIndex={0} /></div>
+      <div className="field"><label>Categoria</label><select className="input focus-tv" value={novaSerieCategoriaId} onChange={(e) => setNovaSerieCategoriaId(e.target.value)} tabIndex={0}><option value="">Selecione...</option>{categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select></div>
+      <div className="field"><label>Gênero</label><select className="input focus-tv" value={novaSerieGenero} onChange={(e) => setNovaSerieGenero(e.target.value)} tabIndex={0}><option value="">Selecione...</option>{generos.map((g) => <option key={g.id} value={g.nome}>{g.nome}</option>)}</select></div>
+      <div className="field"><label>URL da Capa</label><input className="input focus-tv" value={novaSerieCapa} onChange={(e) => setNovaSerieCapa(e.target.value)} placeholder="https://..." tabIndex={0} /></div>
+      <button className="primary-button focus-tv" onClick={createSerie} disabled={criandoSerie} tabIndex={0}>{criandoSerie ? 'Criando...' : 'Criar Série'}</button>
+      <div className="chip-row no-scrollbar" style={{ display: 'flex', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 8, marginTop: 20 }}>{series.map((s) => <button key={s.id} className={'chip focus-tv ' + (selectedSerie?.id === s.id ? 'active' : '')} style={{ flexShrink: 0 }} onClick={() => selectSerie(s)} tabIndex={0}>{s.titulo}</button>)}</div>
       {selectedSerie && <div className="admin-list" style={{ marginTop: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 className="section-title">{selectedSerie.titulo}</h3><button className="quiet-button focus-tv" onClick={() => deleteSerieHandler(selectedSerie.id)} style={{ color: '#ff8275' }}>Apagar Série</button>
+          <h3 className="section-title">{selectedSerie.titulo}</h3><button className="quiet-button focus-tv" onClick={() => deleteSerieHandler(selectedSerie.id)} style={{ color: '#ff8275' }} tabIndex={0}>Apagar Série</button>
         </div>
-        <div className="field" style={{ marginTop: 12 }}><label>Nova Temporada (Número)</label><input type="number" className="input focus-tv" value={novaTemporadaNumero} onChange={(e) => setNovaTemporadaNumero(e.target.value)} /></div>
-        <div className="field"><label>Título da Temporada (Opcional)</label><input className="input focus-tv" value={novaTemporadaTitulo} onChange={(e) => setNovaTemporadaTitulo(e.target.value)} placeholder="Ex.: 1ª Temporada" /></div>
-        <button className="secondary-button focus-tv" onClick={createTemporada}>Adicionar Temporada</button>
-        <div className="chip-row no-scrollbar" style={{ display: 'flex', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 8, marginTop: 20 }}>{temporadas.map((t) => <button key={t.id} className={'chip focus-tv ' + (selectedTemporada?.id === t.id ? 'active' : '')} style={{ flexShrink: 0 }} onClick={() => selectTemporada(t)}>{t.titulo || `Temporada ${t.numero}`}</button>)}</div>
+        <div className="field" style={{ marginTop: 12 }}><label>Nova Temporada (Número)</label><input type="number" className="input focus-tv" value={novaTemporadaNumero} onChange={(e) => setNovaTemporadaNumero(e.target.value)} tabIndex={0} /></div>
+        <div className="field"><label>Título da Temporada (Opcional)</label><input className="input focus-tv" value={novaTemporadaTitulo} onChange={(e) => setNovaTemporadaTitulo(e.target.value)} placeholder="Ex.: 1ª Temporada" tabIndex={0} /></div>
+        <button className="secondary-button focus-tv" onClick={createTemporada} tabIndex={0}>Adicionar Temporada</button>
+        <div className="chip-row no-scrollbar" style={{ display: 'flex', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 8, marginTop: 20 }}>{temporadas.map((t) => <button key={t.id} className={'chip focus-tv ' + (selectedTemporada?.id === t.id ? 'active' : '')} style={{ flexShrink: 0 }} onClick={() => selectTemporada(t)} tabIndex={0}>{t.titulo || `Temporada ${t.numero}`}</button>)}</div>
         {selectedTemporada && <div style={{ marginTop: 16, padding: 12, border: '1px solid rgba(255,255,255,.05)', borderRadius: 8 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <strong>Episódios</strong><button className="quiet-button focus-tv" onClick={() => deleteTemporadaHandler(selectedTemporada.id)} style={{ color: '#ff8275' }}><Trash2 size={15} /></button>
+            <strong>Episódios</strong><button className="quiet-button focus-tv" onClick={() => deleteTemporadaHandler(selectedTemporada.id)} style={{ color: '#ff8275' }} tabIndex={0}><Trash2 size={15} /></button>
           </div>
-          {episodios.map((ep) => <div key={ep.id} className="result-row"><span>Ep. {ep.numero} — {ep.titulo || ep.videos?.titulo}</span><button className="quiet-button focus-tv" onClick={() => removeEpisodioHandler(ep.id)}>Remover</button></div>)}
+          {episodios.map((ep) => <div key={ep.id} className="result-row"><span>Ep. {ep.numero} — {ep.titulo || ep.videos?.titulo}</span><button className="quiet-button focus-tv" onClick={() => removeEpisodioHandler(ep.id)} tabIndex={0}>Remover</button></div>)}
           <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div className="field"><label>Número do Ep.</label><input type="number" className="input focus-tv" value={novoEpisodioNumero} onChange={(e) => setNovoEpisodioNumero(e.target.value)} /></div>
-            <div className="field"><label>Vincular vídeo existente...</label><select className="input focus-tv" value={novoEpisodioVideoId} onChange={(e) => { setNovoEpisodioVideoId(e.target.value); setNovoEpisodioLink(''); setNovoEpisodioTitulo(''); }}><option value="">Selecione ou adicione link abaixo...</option>{videos.map((v) => <option key={v.id} value={v.id}>{v.titulo}</option>)}</select></div>
-            {!novoEpisodioVideoId && <><div className="field"><label>...ou colar Link do Episódio</label><input className="input focus-tv" value={novoEpisodioLink} onChange={(e) => setNovoEpisodioLink(e.target.value)} placeholder="https://..." /></div><div className="field"><label>Título do Episódio</label><input className="input focus-tv" value={novoEpisodioTitulo} onChange={(e) => setNovoEpisodioTitulo(e.target.value)} placeholder="Ex.: Piloto" /></div><div className="field"><label>Sinopse do Episódio</label><input className="input focus-tv" value={novoEpisodioDescricao} onChange={(e) => setNovoEpisodioDescricao(e.target.value)} placeholder="Resumo..." /></div></>}
-            <button className="secondary-button focus-tv" onClick={addEpisodio}>Adicionar Episódio</button>
+            <div className="field"><label>Número do Ep.</label><input type="number" className="input focus-tv" value={novoEpisodioNumero} onChange={(e) => setNovoEpisodioNumero(e.target.value)} tabIndex={0} /></div>
+            <div className="field"><label>Vincular vídeo existente...</label><select className="input focus-tv" value={novoEpisodioVideoId} onChange={(e) => { setNovoEpisodioVideoId(e.target.value); setNovoEpisodioLink(''); setNovoEpisodioTitulo(''); }} tabIndex={0}><option value="">Selecione ou adicione link abaixo...</option>{videos.map((v) => <option key={v.id} value={v.id}>{v.titulo}</option>)}</select></div>
+            {!novoEpisodioVideoId && <><div className="field"><label>...ou colar Link do Episódio</label><input className="input focus-tv" value={novoEpisodioLink} onChange={(e) => setNovoEpisodioLink(e.target.value)} placeholder="https://..." tabIndex={0} /></div><div className="field"><label>Título do Episódio</label><input className="input focus-tv" value={novoEpisodioTitulo} onChange={(e) => setNovoEpisodioTitulo(e.target.value)} placeholder="Ex.: Piloto" tabIndex={0} /></div><div className="field"><label>Sinopse do Episódio</label><input className="input focus-tv" value={novoEpisodioDescricao} onChange={(e) => setNovoEpisodioDescricao(e.target.value)} placeholder="Resumo..." tabIndex={0} /></>}
+            <button className="secondary-button focus-tv" onClick={addEpisodio} tabIndex={0}>Adicionar Episódio</button>
           </div>
         </div>}
       </div>}
@@ -1762,35 +1764,35 @@ function AdminPage() {
     {tab === 'layout' && <section className="panel panel-pad">
       <div className="eyebrow">Aparência</div><h2 className="panel-title" style={{ marginTop: 8 }}>Construtor de Catálogo</h2>
       <p className="muted" style={{ marginBottom: 16 }}>A ordem destas seções define como os usuários veem as fileiras.</p>
-      <div className="field"><label>Nova Seção</label><select className="input focus-tv" value={novaSecaoTipo} onChange={(e) => setNovaSecaoTipo(e.target.value as LayoutItem['tipo'])}>{LAYOUT_SECTION_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
-      <div className="field"><label>Título da Seção (Opcional)</label><input className="input focus-tv" value={novaSecaoTitulo} onChange={(e) => setNovaSecaoTitulo(e.target.value)} placeholder="Ex.: Lançamentos da Semana" /></div>
-      {novaSecaoTipo === 'elenco' && <div className="field"><label>Nome do Ator/Diretor</label><input className="input focus-tv" value={novaSecaoNome} onChange={(e) => setNovaSecaoNome(e.target.value)} placeholder="Ex.: Wagner Moura" /></div>}
-      {novaSecaoTipo === 'categoria' && <div className="field"><label>Nome da Categoria/Gênero</label><input className="input focus-tv" value={novaSecaoValor} onChange={(e) => setNovaSecaoValor(e.target.value)} placeholder="Ex.: Comédia" /></div>}
-      <button className="primary-button focus-tv" onClick={createLayoutSection} disabled={criandoSecao}>{criandoSecao ? 'Criando...' : 'Adicionar Seção'}</button>
+      <div className="field"><label>Nova Seção</label><select className="input focus-tv" value={novaSecaoTipo} onChange={(e) => setNovaSecaoTipo(e.target.value as LayoutItem['tipo'])} tabIndex={0}>{LAYOUT_SECTION_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
+      <div className="field"><label>Título da Seção (Opcional)</label><input className="input focus-tv" value={novaSecaoTitulo} onChange={(e) => setNovaSecaoTitulo(e.target.value)} placeholder="Ex.: Lançamentos da Semana" tabIndex={0} /></div>
+      {novaSecaoTipo === 'elenco' && <div className="field"><label>Nome do Ator/Diretor</label><input className="input focus-tv" value={novaSecaoNome} onChange={(e) => setNovaSecaoNome(e.target.value)} placeholder="Ex.: Wagner Moura" tabIndex={0} /></div>}
+      {novaSecaoTipo === 'categoria' && <div className="field"><label>Nome da Categoria/Gênero</label><input className="input focus-tv" value={novaSecaoValor} onChange={(e) => setNovaSecaoValor(e.target.value)} placeholder="Ex.: Comédia" tabIndex={0} /></div>}
+      <button className="primary-button focus-tv" onClick={createLayoutSection} disabled={criandoSecao} tabIndex={0}>{criandoSecao ? 'Criando...' : 'Adicionar Seção'}</button>
       <div className="admin-list" style={{ marginTop: 24 }}>
         {layoutItems.map((item, index) => <div key={item.id} className="result-row" style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 10, background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.05)', padding: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div draggable onDragStart={() => handleLayoutDragStart(index)} onDragOver={handleLayoutDragOver} onDrop={() => handleLayoutDrop(index)} style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'grab', flex: 1 }}>
+            <div draggable onDragStart={() => handleLayoutDragStart(index)} onDragOver={handleLayoutDragOver} onDrop={() => handleLayoutDrop(index)} style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'grab', flex: 1 }} tabIndex={0}>
               <span style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <strong style={{ opacity: item.visivel ? 1 : 0.4 }}>{item.titulo || labelForLayoutItem(item)}</strong>
                 <span className="muted" style={{ fontSize: '.72rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{item.tipo}</span>
               </span>
             </div>
             <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-              <button className="icon-button focus-tv" onClick={() => moveLayoutSection(index, -1)} disabled={index === 0} aria-label="Mover para cima"><ChevronDown size={16} className="rotate-180" /></button>
-              <button className="icon-button focus-tv" onClick={() => moveLayoutSection(index, 1)} disabled={index === layoutItems.length - 1} aria-label="Mover para baixo"><ChevronDown size={16} /></button>
-              <button className="quiet-button focus-tv" onClick={() => toggleLayoutVisibleHandler(item)}>{item.visivel ? 'Ocultar' : 'Mostrar'}</button>
-              {podeGerenciarVideosDaSecao(item.tipo) && <button className="quiet-button focus-tv" onClick={() => selectLayoutSectionForVideos(item)}>Vídeos</button>}
-              {podeApagarSecao(item.tipo) && <button className="quiet-button focus-tv" onClick={() => deleteLayoutSectionHandler(item)} style={{ color: '#ff8275' }}><Trash2 size={16} /></button>}
+              <button className="icon-button focus-tv" onClick={() => moveLayoutSection(index, -1)} disabled={index === 0} aria-label="Mover para cima" tabIndex={0}><ChevronDown size={16} className="rotate-180" /></button>
+              <button className="icon-button focus-tv" onClick={() => moveLayoutSection(index, 1)} disabled={index === layoutItems.length - 1} aria-label="Mover para baixo" tabIndex={0}><ChevronDown size={16} /></button>
+              <button className="quiet-button focus-tv" onClick={() => toggleLayoutVisibleHandler(item)} tabIndex={0}>{item.visivel ? 'Ocultar' : 'Mostrar'}</button>
+              {podeGerenciarVideosDaSecao(item.tipo) && <button className="quiet-button focus-tv" onClick={() => selectLayoutSectionForVideos(item)} tabIndex={0}>Vídeos</button>}
+              {podeApagarSecao(item.tipo) && <button className="quiet-button focus-tv" onClick={() => deleteLayoutSectionHandler(item)} style={{ color: '#ff8275' }} tabIndex={0}><Trash2 size={16} /></button>}
             </div>
           </div>
           {selectedLayoutSection?.id === item.id && <div style={{ borderTop: '1px solid rgba(255,255,255,.05)', paddingTop: 12, marginTop: 4 }}>
             <p className="muted" style={{ fontSize: '.8rem', marginBottom: 8 }}>Arraste para reordenar os vídeos desta seção.</p>
             {secaoVideoIds.map((vid, vIndex) => {
               const v = findVideo(videos, vid);
-              return v ? <div key={vid} draggable onDragStart={() => handleSecaoVideoDragStart(vIndex)} onDragOver={handleSecaoVideoDragOver} onDrop={() => handleSecaoVideoDrop(vIndex)} className="result-row" style={{ cursor: 'grab', padding: '6px 10px', minHeight: 32 }}><span>{v.titulo}</span><button className="icon-button focus-tv" onClick={() => removeVideoFromSecao(vid)}><X size={14} /></button></div> : null;
+              return v ? <div key={vid} draggable onDragStart={() => handleSecaoVideoDragStart(vIndex)} onDragOver={handleSecaoVideoDragOver} onDrop={() => handleSecaoVideoDrop(vIndex)} className="result-row" style={{ cursor: 'grab', padding: '6px 10px', minHeight: 32 }}><span>{v.titulo}</span><button className="icon-button focus-tv" onClick={() => removeVideoFromSecao(vid)} tabIndex={0}><X size={14} /></button></div> : null;
             })}
-            <select className="input focus-tv" style={{ marginTop: 8 }} onChange={(e) => { addVideoToSecao(e.target.value); e.target.value = ''; }} value=""><option value="">Adicionar vídeo...</option>{videos.filter(v => !secaoVideoIds.includes(v.id)).map(v => <option key={v.id} value={v.id}>{v.titulo}</option>)}</select>
+            <select className="input focus-tv" style={{ marginTop: 8 }} onChange={(e) => { addVideoToSecao(e.target.value); e.target.value = ''; }} value="" tabIndex={0}><option value="">Adicionar vídeo...</option>{videos.filter(v => !secaoVideoIds.includes(v.id)).map(v => <option key={v.id} value={v.id}>{v.titulo}</option>)}</select>
           </div>}
         </div>)}
       </div>
@@ -1798,11 +1800,11 @@ function AdminPage() {
 
     {tab === 'cupons' && <section className="panel panel-pad">
       <div className="eyebrow">Financeiro</div><h2 className="panel-title" style={{ marginTop: 8 }}>Cupons de Desconto</h2>
-      <div className="field"><label>Código do Cupom</label><input className="input focus-tv" value={novoCupomCodigo} onChange={(e) => setNovoCupomCodigo(e.target.value.toUpperCase())} placeholder="Ex.: BEMVINDO10" /></div>
-      <div className="field"><label>Desconto (%)</label><input type="number" className="input focus-tv" value={novoCupomDesconto} onChange={(e) => setNovoCupomDesconto(e.target.value)} min="1" max="100" /></div>
-      <div className="field"><label>Válido até (opcional)</label><input type="date" className="input focus-tv" value={novoCupomValidade} onChange={(e) => setNovoCupomValidade(e.target.value)} /></div>
-      <button className="primary-button focus-tv" onClick={createCupom} disabled={criandoCupom}>{criandoCupom ? 'Criando...' : 'Criar Cupom'}</button>
-      <div className="admin-list" style={{ marginTop: 24 }}>{cupons.map((cupom) => <div className="result-row" key={cupom.codigo}><span><strong>{cupom.codigo}</strong> — {cupom.percentual_desconto}% <span className="muted">({cupom.ativo ? 'Ativo' : 'Inativo'})</span></span><span style={{ display: 'flex', gap: 8 }}><button className="quiet-button focus-tv" onClick={() => toggleCupomHandler(cupom)}>{cupom.ativo ? 'Desativar' : 'Ativar'}</button><button className="quiet-button focus-tv" onClick={() => deleteCupomHandler(cupom.codigo)}>Apagar</button></span></div>)}</div>
+      <div className="field"><label>Código do Cupom</label><input className="input focus-tv" value={novoCupomCodigo} onChange={(e) => setNovoCupomCodigo(e.target.value.toUpperCase())} placeholder="Ex.: BEMVINDO10" tabIndex={0} /></div>
+      <div className="field"><label>Desconto (%)</label><input type="number" className="input focus-tv" value={novoCupomDesconto} onChange={(e) => setNovoCupomDesconto(e.target.value)} min="1" max="100" tabIndex={0} /></div>
+      <div className="field"><label>Válido até (opcional)</label><input type="date" className="input focus-tv" value={novoCupomValidade} onChange={(e) => setNovoCupomValidade(e.target.value)} tabIndex={0} /></div>
+      <button className="primary-button focus-tv" onClick={createCupom} disabled={criandoCupom} tabIndex={0}>{criandoCupom ? 'Criando...' : 'Criar Cupom'}</button>
+      <div className="admin-list" style={{ marginTop: 24 }}>{cupons.map((cupom) => <div className="result-row" key={cupom.codigo}><span><strong>{cupom.codigo}</strong> — {cupom.percentual_desconto}% <span className="muted">({cupom.ativo ? 'Ativo' : 'Inativo'})</span></span><span style={{ display: 'flex', gap: 8 }}><button className="quiet-button focus-tv" onClick={() => toggleCupomHandler(cupom)} tabIndex={0}>{cupom.ativo ? 'Desativar' : 'Ativar'}</button><button className="quiet-button focus-tv" onClick={() => deleteCupomHandler(cupom.codigo)} tabIndex={0}>Apagar</button></span></div>)}</div>
     </section>}
 
     {tab === 'clientes' && <section className="panel panel-pad">
@@ -1816,14 +1818,14 @@ function AdminPage() {
             <span className="muted" style={{ fontSize: '.8rem' }}>{status}</span>
           </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <button className="quiet-button focus-tv" onClick={() => openGrant(c)}>Conceder Acesso</button>
-            {sub && <button className="quiet-button focus-tv" onClick={() => handleRevoke(c)} disabled={revokeBusyId === c.id} style={{ color: '#ff8275' }}>Cancelar Acesso</button>}
+            <button className="quiet-button focus-tv" onClick={() => openGrant(c)} tabIndex={0}>Conceder Acesso</button>
+            {sub && <button className="quiet-button focus-tv" onClick={() => handleRevoke(c)} disabled={revokeBusyId === c.id} style={{ color: '#ff8275' }} tabIndex={0}>Cancelar Acesso</button>}
           </div>
           {grantTarget?.id === c.id && <div style={{ background: 'rgba(0,200,255,.05)', padding: 12, borderRadius: 8, marginTop: 8 }}>
-            <div className="field"><label>Quantidade de tempo</label><input type="number" className="input focus-tv" value={grantForm.quantidade} onChange={(e) => setGrantForm({ ...grantForm, quantidade: Number(e.target.value) })} /></div>
-            <div className="field"><label>Unidade</label><select className="input focus-tv" value={grantForm.unidade} onChange={(e) => setGrantForm({ ...grantForm, unidade: e.target.value as 'dias' | 'meses' })}><option value="dias">Dias</option><option value="meses">Meses</option></select></div>
-            <div className="field"><label>Motivo/Nota (aparece para o cliente)</label><input className="input focus-tv" value={grantForm.motivo} onChange={(e) => setGrantForm({ ...grantForm, motivo: e.target.value })} placeholder="Ex.: Cortesia de suporte" /></div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}><button className="primary-button focus-tv" onClick={confirmGrant} disabled={grantBusy}>Confirmar</button><button className="quiet-button focus-tv" onClick={closeGrant}>Cancelar</button></div>
+            <div className="field"><label>Quantidade de tempo</label><input type="number" className="input focus-tv" value={grantForm.quantidade} onChange={(e) => setGrantForm({ ...grantForm, quantidade: Number(e.target.value) })} tabIndex={0} /></div>
+            <div className="field"><label>Unidade</label><select className="input focus-tv" value={grantForm.unidade} onChange={(e) => setGrantForm({ ...grantForm, unidade: e.target.value as 'dias' | 'meses' })} tabIndex={0}><option value="dias">Dias</option><option value="meses">Meses</option></select></div>
+            <div className="field"><label>Motivo/Nota (aparece para o cliente)</label><input className="input focus-tv" value={grantForm.motivo} onChange={(e) => setGrantForm({ ...grantForm, motivo: e.target.value })} placeholder="Ex.: Cortesia de suporte" tabIndex={0} /></div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}><button className="primary-button focus-tv" onClick={confirmGrant} disabled={grantBusy} tabIndex={0}>Confirmar</button><button className="quiet-button focus-tv" onClick={closeGrant} tabIndex={0}>Cancelar</button></div>
           </div>}
         </div>;
       })}</div>
@@ -1831,27 +1833,27 @@ function AdminPage() {
 
     {tab === 'planos' && <section className="panel panel-pad">
       <div className="eyebrow">Financeiro</div><h2 className="panel-title" style={{ marginTop: 8 }}>Planos de Assinatura</h2>
-      <div className="field"><label>Nome do Plano</label><input className="input focus-tv" value={planoForm.nome} onChange={(e) => setPlanoForm({ ...planoForm, nome: e.target.value })} placeholder="Ex.: Plano Família" /></div>
-      <div className="field"><label>Categoria (agrupa botões)</label><input className="input focus-tv" value={planoForm.categoria} onChange={(e) => setPlanoForm({ ...planoForm, categoria: e.target.value })} placeholder="Ex.: Mensal" /></div>
-      <div className="field"><label>Descrição curta</label><input className="input focus-tv" value={planoForm.descricao} onChange={(e) => setPlanoForm({ ...planoForm, descricao: e.target.value })} placeholder="Ex.: 4 telas simultâneas" /></div>
-      <div className="field"><label>Preço (R$)</label><input type="number" step="0.01" className="input focus-tv" value={planoForm.preco} onChange={(e) => setPlanoForm({ ...planoForm, preco: e.target.value })} placeholder="Ex.: 29.90" /></div>
-      <div className="field"><label>Dispositivos</label><input type="number" className="input focus-tv" value={planoForm.dispositivos} onChange={(e) => setPlanoForm({ ...planoForm, dispositivos: e.target.value })} /></div>
-      <div className="field"><label>Duração do Acesso</label><div style={{ display: 'flex', gap: 8 }}><input type="number" className="input focus-tv" value={planoForm.duracaoQtd} onChange={(e) => setPlanoForm({ ...planoForm, duracaoQtd: e.target.value })} style={{ width: 80 }} /><select className="input focus-tv" value={planoForm.duracaoUnidade} onChange={(e) => setPlanoForm({ ...planoForm, duracaoUnidade: e.target.value as 'dias' | 'meses' })}><option value="dias">Dias</option><option value="meses">Meses</option></select></div></div>
-      <button className="primary-button focus-tv" onClick={savePlano} disabled={savingPlano}>{savingPlano ? 'Salvando...' : editingPlanoId ? 'Salvar Plano' : 'Criar Plano'}</button>
-      {editingPlanoId && <button className="quiet-button focus-tv" style={{ marginLeft: 10 }} onClick={resetPlanoForm}>Cancelar</button>}
-      <div className="admin-list" style={{ marginTop: 24 }}>{plans.map((p) => <div className="result-row" key={p.id}><span><strong>{p.nome}</strong> — R$ {p.preco} <span className="muted">({p.ativo ? 'Ativo' : 'Inativo'})</span></span><span style={{ display: 'flex', gap: 8 }}><button className="quiet-button focus-tv" onClick={() => togglePlan(p)}>{p.ativo ? 'Ocultar' : 'Mostrar'}</button><button className="quiet-button focus-tv" onClick={() => editPlano(p)}>Editar</button><button className="quiet-button focus-tv" onClick={() => deletePlanoHandler(p.id)} style={{ color: '#ff8275' }}>Apagar</button></span></div>)}</div>
+      <div className="field"><label>Nome do Plano</label><input className="input focus-tv" value={planoForm.nome} onChange={(e) => setPlanoForm({ ...planoForm, nome: e.target.value })} placeholder="Ex.: Plano Família" tabIndex={0} /></div>
+      <div className="field"><label>Categoria (agrupa botões)</label><input className="input focus-tv" value={planoForm.categoria} onChange={(e) => setPlanoForm({ ...planoForm, categoria: e.target.value })} placeholder="Ex.: Mensal" tabIndex={0} /></div>
+      <div className="field"><label>Descrição curta</label><input className="input focus-tv" value={planoForm.descricao} onChange={(e) => setPlanoForm({ ...planoForm, descricao: e.target.value })} placeholder="Ex.: 4 telas simultâneas" tabIndex={0} /></div>
+      <div className="field"><label>Preço (R$)</label><input type="number" step="0.01" className="input focus-tv" value={planoForm.preco} onChange={(e) => setPlanoForm({ ...planoForm, preco: e.target.value })} placeholder="Ex.: 29.90" tabIndex={0} /></div>
+      <div className="field"><label>Dispositivos</label><input type="number" className="input focus-tv" value={planoForm.dispositivos} onChange={(e) => setPlanoForm({ ...planoForm, dispositivos: e.target.value })} tabIndex={0} /></div>
+      <div className="field"><label>Duração do Acesso</label><div style={{ display: 'flex', gap: 8 }}><input type="number" className="input focus-tv" value={planoForm.duracaoQtd} onChange={(e) => setPlanoForm({ ...planoForm, duracaoQtd: e.target.value })} style={{ width: 80 }} tabIndex={0} /><select className="input focus-tv" value={planoForm.duracaoUnidade} onChange={(e) => setPlanoForm({ ...planoForm, duracaoUnidade: e.target.value as 'dias' | 'meses' })} tabIndex={0}><option value="dias">Dias</option><option value="meses">Meses</option></select></div></div>
+      <button className="primary-button focus-tv" onClick={savePlano} disabled={savingPlano} tabIndex={0}>{savingPlano ? 'Salvando...' : editingPlanoId ? 'Salvar Plano' : 'Criar Plano'}</button>
+      {editingPlanoId && <button className="quiet-button focus-tv" style={{ marginLeft: 10 }} onClick={resetPlanoForm} tabIndex={0}>Cancelar</button>}
+      <div className="admin-list" style={{ marginTop: 24 }}>{plans.map((p) => <div className="result-row" key={p.id}><span><strong>{p.nome}</strong> — R$ {p.preco} <span className="muted">({p.ativo ? 'Ativo' : 'Inativo'})</span></span><span style={{ display: 'flex', gap: 8 }}><button className="quiet-button focus-tv" onClick={() => togglePlan(p)} tabIndex={0}>{p.ativo ? 'Ocultar' : 'Mostrar'}</button><button className="quiet-button focus-tv" onClick={() => editPlano(p)} tabIndex={0}>Editar</button><button className="quiet-button focus-tv" onClick={() => deletePlanoHandler(p.id)} style={{ color: '#ff8275' }} tabIndex={0}>Apagar</button></span></div>)}</div>
     </section>}
 
     {tab === 'equipe' && <section className="panel panel-pad">
       <div className="eyebrow">Acesso Restrito</div><h2 className="panel-title" style={{ marginTop: 8 }}>Equipe Administrativa</h2>
-      <div className="field"><label>Adicionar Administrador (E-mail)</label><div style={{ display: 'flex', gap: 8 }}><input type="email" className="input focus-tv" value={novoEquipeEmail} onChange={(e) => setNovoEquipeEmail(e.target.value)} placeholder="email@exemplo.com" /><button className="secondary-button focus-tv" onClick={addToEquipeHandler}>Adicionar</button></div></div>
-      <div className="admin-list" style={{ marginTop: 24 }}>{equipe.map((eq) => <div className="result-row" key={eq.id}><span><strong>{eq.email}</strong> {eq.admin_master && <span className="premium-badge" style={{ marginLeft: 8, fontSize: '.65rem' }}>MASTER</span>}</span><span style={{ display: 'flex', gap: 8 }}>{eq.admin_master ? <button className="quiet-button focus-tv" onClick={() => rebaixarMasterHandler(eq.id)}>Remover Master</button> : <button className="quiet-button focus-tv" onClick={() => promoverMasterHandler(eq.id)}>Tornar Master</button>}<button className="quiet-button focus-tv" onClick={() => removerDaEquipeHandler(eq.id)} style={{ color: '#ff8275' }}>Remover Acesso</button></span></div>)}</div>
+      <div className="field"><label>Adicionar Administrador (E-mail)</label><div style={{ display: 'flex', gap: 8 }}><input type="email" className="input focus-tv" value={novoEquipeEmail} onChange={(e) => setNovoEquipeEmail(e.target.value)} placeholder="email@exemplo.com" tabIndex={0} /><button className="secondary-button focus-tv" onClick={addToEquipeHandler} tabIndex={0}>Adicionar</button></div></div>
+      <div className="admin-list" style={{ marginTop: 24 }}>{equipe.map((eq) => <div className="result-row" key={eq.id}><span><strong>{eq.email}</strong> {eq.admin_master && <span className="premium-badge" style={{ marginLeft: 8, fontSize: '.65rem' }}>MASTER</span>}</span><span style={{ display: 'flex', gap: 8 }}>{eq.admin_master ? <button className="quiet-button focus-tv" onClick={() => rebaixarMasterHandler(eq.id)} tabIndex={0}>Remover Master</button> : <button className="quiet-button focus-tv" onClick={() => promoverMasterHandler(eq.id)} tabIndex={0}>Tornar Master</button>}<button className="quiet-button focus-tv" onClick={() => removerDaEquipeHandler(eq.id)} style={{ color: '#ff8275' }} tabIndex={0}>Remover Acesso</button></span></div>)}</div>
     </section>}
   </div>;
 }
 
 function LockedPage({ title, description }: { title: string; description: string }) {
-  return <div className="content-wrap page-main"><div className="empty-state"><KeyRound size={28} /><h3>{title}</h3><p>{description}</p><Link href="/" className="primary-button focus-tv" style={{ marginTop: 12 }}>Ir para entrada</Link></div></div>;
+  return <div className="content-wrap page-main"><div className="empty-state"><KeyRound size={28} /><h3>{title}</h3><p>{description}</p><Link href="/" className="primary-button focus-tv" style={{ marginTop: 12 }} tabIndex={0}>Ir para entrada</Link></div></div>;
 }
 
 function ResetPage() {
@@ -1870,11 +1872,11 @@ function ResetPage() {
       setBusy(false);
     }
   }
-  return <div className="home-shell"><div className="auth-layout" style={{ maxWidth: 620 }}><section className="auth-panel" style={{ borderLeft: 0 }}><Brand /><h2 style={{ marginTop: 42 }}>Redefinir senha</h2><p>Informe o e-mail da conta.</p>{sent ? <div className="notice notice-cyan"><Check size={17} /><span>Instruções enviadas.</span></div> : <form onSubmit={submit}><div className="field"><label htmlFor="reset-email">E-mail</label><input id="reset-email" type="email" required className="input focus-tv" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="voce@exemplo.com" /></div><button className="primary-button button-wide focus-tv" type="submit" disabled={busy}>{busy ? 'Enviando...' : 'Enviar instruções'}</button></form>}<Link href="/" className="quiet-button button-wide focus-tv" style={{ marginTop: 10 }}><ArrowLeft size={15} />Voltar</Link></section></div></div>;
+  return <div className="home-shell"><div className="auth-layout" style={{ maxWidth: 620 }}><section className="auth-panel" style={{ borderLeft: 0 }}><Brand /><h2 style={{ marginTop: 42 }}>Redefinir senha</h2><p>Informe o e-mail da conta.</p>{sent ? <div className="notice notice-cyan"><Check size={17} /><span>Instruções enviadas.</span></div> : <form onSubmit={submit}><div className="field"><label htmlFor="reset-email">E-mail</label><input id="reset-email" type="email" required className="input focus-tv" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="voce@exemplo.com" tabIndex={0} /></div><button className="primary-button button-wide focus-tv" type="submit" disabled={busy} tabIndex={0}>{busy ? 'Enviando...' : 'Enviar instruções'}</button></form>}<Link href="/" className="quiet-button button-wide focus-tv" style={{ marginTop: 10 }} tabIndex={0}><ArrowLeft size={15} />Voltar</Link></section></div></div>;
 }
 
 function NotFoundPage() {
-  return <div className="content-wrap page-main"><div className="empty-state"><CircleAlert size={28} /><h3>Página não encontrada</h3><p>Endereço inválido.</p><Link href="/catalogo" className="primary-button focus-tv" style={{ marginTop: 12 }}>Voltar ao catálogo</Link></div></div>;
+  return <div className="content-wrap page-main"><div className="empty-state"><CircleAlert size={28} /><h3>Página não encontrada</h3><p>Endereço inválido.</p><Link href="/catalogo" className="primary-button focus-tv" style={{ marginTop: 12 }} tabIndex={0}>Voltar ao catálogo</Link></div></div>;
 }
 
 function Router() {
