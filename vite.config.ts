@@ -17,6 +17,8 @@ export default defineConfig({
   build: {
     outDir: path.resolve(root, 'dist'),
     emptyOutDir: true,
+    // Isso traduz o código para rodar sem Tela Branca no iPad Mini 2 (iOS 12)
+    target: ['es2015', 'safari12'],
   },
   server: {
     host: '0.0.0.0',
