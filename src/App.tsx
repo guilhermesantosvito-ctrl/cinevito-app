@@ -1010,8 +1010,8 @@ function VideoPlayer({ embed, title }: { embed: { type: string, src: string }, t
         {/* ESCUDO TOPO: Bloqueia links de direcionamento e título */}
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '60px', zIndex: 10 }} title="Cabeçalho protegido" />
         
-        {/* ESCUDO INFERIOR: Posicionado para cobrir Share, Embed e Logo. Deixa livre o botão de Fullscreen (últimos 42px) */}
-        <div style={{ position: 'absolute', bottom: 0, right: '42px', width: '145px', height: '50px', zIndex: 10 }} title="Controles protegidos" />
+        {/* ESCUDO INFERIOR: Bloqueia o Musem, Share e Embed. Deixa os 3 botões livres (Engrenagem, PiP e Tela Cheia). */}
+        <div style={{ position: 'absolute', bottom: 0, right: '135px', width: '140px', height: '50px', zIndex: 10 }} title="Controles protegidos" />
         
         <iframe src={embed.src} title={title} allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowFullScreen style={{ width: '100%', height: '100%', border: 0 }} data-testid="video-player" />
       </div>
@@ -1048,20 +1048,28 @@ function PlayerPage() {
   useEffect(() => {
     if (!video || access !== true) return;
     let cancelled = false;
+    
+    // GATILHO INDEPENDENTE: Salva a View e o Histórico de filmes na mesma hora
+    registrarVisualizacao(video.id).catch(() => {});
+    if (user && !video.ao_vivo) {
+      salvarProgresso({ video_id: video.id }).catch(() => {});
+    }
+
     (async () => {
       try {
-        registrarVisualizacao(video.id).catch(() => {});
         const info = await fetchEpisodioInfo(video.id);
         if (cancelled) return;
         if (info) {
           setEpisodioInfo(info);
           const lista = await fetchEpisodios(info.episodio.temporada_id);
           if (!cancelled) setEpisodiosDaTemporada(lista);
-          if (user) await salvarProgresso({ video_id: video.id, serie_id: info.serieId, temporada_id: info.episodio.temporada_id, numero_episodio: info.episodio.numero });
+          // Se for série, atualiza o histórico para incluir os dados extras da temporada
+          if (user) {
+            salvarProgresso({ video_id: video.id, serie_id: info.serieId, temporada_id: info.episodio.temporada_id, numero_episodio: info.episodio.numero }).catch(() => {});
+          }
         } else {
           setEpisodioInfo(null);
           setEpisodiosDaTemporada([]);
-          if (user) await salvarProgresso({ video_id: video.id });
         }
       } catch { }
     })();
@@ -1081,17 +1089,34 @@ function PlayerPage() {
   if (loading || access === null || access === false) return <div className="content-wrap page-main"><div className="skeleton" style={{ aspectRatio: '16/9' }} /></div>;
   if (!video) return <div className="content-wrap page-main"><div className="empty-state"><CircleAlert size={26} /><h3>Vídeo não encontrado</h3><p>Esse título não está mais disponível no catálogo.</p><Link href="/catalogo" className="primary-button focus-tv">Voltar ao catálogo</Link></div></div>;
   
-  return <div className="content-wrap page-main"><button className="quiet-button focus-tv" onClick={() => setLocation('/catalogo')} data-testid="button-back-catalog"><ArrowLeft size={16} />Voltar ao catálogo</button><div className="player-stage" style={{ marginTop: 17 }}><div className="player-box">
-    <VideoPlayer embed={embed} title={video.titulo} />
-  </div><div className="player-details"><div><div className="eyebrow">{video.genero || video.categoria || 'CineVito'} {video.ano ? ` / ${video.ano}` : ''}{episodioInfo ? ` · Ep. ${episodioInfo.episodio.numero}` : ''}</div><h1 className="section-title" style={{ marginTop: 7 }} data-testid="text-player-title">{video.titulo}</h1><p>{video.descricao || 'Este título faz parte do catálogo CineVito.'}</p></div><div className="player-actions"><button className={`secondary-button focus-tv ${saved ? 'active' : ''}`} onClick={toggle} data-testid="button-player-favorite"><Heart size={15} fill={saved ? 'currentColor' : 'none'} />{saved ? 'Na coleção' : 'Salvar'}</button>{episodioInfo?.proximo && <button className="primary-button focus-tv" onClick={() => setLocation(`/player/${episodioInfo.proximo!.video_id}`)}>Próximo episódio<ChevronRight size={16} /></button>}</div></div>
-  {episodiosDaTemporada.length > 1 && <div style={{ marginTop: 20 }}>
-    <h3 className="section-title" style={{ fontSize: '1rem' }}>Episódios desta temporada</h3>
-    <div className="admin-list" style={{ marginTop: 10 }}>{episodiosDaTemporada.map((ep) => <div key={ep.id} role="button" tabIndex={0} onClick={() => setLocation(`/player/${ep.video_id}`)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setLocation(`/player/${ep.video_id}`)} className="result-row" style={{ cursor: 'pointer', border: ep.video_id === video.id ? '1px solid var(--accent-teal, #2ec4b6)' : undefined }}>
-      <span><strong>Ep. {ep.numero}</strong> — {ep.titulo || ep.videos?.titulo}</span>
-      {ep.video_id === video.id ? <span className="muted" style={{ fontSize: '.78rem' }}>Assistindo</span> : <Play size={15} color="#00c8ff" />}
-    </div>)}</div>
-  </div>}
-  </div></div>;
+  // SOLUÇÃO DO TAMANHO DA TELA AO VIVO: Controla a altura do player.
+  // Se for ao vivo, o playerStage.height continua o mesmo padrão dos filmes em vez de forçar 100vh.
+  return <div className="content-wrap page-main">
+    <button className="quiet-button focus-tv" onClick={() => setLocation('/catalogo')} data-testid="button-back-catalog"><ArrowLeft size={16} />Voltar ao catálogo</button>
+    <div className="player-stage" style={{ marginTop: 17 }}>
+      <div className="player-box">
+        <VideoPlayer embed={embed} title={video.titulo} />
+      </div>
+      <div className="player-details">
+        <div>
+          <div className="eyebrow">{video.genero || video.categoria || 'CineVito'} {video.ano ? ` / ${video.ano}` : ''}{episodioInfo ? ` · Ep. ${episodioInfo.episodio.numero}` : ''}</div>
+          <h1 className="section-title" style={{ marginTop: 7 }} data-testid="text-player-title">{video.titulo}</h1>
+          <p>{video.descricao || 'Este título faz parte do catálogo CineVito.'}</p>
+        </div>
+        <div className="player-actions">
+          <button className={`secondary-button focus-tv ${saved ? 'active' : ''}`} onClick={toggle} data-testid="button-player-favorite"><Heart size={15} fill={saved ? 'currentColor' : 'none'} />{saved ? 'Na coleção' : 'Salvar'}</button>
+          {episodioInfo?.proximo && <button className="primary-button focus-tv" onClick={() => setLocation(`/player/${episodioInfo.proximo!.video_id}`)}>Próximo episódio<ChevronRight size={16} /></button>}
+        </div>
+      </div>
+      {episodiosDaTemporada.length > 1 && <div style={{ marginTop: 20 }}>
+        <h3 className="section-title" style={{ fontSize: '1rem' }}>Episódios desta temporada</h3>
+        <div className="admin-list" style={{ marginTop: 10 }}>{episodiosDaTemporada.map((ep) => <div key={ep.id} role="button" tabIndex={0} onClick={() => setLocation(`/player/${ep.video_id}`)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setLocation(`/player/${ep.video_id}`)} className="result-row" style={{ cursor: 'pointer', border: ep.video_id === video.id ? '1px solid var(--accent-teal, #2ec4b6)' : undefined }}>
+          <span><strong>Ep. {ep.numero}</strong> — {ep.titulo || ep.videos?.titulo}</span>
+          {ep.video_id === video.id ? <span className="muted" style={{ fontSize: '.78rem' }}>Assistindo</span> : <Play size={15} color="#00c8ff" />}
+        </div>)}</div>
+      </div>}
+    </div>
+  </div>;
 }
 
 function SeriePage() {
@@ -1133,7 +1158,7 @@ function CollectionPage() {
     localStorage.setItem('cinevito-favorites', JSON.stringify(next));
   }
   function openVideo(id: string) { setLocation(access ? `/player/${id}` : '/assinatura'); }
-  return <div className="content-wrap page-main"><PageHeader eyebrow="O que você guardou" title="Minha coleção" description="Seus titles favoritos em um só lugar, prontos para a próxima sessão." />{collection.length ? <div className="video-grid">{collection.map((video) => <Poster key={video.id} video={video} favorite onFavorite={() => remove(video.id)} onOpen={() => openVideo(video.id)} />)}</div> : <div className="empty-state" data-testid="status-collection-empty"><Heart size={27} /><h3>Ainda está vazio</h3><p>Use o coração nos títulos do catálogo para montar sua coleção.</p><Link href="/catalogo" className="primary-button focus-tv" data-testid="link-collection-catalog">Explorar catálogo</Link></div>}</div>;
+  return <div className="content-wrap page-main"><PageHeader eyebrow="O que você guardou" title="Minha coleção" description="Seus títulos favoritos em um só lugar, prontos para a próxima sessão." />{collection.length ? <div className="video-grid">{collection.map((video) => <Poster key={video.id} video={video} favorite onFavorite={() => remove(video.id)} onOpen={() => openVideo(video.id)} />)}</div> : <div className="empty-state" data-testid="status-collection-empty"><Heart size={27} /><h3>Ainda está vazio</h3><p>Use o coração nos títulos do catálogo para montar sua coleção.</p><Link href="/catalogo" className="primary-button focus-tv" data-testid="link-collection-catalog">Explorar catálogo</Link></div>}</div>;
 }
 
 function subscriptionLabel(sub: MinhaAssinatura | null): { status: string; origem: string } {
