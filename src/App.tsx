@@ -367,17 +367,18 @@ function AppShell({ children }: { children: ReactNode }) {
         <div className="content-wrap topbar-inner">
           <Brand />
           <nav className="topbar-nav" aria-label="Navegação principal">
-            {navigation.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className="nav-link focus-tv" aria-current={active(href) ? 'page' : undefined} data-testid={`link-nav-${label.toLowerCase().replaceAll(' ', '-')}`}><Icon size={16} />{label}</Link>)}
+            {navigation.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className="nav-link focus-tv" aria-current={active(href) ? 'page' : undefined} data-testid={`link-nav-${label.toLowerCase().replaceAll(' ', '-')}`} tabIndex={0}><Icon size={16} />{label}</Link>)}
           </nav>
           <div className="topbar-actions">
-            {isAdmin && <Link href="/admin" className="nav-link focus-tv" data-testid="link-admin"><Settings size={16} />Painel</Link>}{user ? <><Link href="/perfil" className="avatar focus-tv" aria-label="Abrir perfil" data-testid="link-profile-avatar">{initials(user)}</Link><button className="icon-button focus-tv" onClick={logout} title="Sair" aria-label="Sair" data-testid="button-logout"><LogOut size={17} /></button></> : <Link href="/" className="secondary-button focus-tv" data-testid="link-login"><LogIn size={15} />Entrar</Link>}
+            {isAdmin && <Link href="/admin" className="nav-link focus-tv" data-testid="link-admin" tabIndex={0}><Settings size={16} />Painel</Link>}
+            {user ? <><Link href="/perfil" className="avatar focus-tv" aria-label="Abrir perfil" data-testid="link-profile-avatar" tabIndex={0}>{initials(user)}</Link><button className="icon-button focus-tv" onClick={logout} title="Sair" aria-label="Sair" data-testid="button-logout" tabIndex={0}><LogOut size={17} /></button></> : <Link href="/" className="secondary-button focus-tv" data-testid="link-login" tabIndex={0}><LogIn size={15} />Entrar</Link>}
           </div>
         </div>
       </header>
       <main>{children}</main>
       <nav className="mobile-nav" aria-label="Navegação mobile">
-        {navigation.slice(0, 3).map(({ href, label, icon: Icon }) => <Link key={href} href={href} className="mobile-nav-link focus-tv" aria-current={active(href) ? 'page' : undefined} data-testid={`link-mobile-${label.toLowerCase().replaceAll(' ', '-')}`}><Icon size={17} /><span>{label}</span></Link>)}
-        <Link href={user ? '/perfil' : '/'} className="mobile-nav-link focus-tv" aria-current={location === '/perfil' ? 'page' : undefined} data-testid="link-mobile-profile"><UserRound size={17} /><span>{user ? 'Perfil' : 'Entrar'}</span></Link>
+        {navigation.slice(0, 3).map(({ href, label, icon: Icon }) => <Link key={href} href={href} className="mobile-nav-link focus-tv" aria-current={active(href) ? 'page' : undefined} data-testid={`link-mobile-${label.toLowerCase().replaceAll(' ', '-')}`} tabIndex={0}><Icon size={17} /><span>{label}</span></Link>)}
+        <Link href={user ? '/perfil' : '/'} className="mobile-nav-link focus-tv" aria-current={location === '/perfil' ? 'page' : undefined} data-testid="link-mobile-profile" tabIndex={0}><UserRound size={17} /><span>{user ? 'Perfil' : 'Entrar'}</span></Link>
       </nav>
     </div>
   );
@@ -540,7 +541,7 @@ function ContinueCard({ item, onOpen, onRemove }: { item: ContinuarAssistindoIte
 }
 
 // ============================================================================
-// TV AO VIVO - ATUALIZADA COM O ISOLAMENTO DE CANAIS E LAYOUT CUSTOMIZADO
+// TV AO VIVO
 // ============================================================================
 function LiveTVPage() {
   const [, setLocation] = useLocation();
@@ -888,10 +889,10 @@ function CatalogPage() {
   return <div className="content-wrap page-main">
     <PageHeader eyebrow="A sua sala de cinema" title={`Olá, ${titleCaseName(user)}.`} description="Escolha algo para assistir. O catálogo se adapta à sua tela, do celular à Smart TV." action={<Link href="/assinatura" className="primary-button focus-tv" data-testid="link-subscription"><Sparkles size={16} />Ver planos</Link>} />
     {!hasRuntimeConfig && <div className="notice notice-cyan" data-testid="status-runtime-demo"><Info size={17} color="#00c8ff" /><span><strong>Modo de demonstração.</strong> O ambiente ainda não está conectado ao Supabase; os dados desta sessão ficam apenas neste aparelho.</span></div>}
-    {!user && <div className="notice notice-orange" data-testid="status-catalog-auth"><CircleAlert size={17} color="#ff8228" /><span><strong>Você está navegando como visitante.</strong> Entre para salvar favoritos e continuar assistindo em outros dispositivos.</span><Link href="/" className="quiet-button focus-tv" data-testid="link-catalog-login">Entrar</Link></div>}
-    {user && access === false && <div className="notice notice-orange" data-testid="status-catalog-locked"><CircleAlert size={17} color="#ff8228" /><span><strong>Seu acesso gratuito acabou.</strong> Assine um plano para continuar assistindo ao catálogo completo.</span><Link href="/assinatura" className="quiet-button focus-tv">Ver planos</Link></div>}
+    {!user && <div className="notice notice-orange" data-testid="status-catalog-auth"><CircleAlert size={17} color="#ff8228" /><span><strong>Você está navegando como visitante.</strong> Entre para salvar favoritos e continuar assistindo em outros dispositivos.</span><Link href="/" className="quiet-button focus-tv" data-testid="link-catalog-login" tabIndex={0}>Entrar</Link></div>}
+    {user && access === false && <div className="notice notice-orange" data-testid="status-catalog-locked"><CircleAlert size={17} color="#ff8228" /><span><strong>Seu acesso gratuito acabou.</strong> Assine um plano para continuar assistindo ao catálogo completo.</span><Link href="/assinatura" className="quiet-button focus-tv" tabIndex={0}>Ver planos</Link></div>}
     
-    <div className="catalog-toolbar"><div className="search-wrap"><Search size={16} /><input className="input focus-tv" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar no catálogo" aria-label="Buscar no catálogo" data-testid="input-search-catalog" tabIndex={0} /></div><Link href="/colecao" className="secondary-button focus-tv" data-testid="link-open-collection"><Heart size={15} />Minha coleção</Link></div>
+    <div className="catalog-toolbar"><div className="search-wrap"><Search size={16} /><input className="input focus-tv" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar no catálogo" aria-label="Buscar no catálogo" data-testid="input-search-catalog" tabIndex={0} /></div><Link href="/colecao" className="secondary-button focus-tv" data-testid="link-open-collection" tabIndex={0}><Heart size={15} />Minha coleção</Link></div>
     
     {/* MENU SUPERIOR PREMIUM: Início, Filmes, Séries */}
     <div className="chip-row horizontal-scroll" role="tablist">
@@ -952,6 +953,9 @@ function CatalogPage() {
   </div>;
 }
 
+// ============================================================================
+// COMPONENTE DO PLAYER (Com escudos de proteção)
+// ============================================================================
 function VideoPlayer({ embed, title }: { embed: { type: string, src: string }, title?: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [hlsReady, setHlsReady] = useState(!!(window as any).Hls);
@@ -1010,9 +1014,8 @@ function VideoPlayer({ embed, title }: { embed: { type: string, src: string }, t
         {/* ESCUDO TOPO: Bloqueia links de direcionamento e título */}
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '60px', zIndex: 10 }} title="Cabeçalho protegido" />
         
-        {/* ESCUDO INFERIOR (CORRIGIDO PARA A ENGRENAGEM E O MODO MINI): 
-            Posicionado exatamente para cobrir Share, Embed e Logo. 
-            Deixa os últimos 135px totalmente livres para clicar na engrenagem, no mini-player e no fullscreen! */}
+        {/* ESCUDO INFERIOR: Posicionado exatamente para cobrir Share, Embed e Logo. 
+            Deixa os últimos 135px (Engrenagem, Mini-player e Fullscreen) totalmente livres! */}
         <div style={{ position: 'absolute', bottom: 0, right: '135px', width: '140px', height: '50px', zIndex: 10 }} title="Controles protegidos" />
         
         <iframe src={embed.src} title={title} allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowFullScreen style={{ width: '100%', height: '100%', border: 0 }} data-testid="video-player" />
@@ -1091,12 +1094,11 @@ function PlayerPage() {
   if (loading || access === null || access === false) return <div className="content-wrap page-main"><div className="skeleton" style={{ aspectRatio: '16/9' }} /></div>;
   if (!video) return <div className="content-wrap page-main"><div className="empty-state"><CircleAlert size={26} /><h3>Vídeo não encontrado</h3><p>Esse título não está mais disponível no catálogo.</p><Link href="/catalogo" className="primary-button focus-tv" tabIndex={0}>Voltar ao catálogo</Link></div></div>;
   
-  // SOLUÇÃO DO TAMANHO DA TELA AO VIVO: Controla a altura do player.
-  // Se for ao vivo, o playerStage.height continua o mesmo padrão dos filmes em vez de forçar 100vh.
+  // SOLUÇÃO DO TAMANHO DA TELA AO VIVO E FILMES
   return <div className="content-wrap page-main">
     <button className="quiet-button focus-tv" onClick={() => setLocation('/catalogo')} data-testid="button-back-catalog" tabIndex={0}><ArrowLeft size={16} />Voltar ao catálogo</button>
     <div className="player-stage" style={{ marginTop: 17 }}>
-      <div className="player-box">
+      <div className="player-box" style={{ aspectRatio: '16/9', width: '100%', background: '#000', borderRadius: '12px', overflow: 'hidden' }}>
         <VideoPlayer embed={embed} title={video.titulo} />
       </div>
       <div className="player-details">
@@ -1688,168 +1690,209 @@ function AdminPage() {
     if (item === 'equipe') loadEquipe();
   }
 
-  return <div className="content-wrap page-main">
-    <PageHeader eyebrow="Painel protegido" title="Administração" description={profile.admin_master ? 'Controle completo do CineVito.' : 'Acesso ao catálogo.'} action={<Link href="/admin/uploads" className="primary-button focus-tv" style={{ textDecoration: 'none' }} tabIndex={0}><Film size={16} />Moderação de Uploads</Link>} />
-    <div className="admin-tabs" role="tablist">{tabs.map((item) => <button key={item} className={'admin-tab focus-tv ' + (tab === item ? 'active' : '')} onClick={() => onSelectTab(item)} role="tab" aria-selected={tab === item} tabIndex={0}>{tabLabels[item]}</button>)}</div>
-    {message && <div className="notice notice-orange" role="status">{message}</div>}
-
-    {tab === 'videos' && <section className="panel panel-pad"><div className="eyebrow">Catálogo manual</div><h2 className="panel-title" style={{ marginTop: 8 }}>{editingVideoId ? 'Editar vídeo' : 'Adicionar vídeo'}</h2>
-      <div className="field"><label htmlFor="v-url">Link do vídeo ou código &lt;iframe&gt;</label><textarea id="v-url" className="input focus-tv" rows={3} value={videoForm.url_video} onChange={(e) => setVideoForm({ ...videoForm, url_video: e.target.value })} placeholder="https://..." tabIndex={0} /></div>
-      <div className="field"><label htmlFor="v-titulo">Título</label><input id="v-titulo" className="input focus-tv" value={videoForm.titulo} onChange={(e) => setVideoForm({ ...videoForm, titulo: e.target.value })} placeholder="Nome do filme/vídeo" tabIndex={0} /></div>
-      <div className="field"><label htmlFor="v-descricao">Sinopse</label><input id="v-descricao" className="input focus-tv" value={videoForm.descricao} onChange={(e) => setVideoForm({ ...videoForm, descricao: e.target.value })} placeholder="Sinopse" tabIndex={0} /></div>
-      <div className="field"><label htmlFor="v-categoria">Categoria</label><select id="v-categoria" className="input focus-tv" value={videoForm.categoria_id} onChange={(e) => setVideoForm({ ...videoForm, categoria_id: e.target.value })} tabIndex={0}><option value="">Selecione...</option>{categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select><div style={{ display: 'flex', gap: 8, marginTop: 6 }}><input className="input focus-tv" value={novaCategoria} onChange={(e) => setNovaCategoria(e.target.value)} placeholder="Nova categoria..." tabIndex={0} /><button type="button" className="secondary-button focus-tv" onClick={handleCreateCategoria} tabIndex={0}>Criar</button></div></div>
-      <div className="field"><label htmlFor="v-genero">Gênero</label><select id="v-genero" className="input focus-tv" value={videoForm.genero} onChange={(e) => setVideoForm({ ...videoForm, genero: e.target.value })} tabIndex={0}><option value="">Selecione...</option>{generos.map((g) => <option key={g.id} value={g.nome}>{g.nome}</option>)}</select><div style={{ display: 'flex', gap: 8, marginTop: 6 }}><input className="input focus-tv" value={novoGenero} onChange={(e) => setNovoGenero(e.target.value)} placeholder="Novo gênero..." tabIndex={0} /><button type="button" className="secondary-button focus-tv" onClick={handleCreateGenero} tabIndex={0}>Criar</button></div></div>
-      <div className="field"><label htmlFor="v-elenco">Elenco (separe os nomes por vírgula)</label><input id="v-elenco" className="input focus-tv" value={videoForm.elenco} onChange={(e) => setVideoForm({ ...videoForm, elenco: e.target.value })} placeholder="Ex.: Gal Gadot, Fernanda Torres" tabIndex={0} /></div>
-      <label className="check-row"><input type="checkbox" checked={videoForm.ao_vivo} onChange={(e) => setVideoForm({ ...videoForm, ao_vivo: e.target.checked })} tabIndex={0} />Transmissão ao vivo / esportes (aparece na seção "Ao vivo")</label>
-      <div className="field"><label htmlFor="v-capa">URL da capa (opcional)</label><input id="v-capa" className="input focus-tv" value={videoForm.url_capa} onChange={(e) => setVideoForm({ ...videoForm, url_capa: e.target.value })} placeholder="https://..." tabIndex={0} /></div>
-      <div className="field"><label htmlFor="v-licenca">Licença</label><input id="v-licenca" className="input focus-tv" value={videoForm.licenca} onChange={(e) => setVideoForm({ ...videoForm, licenca: e.target.value })} placeholder="Ex.: Domínio Público" tabIndex={0} /></div>
-      <div className="field"><label htmlFor="v-ano">Ano</label><input id="v-ano" type="number" className="input focus-tv" value={videoForm.ano} onChange={(e) => setVideoForm({ ...videoForm, ano: e.target.value })} placeholder="Ex.: 1968" tabIndex={0} /></div>
-      <button className="primary-button focus-tv" onClick={saveVideo} disabled={savingVideo} tabIndex={0}>{savingVideo ? 'Salvando...' : editingVideoId ? 'Salvar alterações' : 'Adicionar ao catálogo'}</button>
-      {editingVideoId && <button className="quiet-button focus-tv" style={{ marginLeft: 10 }} onClick={resetVideoForm} tabIndex={0}>Cancelar</button>}
-      <h3 style={{ marginTop: 26 }}>Vídeos cadastrados</h3>
-      <div className="admin-list" style={{ marginTop: 10 }}>{videos.length ? videos.map((video) => <div className="result-row" key={video.id}><span><strong>{video.titulo}</strong></span><span style={{ display: 'flex', gap: 8 }}><button className="quiet-button focus-tv" onClick={() => editVideo(video)} tabIndex={0}>Editar</button><button className="quiet-button focus-tv" onClick={() => deleteVideo(video.id)} tabIndex={0}>Apagar</button></span></div>) : <p className="muted">Nenhum vídeo cadastrado.</p>}</div>
-    </section>}
-
-    {tab === 'colecoes' && <section className="panel panel-pad">
-      <div className="eyebrow">Organização</div><h2 className="panel-title" style={{ marginTop: 8 }}>Coleções</h2>
-      <div className="field"><label>Nova coleção</label><input className="input focus-tv" value={novaColecaoTitulo} onChange={(e) => setNovaColecaoTitulo(e.target.value)} placeholder="Ex.: Ação Explosiva" tabIndex={0} /></div>
-      <div className="field"><label>Descrição (opcional)</label><input className="input focus-tv" value={novaColecaoDescricao} onChange={(e) => setNovaColecaoDescricao(e.target.value)} placeholder="Descrição da coleção" tabIndex={0} /></div>
-      <button className="primary-button focus-tv" onClick={createColecao} disabled={criandoColecao} tabIndex={0}>{criandoColecao ? 'Criando...' : 'Criar coleção'}</button>
-      <div className="chip-row no-scrollbar" style={{ display: 'flex', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 8, marginTop: 20 }}>{colecoes.map((c) => <button key={c.id} className={'chip focus-tv ' + (selectedColecao?.id === c.id ? 'active' : '')} style={{ flexShrink: 0 }} onClick={() => selectColecao(c)} tabIndex={0}>{c.titulo}</button>)}</div>
-      {selectedColecao && <div className="admin-list" style={{ marginTop: 16 }}>
-        <h3 className="section-title">{selectedColecao.titulo}</h3>
-        <p className="muted" style={{ marginBottom: 12 }}>Arraste para reordenar.</p>
-        {colecaoVideos.map((cv, index) => <div key={cv.video_id} draggable onDragStart={() => handleDragStart(index)} onDragOver={handleDragOver} onDrop={() => handleDrop(index)} className="result-row" style={{ cursor: 'grab' }}>
-          <span><strong>{cv.videos?.titulo}</strong></span><button className="quiet-button focus-tv" onClick={() => removeVideoFromColecaoHandler(cv.video_id)} tabIndex={0}>Remover</button>
-        </div>)}
-        <div style={{ marginTop: 16, display: 'flex', gap: 8, alignItems: 'center' }}>
-          <select className="input focus-tv" onChange={(e) => addVideoToColecaoHandler(e.target.value)} value="" tabIndex={0}><option value="">Adicionar vídeo...</option>{videos.filter((v) => !colecaoVideos.some((cv) => cv.video_id === v.id)).map((v) => <option key={v.id} value={v.id}>{v.titulo}</option>)}</select>
-          <button className="quiet-button focus-tv" onClick={() => deleteColecaoHandler(selectedColecao.id)} style={{ color: '#ff8275' }} tabIndex={0}>Apagar Coleção</button>
-        </div>
-      </div>}
-    </section>}
-
-    {tab === 'series' && <section className="panel panel-pad">
-      <div className="eyebrow">Organização</div><h2 className="panel-title" style={{ marginTop: 8 }}>Séries e Temporadas</h2>
-      <div className="field"><label>Título da Série</label><input className="input focus-tv" value={novaSerieTitulo} onChange={(e) => setNovaSerieTitulo(e.target.value)} placeholder="Ex.: Breaking Bad" tabIndex={0} /></div>
-      <div className="field"><label>Sinopse</label><input className="input focus-tv" value={novaSerieDescricao} onChange={(e) => setNovaSerieDescricao(e.target.value)} placeholder="Sinopse da série" tabIndex={0} /></div>
-      <div className="field"><label>Categoria</label><select className="input focus-tv" value={novaSerieCategoriaId} onChange={(e) => setNovaSerieCategoriaId(e.target.value)} tabIndex={0}><option value="">Selecione...</option>{categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select></div>
-      <div className="field"><label>Gênero</label><select className="input focus-tv" value={novaSerieGenero} onChange={(e) => setNovaSerieGenero(e.target.value)} tabIndex={0}><option value="">Selecione...</option>{generos.map((g) => <option key={g.id} value={g.nome}>{g.nome}</option>)}</select></div>
-      <div className="field"><label>URL da Capa</label><input className="input focus-tv" value={novaSerieCapa} onChange={(e) => setNovaSerieCapa(e.target.value)} placeholder="https://..." tabIndex={0} /></div>
-      <button className="primary-button focus-tv" onClick={createSerie} disabled={criandoSerie} tabIndex={0}>{criandoSerie ? 'Criando...' : 'Criar Série'}</button>
-      <div className="chip-row no-scrollbar" style={{ display: 'flex', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 8, marginTop: 20 }}>{series.map((s) => <button key={s.id} className={'chip focus-tv ' + (selectedSerie?.id === s.id ? 'active' : '')} style={{ flexShrink: 0 }} onClick={() => selectSerie(s)} tabIndex={0}>{s.titulo}</button>)}</div>
-      {selectedSerie && <div className="admin-list" style={{ marginTop: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 className="section-title">{selectedSerie.titulo}</h3><button className="quiet-button focus-tv" onClick={() => deleteSerieHandler(selectedSerie.id)} style={{ color: '#ff8275' }} tabIndex={0}>Apagar Série</button>
-        </div>
-        <div className="field" style={{ marginTop: 12 }}><label>Nova Temporada (Número)</label><input type="number" className="input focus-tv" value={novaTemporadaNumero} onChange={(e) => setNovaTemporadaNumero(e.target.value)} tabIndex={0} /></div>
-        <div className="field"><label>Título da Temporada (Opcional)</label><input className="input focus-tv" value={novaTemporadaTitulo} onChange={(e) => setNovaTemporadaTitulo(e.target.value)} placeholder="Ex.: 1ª Temporada" tabIndex={0} /></div>
-        <button className="secondary-button focus-tv" onClick={createTemporada} tabIndex={0}>Adicionar Temporada</button>
-        <div className="chip-row no-scrollbar" style={{ display: 'flex', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 8, marginTop: 20 }}>{temporadas.map((t) => <button key={t.id} className={'chip focus-tv ' + (selectedTemporada?.id === t.id ? 'active' : '')} style={{ flexShrink: 0 }} onClick={() => selectTemporada(t)} tabIndex={0}>{t.titulo || `Temporada ${t.numero}`}</button>)}</div>
-        {selectedTemporada && <div style={{ marginTop: 16, padding: 12, border: '1px solid rgba(255,255,255,.05)', borderRadius: 8 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <strong>Episódios</strong><button className="quiet-button focus-tv" onClick={() => deleteTemporadaHandler(selectedTemporada.id)} style={{ color: '#ff8275' }} tabIndex={0}><Trash2 size={15} /></button>
-          </div>
-          {episodios.map((ep) => <div key={ep.id} className="result-row"><span>Ep. {ep.numero} — {ep.titulo || ep.videos?.titulo}</span><button className="quiet-button focus-tv" onClick={() => removeEpisodioHandler(ep.id)} tabIndex={0}>Remover</button></div>)}
-          <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div className="field"><label>Número do Ep.</label><input type="number" className="input focus-tv" value={novoEpisodioNumero} onChange={(e) => setNovoEpisodioNumero(e.target.value)} tabIndex={0} /></div>
-            <div className="field"><label>Vincular vídeo existente...</label><select className="input focus-tv" value={novoEpisodioVideoId} onChange={(e) => { setNovoEpisodioVideoId(e.target.value); setNovoEpisodioLink(''); setNovoEpisodioTitulo(''); }} tabIndex={0}><option value="">Selecione ou adicione link abaixo...</option>{videos.map((v) => <option key={v.id} value={v.id}>{v.titulo}</option>)}</select></div>
-            {!novoEpisodioVideoId && <><div className="field"><label>...ou colar Link do Episódio</label><input className="input focus-tv" value={novoEpisodioLink} onChange={(e) => setNovoEpisodioLink(e.target.value)} placeholder="https://..." tabIndex={0} /></div><div className="field"><label>Título do Episódio</label><input className="input focus-tv" value={novoEpisodioTitulo} onChange={(e) => setNovoEpisodioTitulo(e.target.value)} placeholder="Ex.: Piloto" tabIndex={0} /></div><div className="field"><label>Sinopse do Episódio</label><input className="input focus-tv" value={novoEpisodioDescricao} onChange={(e) => setNovoEpisodioDescricao(e.target.value)} placeholder="Resumo..." tabIndex={0} /></>}
-            <button className="secondary-button focus-tv" onClick={addEpisodio} tabIndex={0}>Adicionar Episódio</button>
-          </div>
-        </div>}
-      </div>}
-    </section>}
-
-    {tab === 'layout' && <section className="panel panel-pad">
-      <div className="eyebrow">Aparência</div><h2 className="panel-title" style={{ marginTop: 8 }}>Construtor de Catálogo</h2>
-      <p className="muted" style={{ marginBottom: 16 }}>A ordem destas seções define como os usuários veem as fileiras.</p>
-      <div className="field"><label>Nova Seção</label><select className="input focus-tv" value={novaSecaoTipo} onChange={(e) => setNovaSecaoTipo(e.target.value as LayoutItem['tipo'])} tabIndex={0}>{LAYOUT_SECTION_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
-      <div className="field"><label>Título da Seção (Opcional)</label><input className="input focus-tv" value={novaSecaoTitulo} onChange={(e) => setNovaSecaoTitulo(e.target.value)} placeholder="Ex.: Lançamentos da Semana" tabIndex={0} /></div>
-      {novaSecaoTipo === 'elenco' && <div className="field"><label>Nome do Ator/Diretor</label><input className="input focus-tv" value={novaSecaoNome} onChange={(e) => setNovaSecaoNome(e.target.value)} placeholder="Ex.: Wagner Moura" tabIndex={0} /></div>}
-      {novaSecaoTipo === 'categoria' && <div className="field"><label>Nome da Categoria/Gênero</label><input className="input focus-tv" value={novaSecaoValor} onChange={(e) => setNovaSecaoValor(e.target.value)} placeholder="Ex.: Comédia" tabIndex={0} /></div>}
-      <button className="primary-button focus-tv" onClick={createLayoutSection} disabled={criandoSecao} tabIndex={0}>{criandoSecao ? 'Criando...' : 'Adicionar Seção'}</button>
-      <div className="admin-list" style={{ marginTop: 24 }}>
-        {layoutItems.map((item, index) => <div key={item.id} className="result-row" style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 10, background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.05)', padding: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div draggable onDragStart={() => handleLayoutDragStart(index)} onDragOver={handleLayoutDragOver} onDrop={() => handleLayoutDrop(index)} style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'grab', flex: 1 }} tabIndex={0}>
-              <span style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <strong style={{ opacity: item.visivel ? 1 : 0.4 }}>{item.titulo || labelForLayoutItem(item)}</strong>
-                <span className="muted" style={{ fontSize: '.72rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{item.tipo}</span>
-              </span>
-            </div>
-            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-              <button className="icon-button focus-tv" onClick={() => moveLayoutSection(index, -1)} disabled={index === 0} aria-label="Mover para cima" tabIndex={0}><ChevronDown size={16} className="rotate-180" /></button>
-              <button className="icon-button focus-tv" onClick={() => moveLayoutSection(index, 1)} disabled={index === layoutItems.length - 1} aria-label="Mover para baixo" tabIndex={0}><ChevronDown size={16} /></button>
-              <button className="quiet-button focus-tv" onClick={() => toggleLayoutVisibleHandler(item)} tabIndex={0}>{item.visivel ? 'Ocultar' : 'Mostrar'}</button>
-              {podeGerenciarVideosDaSecao(item.tipo) && <button className="quiet-button focus-tv" onClick={() => selectLayoutSectionForVideos(item)} tabIndex={0}>Vídeos</button>}
-              {podeApagarSecao(item.tipo) && <button className="quiet-button focus-tv" onClick={() => deleteLayoutSectionHandler(item)} style={{ color: '#ff8275' }} tabIndex={0}><Trash2 size={16} /></button>}
-            </div>
-          </div>
-          {selectedLayoutSection?.id === item.id && <div style={{ borderTop: '1px solid rgba(255,255,255,.05)', paddingTop: 12, marginTop: 4 }}>
-            <p className="muted" style={{ fontSize: '.8rem', marginBottom: 8 }}>Arraste para reordenar os vídeos desta seção.</p>
-            {secaoVideoIds.map((vid, vIndex) => {
-              const v = findVideo(videos, vid);
-              return v ? <div key={vid} draggable onDragStart={() => handleSecaoVideoDragStart(vIndex)} onDragOver={handleSecaoVideoDragOver} onDrop={() => handleSecaoVideoDrop(vIndex)} className="result-row" style={{ cursor: 'grab', padding: '6px 10px', minHeight: 32 }}><span>{v.titulo}</span><button className="icon-button focus-tv" onClick={() => removeVideoFromSecao(vid)} tabIndex={0}><X size={14} /></button></div> : null;
-            })}
-            <select className="input focus-tv" style={{ marginTop: 8 }} onChange={(e) => { addVideoToSecao(e.target.value); e.target.value = ''; }} value="" tabIndex={0}><option value="">Adicionar vídeo...</option>{videos.filter(v => !secaoVideoIds.includes(v.id)).map(v => <option key={v.id} value={v.id}>{v.titulo}</option>)}</select>
-          </div>}
-        </div>)}
+  return (
+    <div className="content-wrap page-main">
+      <PageHeader eyebrow="Painel protegido" title="Administração" description={profile.admin_master ? 'Controle completo do CineVito.' : 'Acesso ao catálogo.'} action={<Link href="/admin/uploads" className="primary-button focus-tv" style={{ textDecoration: 'none' }} tabIndex={0}><Film size={16} />Moderação de Uploads</Link>} />
+      <div className="admin-tabs" role="tablist">
+        {tabs.map((item) => (
+          <button key={item} className={'admin-tab focus-tv ' + (tab === item ? 'active' : '')} onClick={() => onSelectTab(item)} role="tab" aria-selected={tab === item} tabIndex={0}>{tabLabels[item]}</button>
+        ))}
       </div>
-    </section>}
+      {message && <div className="notice notice-orange" role="status">{message}</div>}
 
-    {tab === 'cupons' && <section className="panel panel-pad">
-      <div className="eyebrow">Financeiro</div><h2 className="panel-title" style={{ marginTop: 8 }}>Cupons de Desconto</h2>
-      <div className="field"><label>Código do Cupom</label><input className="input focus-tv" value={novoCupomCodigo} onChange={(e) => setNovoCupomCodigo(e.target.value.toUpperCase())} placeholder="Ex.: BEMVINDO10" tabIndex={0} /></div>
-      <div className="field"><label>Desconto (%)</label><input type="number" className="input focus-tv" value={novoCupomDesconto} onChange={(e) => setNovoCupomDesconto(e.target.value)} min="1" max="100" tabIndex={0} /></div>
-      <div className="field"><label>Válido até (opcional)</label><input type="date" className="input focus-tv" value={novoCupomValidade} onChange={(e) => setNovoCupomValidade(e.target.value)} tabIndex={0} /></div>
-      <button className="primary-button focus-tv" onClick={createCupom} disabled={criandoCupom} tabIndex={0}>{criandoCupom ? 'Criando...' : 'Criar Cupom'}</button>
-      <div className="admin-list" style={{ marginTop: 24 }}>{cupons.map((cupom) => <div className="result-row" key={cupom.codigo}><span><strong>{cupom.codigo}</strong> — {cupom.percentual_desconto}% <span className="muted">({cupom.ativo ? 'Ativo' : 'Inativo'})</span></span><span style={{ display: 'flex', gap: 8 }}><button className="quiet-button focus-tv" onClick={() => toggleCupomHandler(cupom)} tabIndex={0}>{cupom.ativo ? 'Desativar' : 'Ativar'}</button><button className="quiet-button focus-tv" onClick={() => deleteCupomHandler(cupom.codigo)} tabIndex={0}>Apagar</button></span></div>)}</div>
-    </section>}
+      {tab === 'videos' && (
+        <section className="panel panel-pad">
+          <div className="eyebrow">Catálogo manual</div><h2 className="panel-title" style={{ marginTop: 8 }}>{editingVideoId ? 'Editar vídeo' : 'Adicionar vídeo'}</h2>
+          <div className="field"><label htmlFor="v-url">Link do vídeo ou código &lt;iframe&gt;</label><textarea id="v-url" className="input focus-tv" rows={3} value={videoForm.url_video} onChange={(e) => setVideoForm({ ...videoForm, url_video: e.target.value })} placeholder="https://..." tabIndex={0} /></div>
+          <div className="field"><label htmlFor="v-titulo">Título</label><input id="v-titulo" className="input focus-tv" value={videoForm.titulo} onChange={(e) => setVideoForm({ ...videoForm, titulo: e.target.value })} placeholder="Nome do filme/vídeo" tabIndex={0} /></div>
+          <div className="field"><label htmlFor="v-descricao">Sinopse</label><input id="v-descricao" className="input focus-tv" value={videoForm.descricao} onChange={(e) => setVideoForm({ ...videoForm, descricao: e.target.value })} placeholder="Sinopse" tabIndex={0} /></div>
+          <div className="field"><label htmlFor="v-categoria">Categoria</label><select id="v-categoria" className="input focus-tv" value={videoForm.categoria_id} onChange={(e) => setVideoForm({ ...videoForm, categoria_id: e.target.value })} tabIndex={0}><option value="">Selecione...</option>{categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select><div style={{ display: 'flex', gap: 8, marginTop: 6 }}><input className="input focus-tv" value={novaCategoria} onChange={(e) => setNovaCategoria(e.target.value)} placeholder="Nova categoria..." tabIndex={0} /><button type="button" className="secondary-button focus-tv" onClick={handleCreateCategoria} tabIndex={0}>Criar</button></div></div>
+          <div className="field"><label htmlFor="v-genero">Gênero</label><select id="v-genero" className="input focus-tv" value={videoForm.genero} onChange={(e) => setVideoForm({ ...videoForm, genero: e.target.value })} tabIndex={0}><option value="">Selecione...</option>{generos.map((g) => <option key={g.id} value={g.nome}>{g.nome}</option>)}</select><div style={{ display: 'flex', gap: 8, marginTop: 6 }}><input className="input focus-tv" value={novoGenero} onChange={(e) => setNovoGenero(e.target.value)} placeholder="Novo gênero..." tabIndex={0} /><button type="button" className="secondary-button focus-tv" onClick={handleCreateGenero} tabIndex={0}>Criar</button></div></div>
+          <div className="field"><label htmlFor="v-elenco">Elenco (separe os nomes por vírgula)</label><input id="v-elenco" className="input focus-tv" value={videoForm.elenco} onChange={(e) => setVideoForm({ ...videoForm, elenco: e.target.value })} placeholder="Ex.: Gal Gadot, Fernanda Torres" tabIndex={0} /></div>
+          <label className="check-row"><input type="checkbox" checked={videoForm.ao_vivo} onChange={(e) => setVideoForm({ ...videoForm, ao_vivo: e.target.checked })} tabIndex={0} />Transmissão ao vivo / esportes (aparece na seção "Ao vivo")</label>
+          <div className="field"><label htmlFor="v-capa">URL da capa (opcional)</label><input id="v-capa" className="input focus-tv" value={videoForm.url_capa} onChange={(e) => setVideoForm({ ...videoForm, url_capa: e.target.value })} placeholder="https://..." tabIndex={0} /></div>
+          <div className="field"><label htmlFor="v-licenca">Licença</label><input id="v-licenca" className="input focus-tv" value={videoForm.licenca} onChange={(e) => setVideoForm({ ...videoForm, licenca: e.target.value })} placeholder="Ex.: Domínio Público" tabIndex={0} /></div>
+          <div className="field"><label htmlFor="v-ano">Ano</label><input id="v-ano" type="number" className="input focus-tv" value={videoForm.ano} onChange={(e) => setVideoForm({ ...videoForm, ano: e.target.value })} placeholder="Ex.: 1968" tabIndex={0} /></div>
+          <button className="primary-button focus-tv" onClick={saveVideo} disabled={savingVideo} tabIndex={0}>{savingVideo ? 'Salvando...' : editingVideoId ? 'Salvar alterações' : 'Adicionar ao catálogo'}</button>
+          {editingVideoId && <button className="quiet-button focus-tv" style={{ marginLeft: 10 }} onClick={resetVideoForm} tabIndex={0}>Cancelar</button>}
+          <h3 style={{ marginTop: 26 }}>Vídeos cadastrados</h3>
+          <div className="admin-list" style={{ marginTop: 10 }}>{videos.length ? videos.map((video) => <div className="result-row" key={video.id}><span><strong>{video.titulo}</strong></span><span style={{ display: 'flex', gap: 8 }}><button className="quiet-button focus-tv" onClick={() => editVideo(video)} tabIndex={0}>Editar</button><button className="quiet-button focus-tv" onClick={() => deleteVideo(video.id)} tabIndex={0}>Apagar</button></span></div>) : <p className="muted">Nenhum vídeo cadastrado.</p>}</div>
+        </section>
+      )}
 
-    {tab === 'clientes' && <section className="panel panel-pad">
-      <div className="eyebrow">Gestão</div><h2 className="panel-title" style={{ marginTop: 8 }}>Clientes e Acessos</h2>
-      <div className="admin-list" style={{ marginTop: 16 }}>{clients.map((c) => {
-        const sub = (c as any).assinatura?.[0] || (c as any).assinaturas?.[0] || (c as any).assinatura;
-        const status = !sub ? 'Sem acesso' : sub.status === 'ativa' ? 'Ativo' : sub.status === 'trial' ? 'Trial' : sub.status === 'pendente' ? 'Pendente' : 'Inativo';
-        return <div className="result-row" key={c.id} style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span><strong>{c.nome || 'Usuário'}</strong> <span className="muted">({c.email})</span></span>
-            <span className="muted" style={{ fontSize: '.8rem' }}>{status}</span>
+      {tab === 'colecoes' && (
+        <section className="panel panel-pad">
+          <div className="eyebrow">Organização</div><h2 className="panel-title" style={{ marginTop: 8 }}>Coleções</h2>
+          <div className="field"><label>Nova coleção</label><input className="input focus-tv" value={novaColecaoTitulo} onChange={(e) => setNovaColecaoTitulo(e.target.value)} placeholder="Ex.: Ação Explosiva" tabIndex={0} /></div>
+          <div className="field"><label>Descrição (opcional)</label><input className="input focus-tv" value={novaColecaoDescricao} onChange={(e) => setNovaColecaoDescricao(e.target.value)} placeholder="Descrição da coleção" tabIndex={0} /></div>
+          <button className="primary-button focus-tv" onClick={createColecao} disabled={criandoColecao} tabIndex={0}>{criandoColecao ? 'Criando...' : 'Criar coleção'}</button>
+          <div className="chip-row no-scrollbar" style={{ display: 'flex', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 8, marginTop: 20 }}>{colecoes.map((c) => <button key={c.id} className={'chip focus-tv ' + (selectedColecao?.id === c.id ? 'active' : '')} style={{ flexShrink: 0 }} onClick={() => selectColecao(c)} tabIndex={0}>{c.titulo}</button>)}</div>
+          {selectedColecao && (
+            <div className="admin-list" style={{ marginTop: 16 }}>
+              <h3 className="section-title">{selectedColecao.titulo}</h3>
+              <p className="muted" style={{ marginBottom: 12 }}>Arraste para reordenar.</p>
+              {colecaoVideos.map((cv, index) => (
+                <div key={cv.video_id} draggable onDragStart={() => handleDragStart(index)} onDragOver={handleDragOver} onDrop={() => handleDrop(index)} className="result-row" style={{ cursor: 'grab' }}>
+                  <span><strong>{cv.videos?.titulo}</strong></span><button className="quiet-button focus-tv" onClick={() => removeVideoFromColecaoHandler(cv.video_id)} tabIndex={0}>Remover</button>
+                </div>
+              ))}
+              <div style={{ marginTop: 16, display: 'flex', gap: 8, alignItems: 'center' }}>
+                <select className="input focus-tv" onChange={(e) => addVideoToColecaoHandler(e.target.value)} value="" tabIndex={0}><option value="">Adicionar vídeo...</option>{videos.filter((v) => !colecaoVideos.some((cv) => cv.video_id === v.id)).map((v) => <option key={v.id} value={v.id}>{v.titulo}</option>)}</select>
+                <button className="quiet-button focus-tv" onClick={() => deleteColecaoHandler(selectedColecao.id)} style={{ color: '#ff8275' }} tabIndex={0}>Apagar Coleção</button>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      {tab === 'series' && (
+        <section className="panel panel-pad">
+          <div className="eyebrow">Organização</div><h2 className="panel-title" style={{ marginTop: 8 }}>Séries e Temporadas</h2>
+          <div className="field"><label>Título da Série</label><input className="input focus-tv" value={novaSerieTitulo} onChange={(e) => setNovaSerieTitulo(e.target.value)} placeholder="Ex.: Breaking Bad" tabIndex={0} /></div>
+          <div className="field"><label>Sinopse</label><input className="input focus-tv" value={novaSerieDescricao} onChange={(e) => setNovaSerieDescricao(e.target.value)} placeholder="Sinopse da série" tabIndex={0} /></div>
+          <div className="field"><label>Categoria</label><select className="input focus-tv" value={novaSerieCategoriaId} onChange={(e) => setNovaSerieCategoriaId(e.target.value)} tabIndex={0}><option value="">Selecione...</option>{categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select></div>
+          <div className="field"><label>Gênero</label><select className="input focus-tv" value={novaSerieGenero} onChange={(e) => setNovaSerieGenero(e.target.value)} tabIndex={0}><option value="">Selecione...</option>{generos.map((g) => <option key={g.id} value={g.nome}>{g.nome}</option>)}</select></div>
+          <div className="field"><label>URL da Capa</label><input className="input focus-tv" value={novaSerieCapa} onChange={(e) => setNovaSerieCapa(e.target.value)} placeholder="https://..." tabIndex={0} /></div>
+          <button className="primary-button focus-tv" onClick={createSerie} disabled={criandoSerie} tabIndex={0}>{criandoSerie ? 'Criando...' : 'Criar Série'}</button>
+          <div className="chip-row no-scrollbar" style={{ display: 'flex', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 8, marginTop: 20 }}>{series.map((s) => <button key={s.id} className={'chip focus-tv ' + (selectedSerie?.id === s.id ? 'active' : '')} style={{ flexShrink: 0 }} onClick={() => selectSerie(s)} tabIndex={0}>{s.titulo}</button>)}</div>
+          {selectedSerie && (
+            <div className="admin-list" style={{ marginTop: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 className="section-title">{selectedSerie.titulo}</h3><button className="quiet-button focus-tv" onClick={() => deleteSerieHandler(selectedSerie.id)} style={{ color: '#ff8275' }} tabIndex={0}>Apagar Série</button>
+              </div>
+              <div className="field" style={{ marginTop: 12 }}><label>Nova Temporada (Número)</label><input type="number" className="input focus-tv" value={novaTemporadaNumero} onChange={(e) => setNovaTemporadaNumero(e.target.value)} tabIndex={0} /></div>
+              <div className="field"><label>Título da Temporada (Opcional)</label><input className="input focus-tv" value={novaTemporadaTitulo} onChange={(e) => setNovaTemporadaTitulo(e.target.value)} placeholder="Ex.: 1ª Temporada" tabIndex={0} /></div>
+              <button className="secondary-button focus-tv" onClick={createTemporada} tabIndex={0}>Adicionar Temporada</button>
+              <div className="chip-row no-scrollbar" style={{ display: 'flex', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 8, marginTop: 20 }}>{temporadas.map((t) => <button key={t.id} className={'chip focus-tv ' + (selectedTemporada?.id === t.id ? 'active' : '')} style={{ flexShrink: 0 }} onClick={() => selectTemporada(t)} tabIndex={0}>{t.titulo || `Temporada ${t.numero}`}</button>)}</div>
+              {selectedTemporada && (
+                <div style={{ marginTop: 16, padding: 12, border: '1px solid rgba(255,255,255,.05)', borderRadius: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <strong>Episódios</strong><button className="quiet-button focus-tv" onClick={() => deleteTemporadaHandler(selectedTemporada.id)} style={{ color: '#ff8275' }} tabIndex={0}><Trash2 size={15} /></button>
+                  </div>
+                  {episodios.map((ep) => <div key={ep.id} className="result-row"><span>Ep. {ep.numero} — {ep.titulo || ep.videos?.titulo}</span><button className="quiet-button focus-tv" onClick={() => removeEpisodioHandler(ep.id)} tabIndex={0}>Remover</button></div>)}
+                  <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div className="field"><label>Número do Ep.</label><input type="number" className="input focus-tv" value={novoEpisodioNumero} onChange={(e) => setNovoEpisodioNumero(e.target.value)} tabIndex={0} /></div>
+                    <div className="field"><label>Vincular vídeo existente...</label><select className="input focus-tv" value={novoEpisodioVideoId} onChange={(e) => { setNovoEpisodioVideoId(e.target.value); setNovoEpisodioLink(''); setNovoEpisodioTitulo(''); }} tabIndex={0}><option value="">Selecione ou adicione link abaixo...</option>{videos.map((v) => <option key={v.id} value={v.id}>{v.titulo}</option>)}</select></div>
+                    {!novoEpisodioVideoId && (
+                      <>
+                        <div className="field"><label>...ou colar Link do Episódio</label><input className="input focus-tv" value={novoEpisodioLink} onChange={(e) => setNovoEpisodioLink(e.target.value)} placeholder="https://..." tabIndex={0} /></div>
+                        <div className="field"><label>Título do Episódio</label><input className="input focus-tv" value={novoEpisodioTitulo} onChange={(e) => setNovoEpisodioTitulo(e.target.value)} placeholder="Ex.: Piloto" tabIndex={0} /></div>
+                        <div className="field"><label>Sinopse do Episódio</label><input className="input focus-tv" value={novoEpisodioDescricao} onChange={(e) => setNovoEpisodioDescricao(e.target.value)} placeholder="Resumo..." tabIndex={0} /></div>
+                      </>
+                    )}
+                    <button className="secondary-button focus-tv" onClick={addEpisodio} tabIndex={0}>Adicionar Episódio</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+      )}
+
+      {tab === 'layout' && (
+        <section className="panel panel-pad">
+          <div className="eyebrow">Aparência</div><h2 className="panel-title" style={{ marginTop: 8 }}>Construtor de Catálogo</h2>
+          <p className="muted" style={{ marginBottom: 16 }}>A ordem destas seções define como os usuários veem as fileiras.</p>
+          <div className="field"><label>Nova Seção</label><select className="input focus-tv" value={novaSecaoTipo} onChange={(e) => setNovaSecaoTipo(e.target.value as LayoutItem['tipo'])} tabIndex={0}>{LAYOUT_SECTION_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
+          <div className="field"><label>Título da Seção (Opcional)</label><input className="input focus-tv" value={novaSecaoTitulo} onChange={(e) => setNovaSecaoTitulo(e.target.value)} placeholder="Ex.: Lançamentos da Semana" tabIndex={0} /></div>
+          {novaSecaoTipo === 'elenco' && <div className="field"><label>Nome do Ator/Diretor</label><input className="input focus-tv" value={novaSecaoNome} onChange={(e) => setNovaSecaoNome(e.target.value)} placeholder="Ex.: Wagner Moura" tabIndex={0} /></div>}
+          {novaSecaoTipo === 'categoria' && <div className="field"><label>Nome da Categoria/Gênero</label><input className="input focus-tv" value={novaSecaoValor} onChange={(e) => setNovaSecaoValor(e.target.value)} placeholder="Ex.: Comédia" tabIndex={0} /></div>}
+          <button className="primary-button focus-tv" onClick={createLayoutSection} disabled={criandoSecao} tabIndex={0}>{criandoSecao ? 'Criando...' : 'Adicionar Seção'}</button>
+          <div className="admin-list" style={{ marginTop: 24 }}>
+            {layoutItems.map((item, index) => (
+              <div key={item.id} className="result-row" style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 10, background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.05)', padding: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div draggable onDragStart={() => handleLayoutDragStart(index)} onDragOver={handleLayoutDragOver} onDrop={() => handleLayoutDrop(index)} style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'grab', flex: 1 }} tabIndex={0}>
+                    <span style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <strong style={{ opacity: item.visivel ? 1 : 0.4 }}>{item.titulo || labelForLayoutItem(item)}</strong>
+                      <span className="muted" style={{ fontSize: '.72rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{item.tipo}</span>
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                    <button className="icon-button focus-tv" onClick={() => moveLayoutSection(index, -1)} disabled={index === 0} aria-label="Mover para cima" tabIndex={0}><ChevronDown size={16} className="rotate-180" /></button>
+                    <button className="icon-button focus-tv" onClick={() => moveLayoutSection(index, 1)} disabled={index === layoutItems.length - 1} aria-label="Mover para baixo" tabIndex={0}><ChevronDown size={16} /></button>
+                    <button className="quiet-button focus-tv" onClick={() => toggleLayoutVisibleHandler(item)} tabIndex={0}>{item.visivel ? 'Ocultar' : 'Mostrar'}</button>
+                    {podeGerenciarVideosDaSecao(item.tipo) && <button className="quiet-button focus-tv" onClick={() => selectLayoutSectionForVideos(item)} tabIndex={0}>Vídeos</button>}
+                    {podeApagarSecao(item.tipo) && <button className="quiet-button focus-tv" onClick={() => deleteLayoutSectionHandler(item)} style={{ color: '#ff8275' }} tabIndex={0}><Trash2 size={16} /></button>}
+                  </div>
+                </div>
+                {selectedLayoutSection?.id === item.id && (
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,.05)', paddingTop: 12, marginTop: 4 }}>
+                    <p className="muted" style={{ fontSize: '.8rem', marginBottom: 8 }}>Arraste para reordenar os vídeos desta seção.</p>
+                    {secaoVideoIds.map((vid, vIndex) => {
+                      const v = findVideo(videos, vid);
+                      return v ? <div key={vid} draggable onDragStart={() => handleSecaoVideoDragStart(vIndex)} onDragOver={handleSecaoVideoDragOver} onDrop={() => handleSecaoVideoDrop(vIndex)} className="result-row" style={{ cursor: 'grab', padding: '6px 10px', minHeight: 32 }}><span>{v.titulo}</span><button className="icon-button focus-tv" onClick={() => removeVideoFromSecao(vid)} tabIndex={0}><X size={14} /></button></div> : null;
+                    })}
+                    <select className="input focus-tv" style={{ marginTop: 8 }} onChange={(e) => { addVideoToSecao(e.target.value); e.target.value = ''; }} value="" tabIndex={0}><option value="">Adicionar vídeo...</option>{videos.filter(v => !secaoVideoIds.includes(v.id)).map(v => <option key={v.id} value={v.id}>{v.titulo}</option>)}</select>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <button className="quiet-button focus-tv" onClick={() => openGrant(c)} tabIndex={0}>Conceder Acesso</button>
-            {sub && <button className="quiet-button focus-tv" onClick={() => handleRevoke(c)} disabled={revokeBusyId === c.id} style={{ color: '#ff8275' }} tabIndex={0}>Cancelar Acesso</button>}
-          </div>
-          {grantTarget?.id === c.id && <div style={{ background: 'rgba(0,200,255,.05)', padding: 12, borderRadius: 8, marginTop: 8 }}>
-            <div className="field"><label>Quantidade de tempo</label><input type="number" className="input focus-tv" value={grantForm.quantidade} onChange={(e) => setGrantForm({ ...grantForm, quantidade: Number(e.target.value) })} tabIndex={0} /></div>
-            <div className="field"><label>Unidade</label><select className="input focus-tv" value={grantForm.unidade} onChange={(e) => setGrantForm({ ...grantForm, unidade: e.target.value as 'dias' | 'meses' })} tabIndex={0}><option value="dias">Dias</option><option value="meses">Meses</option></select></div>
-            <div className="field"><label>Motivo/Nota (aparece para o cliente)</label><input className="input focus-tv" value={grantForm.motivo} onChange={(e) => setGrantForm({ ...grantForm, motivo: e.target.value })} placeholder="Ex.: Cortesia de suporte" tabIndex={0} /></div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}><button className="primary-button focus-tv" onClick={confirmGrant} disabled={grantBusy} tabIndex={0}>Confirmar</button><button className="quiet-button focus-tv" onClick={closeGrant} tabIndex={0}>Cancelar</button></div>
-          </div>}
-        </div>;
-      })}</div>
-    </section>}
+        </section>
+      )}
 
-    {tab === 'planos' && <section className="panel panel-pad">
-      <div className="eyebrow">Financeiro</div><h2 className="panel-title" style={{ marginTop: 8 }}>Planos de Assinatura</h2>
-      <div className="field"><label>Nome do Plano</label><input className="input focus-tv" value={planoForm.nome} onChange={(e) => setPlanoForm({ ...planoForm, nome: e.target.value })} placeholder="Ex.: Plano Família" tabIndex={0} /></div>
-      <div className="field"><label>Categoria (agrupa botões)</label><input className="input focus-tv" value={planoForm.categoria} onChange={(e) => setPlanoForm({ ...planoForm, categoria: e.target.value })} placeholder="Ex.: Mensal" tabIndex={0} /></div>
-      <div className="field"><label>Descrição curta</label><input className="input focus-tv" value={planoForm.descricao} onChange={(e) => setPlanoForm({ ...planoForm, descricao: e.target.value })} placeholder="Ex.: 4 telas simultâneas" tabIndex={0} /></div>
-      <div className="field"><label>Preço (R$)</label><input type="number" step="0.01" className="input focus-tv" value={planoForm.preco} onChange={(e) => setPlanoForm({ ...planoForm, preco: e.target.value })} placeholder="Ex.: 29.90" tabIndex={0} /></div>
-      <div className="field"><label>Dispositivos</label><input type="number" className="input focus-tv" value={planoForm.dispositivos} onChange={(e) => setPlanoForm({ ...planoForm, dispositivos: e.target.value })} tabIndex={0} /></div>
-      <div className="field"><label>Duração do Acesso</label><div style={{ display: 'flex', gap: 8 }}><input type="number" className="input focus-tv" value={planoForm.duracaoQtd} onChange={(e) => setPlanoForm({ ...planoForm, duracaoQtd: e.target.value })} style={{ width: 80 }} tabIndex={0} /><select className="input focus-tv" value={planoForm.duracaoUnidade} onChange={(e) => setPlanoForm({ ...planoForm, duracaoUnidade: e.target.value as 'dias' | 'meses' })} tabIndex={0}><option value="dias">Dias</option><option value="meses">Meses</option></select></div></div>
-      <button className="primary-button focus-tv" onClick={savePlano} disabled={savingPlano} tabIndex={0}>{savingPlano ? 'Salvando...' : editingPlanoId ? 'Salvar Plano' : 'Criar Plano'}</button>
-      {editingPlanoId && <button className="quiet-button focus-tv" style={{ marginLeft: 10 }} onClick={resetPlanoForm} tabIndex={0}>Cancelar</button>}
-      <div className="admin-list" style={{ marginTop: 24 }}>{plans.map((p) => <div className="result-row" key={p.id}><span><strong>{p.nome}</strong> — R$ {p.preco} <span className="muted">({p.ativo ? 'Ativo' : 'Inativo'})</span></span><span style={{ display: 'flex', gap: 8 }}><button className="quiet-button focus-tv" onClick={() => togglePlan(p)} tabIndex={0}>{p.ativo ? 'Ocultar' : 'Mostrar'}</button><button className="quiet-button focus-tv" onClick={() => editPlano(p)} tabIndex={0}>Editar</button><button className="quiet-button focus-tv" onClick={() => deletePlanoHandler(p.id)} style={{ color: '#ff8275' }} tabIndex={0}>Apagar</button></span></div>)}</div>
-    </section>}
+      {tab === 'cupons' && (
+        <section className="panel panel-pad">
+          <div className="eyebrow">Financeiro</div><h2 className="panel-title" style={{ marginTop: 8 }}>Cupons de Desconto</h2>
+          <div className="field"><label>Código do Cupom</label><input className="input focus-tv" value={novoCupomCodigo} onChange={(e) => setNovoCupomCodigo(e.target.value.toUpperCase())} placeholder="Ex.: BEMVINDO10" tabIndex={0} /></div>
+          <div className="field"><label>Desconto (%)</label><input type="number" className="input focus-tv" value={novoCupomDesconto} onChange={(e) => setNovoCupomDesconto(e.target.value)} min="1" max="100" tabIndex={0} /></div>
+          <div className="field"><label>Válido até (opcional)</label><input type="date" className="input focus-tv" value={novoCupomValidade} onChange={(e) => setNovoCupomValidade(e.target.value)} tabIndex={0} /></div>
+          <button className="primary-button focus-tv" onClick={createCupom} disabled={criandoCupom} tabIndex={0}>{criandoCupom ? 'Criando...' : 'Criar Cupom'}</button>
+          <div className="admin-list" style={{ marginTop: 24 }}>{cupons.map((cupom) => <div className="result-row" key={cupom.codigo}><span><strong>{cupom.codigo}</strong> — {cupom.percentual_desconto}% <span className="muted">({cupom.ativo ? 'Ativo' : 'Inativo'})</span></span><span style={{ display: 'flex', gap: 8 }}><button className="quiet-button focus-tv" onClick={() => toggleCupomHandler(cupom)} tabIndex={0}>{cupom.ativo ? 'Desativar' : 'Ativar'}</button><button className="quiet-button focus-tv" onClick={() => deleteCupomHandler(cupom.codigo)} tabIndex={0}>Apagar</button></span></div>)}</div>
+        </section>
+      )}
 
-    {tab === 'equipe' && <section className="panel panel-pad">
-      <div className="eyebrow">Acesso Restrito</div><h2 className="panel-title" style={{ marginTop: 8 }}>Equipe Administrativa</h2>
-      <div className="field"><label>Adicionar Administrador (E-mail)</label><div style={{ display: 'flex', gap: 8 }}><input type="email" className="input focus-tv" value={novoEquipeEmail} onChange={(e) => setNovoEquipeEmail(e.target.value)} placeholder="email@exemplo.com" tabIndex={0} /><button className="secondary-button focus-tv" onClick={addToEquipeHandler} tabIndex={0}>Adicionar</button></div></div>
-      <div className="admin-list" style={{ marginTop: 24 }}>{equipe.map((eq) => <div className="result-row" key={eq.id}><span><strong>{eq.email}</strong> {eq.admin_master && <span className="premium-badge" style={{ marginLeft: 8, fontSize: '.65rem' }}>MASTER</span>}</span><span style={{ display: 'flex', gap: 8 }}>{eq.admin_master ? <button className="quiet-button focus-tv" onClick={() => rebaixarMasterHandler(eq.id)} tabIndex={0}>Remover Master</button> : <button className="quiet-button focus-tv" onClick={() => promoverMasterHandler(eq.id)} tabIndex={0}>Tornar Master</button>}<button className="quiet-button focus-tv" onClick={() => removerDaEquipeHandler(eq.id)} style={{ color: '#ff8275' }} tabIndex={0}>Remover Acesso</button></span></div>)}</div>
-    </section>}
-  </div>;
+      {tab === 'clientes' && (
+        <section className="panel panel-pad">
+          <div className="eyebrow">Gestão</div><h2 className="panel-title" style={{ marginTop: 8 }}>Clientes e Acessos</h2>
+          <div className="admin-list" style={{ marginTop: 16 }}>{clients.map((c) => {
+            const sub = (c as any).assinatura?.[0] || (c as any).assinaturas?.[0] || (c as any).assinatura;
+            const status = !sub ? 'Sem acesso' : sub.status === 'ativa' ? 'Ativo' : sub.status === 'trial' ? 'Trial' : sub.status === 'pendente' ? 'Pendente' : 'Inativo';
+            return <div className="result-row" key={c.id} style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span><strong>{c.nome || 'Usuário'}</strong> <span className="muted">({c.email})</span></span>
+                <span className="muted" style={{ fontSize: '.8rem' }}>{status}</span>
+              </div>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button className="quiet-button focus-tv" onClick={() => openGrant(c)} tabIndex={0}>Conceder Acesso</button>
+                {sub && <button className="quiet-button focus-tv" onClick={() => handleRevoke(c)} disabled={revokeBusyId === c.id} style={{ color: '#ff8275' }} tabIndex={0}>Cancelar Acesso</button>}
+              </div>
+              {grantTarget?.id === c.id && <div style={{ background: 'rgba(0,200,255,.05)', padding: 12, borderRadius: 8, marginTop: 8 }}>
+                <div className="field"><label>Quantidade de tempo</label><input type="number" className="input focus-tv" value={grantForm.quantidade} onChange={(e) => setGrantForm({ ...grantForm, quantidade: Number(e.target.value) })} tabIndex={0} /></div>
+                <div className="field"><label>Unidade</label><select className="input focus-tv" value={grantForm.unidade} onChange={(e) => setGrantForm({ ...grantForm, unidade: e.target.value as 'dias' | 'meses' })} tabIndex={0}><option value="dias">Dias</option><option value="meses">Meses</option></select></div>
+                <div className="field"><label>Motivo/Nota (aparece para o cliente)</label><input className="input focus-tv" value={grantForm.motivo} onChange={(e) => setGrantForm({ ...grantForm, motivo: e.target.value })} placeholder="Ex.: Cortesia de suporte" tabIndex={0} /></div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}><button className="primary-button focus-tv" onClick={confirmGrant} disabled={grantBusy} tabIndex={0}>Confirmar</button><button className="quiet-button focus-tv" onClick={closeGrant} tabIndex={0}>Cancelar</button></div>
+              </div>}
+            </div>;
+          })}</div>
+        </section>
+      )}
+
+      {tab === 'planos' && (
+        <section className="panel panel-pad">
+          <div className="eyebrow">Financeiro</div><h2 className="panel-title" style={{ marginTop: 8 }}>Planos de Assinatura</h2>
+          <div className="field"><label>Nome do Plano</label><input className="input focus-tv" value={planoForm.nome} onChange={(e) => setPlanoForm({ ...planoForm, nome: e.target.value })} placeholder="Ex.: Plano Família" tabIndex={0} /></div>
+          <div className="field"><label>Categoria (agrupa botões)</label><input className="input focus-tv" value={planoForm.categoria} onChange={(e) => setPlanoForm({ ...planoForm, categoria: e.target.value })} placeholder="Ex.: Mensal" tabIndex={0} /></div>
+          <div className="field"><label>Descrição curta</label><input className="input focus-tv" value={planoForm.descricao} onChange={(e) => setPlanoForm({ ...planoForm, descricao: e.target.value })} placeholder="Ex.: 4 telas simultâneas" tabIndex={0} /></div>
+          <div className="field"><label>Preço (R$)</label><input type="number" step="0.01" className="input focus-tv" value={planoForm.preco} onChange={(e) => setPlanoForm({ ...planoForm, preco: e.target.value })} placeholder="Ex.: 29.90" tabIndex={0} /></div>
+          <div className="field"><label>Dispositivos</label><input type="number" className="input focus-tv" value={planoForm.dispositivos} onChange={(e) => setPlanoForm({ ...planoForm, dispositivos: e.target.value })} tabIndex={0} /></div>
+          <div className="field"><label>Duração do Acesso</label><div style={{ display: 'flex', gap: 8 }}><input type="number" className="input focus-tv" value={planoForm.duracaoQtd} onChange={(e) => setPlanoForm({ ...planoForm, duracaoQtd: e.target.value })} style={{ width: 80 }} tabIndex={0} /><select className="input focus-tv" value={planoForm.duracaoUnidade} onChange={(e) => setPlanoForm({ ...planoForm, duracaoUnidade: e.target.value as 'dias' | 'meses' })} tabIndex={0}><option value="dias">Dias</option><option value="meses">Meses</option></select></div></div>
+          <button className="primary-button focus-tv" onClick={savePlano} disabled={savingPlano} tabIndex={0}>{savingPlano ? 'Salvando...' : editingPlanoId ? 'Salvar Plano' : 'Criar Plano'}</button>
+          {editingPlanoId && <button className="quiet-button focus-tv" style={{ marginLeft: 10 }} onClick={resetPlanoForm} tabIndex={0}>Cancelar</button>}
+          <div className="admin-list" style={{ marginTop: 24 }}>{plans.map((p) => <div className="result-row" key={p.id}><span><strong>{p.nome}</strong> — R$ {p.preco} <span className="muted">({p.ativo ? 'Ativo' : 'Inativo'})</span></span><span style={{ display: 'flex', gap: 8 }}><button className="quiet-button focus-tv" onClick={() => togglePlan(p)} tabIndex={0}>{p.ativo ? 'Ocultar' : 'Mostrar'}</button><button className="quiet-button focus-tv" onClick={() => editPlano(p)} tabIndex={0}>Editar</button><button className="quiet-button focus-tv" onClick={() => deletePlanoHandler(p.id)} style={{ color: '#ff8275' }} tabIndex={0}>Apagar</button></span></div>)}</div>
+        </section>
+      )}
+
+      {tab === 'equipe' && (
+        <section className="panel panel-pad">
+          <div className="eyebrow">Acesso Restrito</div><h2 className="panel-title" style={{ marginTop: 8 }}>Equipe Administrativa</h2>
+          <div className="field"><label>Adicionar Administrador (E-mail)</label><div style={{ display: 'flex', gap: 8 }}><input type="email" className="input focus-tv" value={novoEquipeEmail} onChange={(e) => setNovoEquipeEmail(e.target.value)} placeholder="email@exemplo.com" tabIndex={0} /><button className="secondary-button focus-tv" onClick={addToEquipeHandler} tabIndex={0}>Adicionar</button></div></div>
+          <div className="admin-list" style={{ marginTop: 24 }}>{equipe.map((eq) => <div className="result-row" key={eq.id}><span><strong>{eq.email}</strong> {eq.admin_master && <span className="premium-badge" style={{ marginLeft: 8, fontSize: '.65rem' }}>MASTER</span>}</span><span style={{ display: 'flex', gap: 8 }}>{eq.admin_master ? <button className="quiet-button focus-tv" onClick={() => rebaixarMasterHandler(eq.id)} tabIndex={0}>Remover Master</button> : <button className="quiet-button focus-tv" onClick={() => promoverMasterHandler(eq.id)} tabIndex={0}>Tornar Master</button>}<button className="quiet-button focus-tv" onClick={() => removerDaEquipeHandler(eq.id)} style={{ color: '#ff8275' }} tabIndex={0}>Remover Acesso</button></span></div>)}</div>
+        </section>
+      )}
+    </div>
+  );
 }
 
 function LockedPage({ title, description }: { title: string; description: string }) {
