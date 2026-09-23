@@ -1040,7 +1040,7 @@ function PlayerPage() {
     if (access === false) setLocation('/assinatura');
   }, [access, setLocation]);
 
-  const video = findVideo(videos, params.id || newSearchParams(window.location.search).get('id') || '');
+  const video = findVideo(videos, params.id || new URLSearchParams(window.location.search).get('id') || '');
   const [saved, setSaved] = useState(() => JSON.parse(localStorage.getItem('cinevito-favorites') || '[]').includes(video?.id));
   const [episodioInfo, setEpisodioInfo] = useState<{ episodio: Episodio; serieId: string; proximo?: Episodio } | null>(null);
   const [episodiosDaTemporada, setEpisodiosDaTemporada] = useState<Episodio[]>([]);
@@ -1133,7 +1133,7 @@ function CollectionPage() {
     localStorage.setItem('cinevito-favorites', JSON.stringify(next));
   }
   function openVideo(id: string) { setLocation(access ? `/player/${id}` : '/assinatura'); }
-  return <div className="content-wrap page-main"><PageHeader eyebrow="O que você guardou" title="Minha coleção" description="Seus títulos favoritos em um só lugar, prontos para a próxima sessão." />{collection.length ? <div className="video-grid">{collection.map((video) => <Poster key={video.id} video={video} favorite onFavorite={() => remove(video.id)} onOpen={() => openVideo(video.id)} />)}</div> : <div className="empty-state" data-testid="status-collection-empty"><Heart size={27} /><h3>Ainda está vazio</h3><p>Use o coração nos títulos do catálogo para montar sua coleção.</p><Link href="/catalogo" className="primary-button focus-tv" data-testid="link-collection-catalog">Explorar catálogo</Link></div>}</div>;
+  return <div className="content-wrap page-main"><PageHeader eyebrow="O que você guardou" title="Minha coleção" description="Seus titles favoritos em um só lugar, prontos para a próxima sessão." />{collection.length ? <div className="video-grid">{collection.map((video) => <Poster key={video.id} video={video} favorite onFavorite={() => remove(video.id)} onOpen={() => openVideo(video.id)} />)}</div> : <div className="empty-state" data-testid="status-collection-empty"><Heart size={27} /><h3>Ainda está vazio</h3><p>Use o coração nos títulos do catálogo para montar sua coleção.</p><Link href="/catalogo" className="primary-button focus-tv" data-testid="link-collection-catalog">Explorar catálogo</Link></div>}</div>;
 }
 
 function subscriptionLabel(sub: MinhaAssinatura | null): { status: string; origem: string } {
