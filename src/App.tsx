@@ -370,8 +370,7 @@ function AppShell({ children }: { children: ReactNode }) {
             {navigation.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className="nav-link focus-tv" aria-current={active(href) ? 'page' : undefined} data-testid={`link-nav-${label.toLowerCase().replaceAll(' ', '-')}`} tabIndex={0}><Icon size={16} />{label}</Link>)}
           </nav>
           <div className="topbar-actions">
-            {isAdmin && <Link href="/admin" className="nav-link focus-tv" data-testid="link-admin" tabIndex={0}><Settings size={16} />Painel</Link>}
-            {user ? <><Link href="/perfil" className="avatar focus-tv" aria-label="Abrir perfil" data-testid="link-profile-avatar" tabIndex={0}>{initials(user)}</Link><button className="icon-button focus-tv" onClick={logout} title="Sair" aria-label="Sair" data-testid="button-logout" tabIndex={0}><LogOut size={17} /></button></> : <Link href="/" className="secondary-button focus-tv" data-testid="link-login" tabIndex={0}><LogIn size={15} />Entrar</Link>}
+            {isAdmin && <Link href="/admin" className="nav-link focus-tv" data-testid="link-admin" tabIndex={0}><Settings size={16} />Painel</Link>}{user ? <><Link href="/perfil" className="avatar focus-tv" aria-label="Abrir perfil" data-testid="link-profile-avatar" tabIndex={0}>{initials(user)}</Link><button className="icon-button focus-tv" onClick={logout} title="Sair" aria-label="Sair" data-testid="button-logout" tabIndex={0}><LogOut size={17} /></button></> : <Link href="/" className="secondary-button focus-tv" data-testid="link-login" tabIndex={0}><LogIn size={15} />Entrar</Link>}
           </div>
         </div>
       </header>
@@ -500,6 +499,10 @@ function HeroBanner({ videos, onOpen }: { videos: Video[]; onOpen: (id: string) 
   </section>;
 }
 
+export function findVideo(videos: Video[], id: string) {
+  return videos.find((video) => video.id === id);
+}
+
 function useVideos() {
   const [videos, setVideos] = useState<Video[]>([]); const [loading, setLoading] = useState(hasRuntimeConfig); const [error, setError] = useState('');
   useEffect(() => {
@@ -525,7 +528,7 @@ function useVideos() {
 function ContinueCard({ item, onOpen, onRemove }: { item: ContinuarAssistindoItem; onOpen: () => void; onRemove: () => void }) {
   const video = item.videos;
   if (!video) return null;
-  const subtitle = video.genero || video.categoria || 'Continuar assistindo';
+  const subtitle = item.series ? `${item.series.titulo}${item.numero_episodio ? ` · Ep. ${item.numero_episodio}` : ''}` : undefined;
   const style = video.url_capa ? undefined : ({ '--poster': 'linear-gradient(145deg, #0d596c, #172532 50%, #e58d49)' } as CSSProperties);
   return <article className="video-card reveal" style={{ position: 'relative' }}>
     <button onClick={(e) => { e.stopPropagation(); onRemove(); }} style={{ position: 'absolute', top: 6, right: 6, zIndex: 10, background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%', padding: 4, cursor: 'pointer', color: '#fff' }} title="Remover do histórico" aria-label="Remover" className="focus-tv" tabIndex={0}>
@@ -533,10 +536,10 @@ function ContinueCard({ item, onOpen, onRemove }: { item: ContinuarAssistindoIte
     </button>
     <div className="poster focus-tv" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen()} style={style}>
       <div className="poster-art" style={video.url_capa ? { backgroundImage: `url(${video.url_capa})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}>
-        <span className="poster-meta">CONTINUAR</span><strong className="poster-word">{video.titulo}</strong>
+        <span className="poster-meta">CONTINUAR</span><strong className="poster-word">{item.series?.titulo || video.titulo}</strong>
       </div>
     </div>
-    <div className="video-info"><div><h3 className="video-title">{video.titulo}</h3><p className="video-subtitle">{subtitle}</p></div><Play size={14} color="#00c8ff" /></div>
+    <div className="video-info"><div><h3 className="video-title">{item.series?.titulo || video.titulo}</h3><p className="video-subtitle">{subtitle || 'Continuar assistindo'}</p></div><Play size={14} color="#00c8ff" /></div>
   </article>;
 }
 
@@ -887,7 +890,7 @@ function CatalogPage() {
   }
 
   return <div className="content-wrap page-main">
-    <PageHeader eyebrow="A sua sala de cinema" title={`Olá, ${titleCaseName(user)}.`} description="Escolha algo para assistir. O catálogo se adapta à sua tela, do celular à Smart TV." action={<Link href="/assinatura" className="primary-button focus-tv" data-testid="link-subscription"><Sparkles size={16} />Ver planos</Link>} />
+    <PageHeader eyebrow="A sua sala de cinema" title={`Olá, ${titleCaseName(user)}.`} description="Escolha algo para assistir. O catálogo se adapta à sua tela, do celular à Smart TV." action={<Link href="/assinatura" className="primary-button focus-tv" data-testid="link-subscription" tabIndex={0}><Sparkles size={16} />Ver planos</Link>} />
     {!hasRuntimeConfig && <div className="notice notice-cyan" data-testid="status-runtime-demo"><Info size={17} color="#00c8ff" /><span><strong>Modo de demonstração.</strong> O ambiente ainda não está conectado ao Supabase; os dados desta sessão ficam apenas neste aparelho.</span></div>}
     {!user && <div className="notice notice-orange" data-testid="status-catalog-auth"><CircleAlert size={17} color="#ff8228" /><span><strong>Você está navegando como visitante.</strong> Entre para salvar favoritos e continuar assistindo em outros dispositivos.</span><Link href="/" className="quiet-button focus-tv" data-testid="link-catalog-login" tabIndex={0}>Entrar</Link></div>}
     {user && access === false && <div className="notice notice-orange" data-testid="status-catalog-locked"><CircleAlert size={17} color="#ff8228" /><span><strong>Seu acesso gratuito acabou.</strong> Assine um plano para continuar assistindo ao catálogo completo.</span><Link href="/assinatura" className="quiet-button focus-tv" tabIndex={0}>Ver planos</Link></div>}
@@ -923,7 +926,7 @@ function CatalogPage() {
             {continuarAssistindo.length > 0 && <section className="shelf" style={{ marginTop: 22 }}>
               <div className="shelf-heading"><h2 className="section-title">Continuar assistindo</h2><div className="section-rule" /></div>
               <div className="video-grid horizontal-scroll">
-                {continuarAssistindo.filter((item) => item.videos).map((item) => <div key={item.id} style={{ width: 160, flexShrink: 0, scrollSnapAlign: 'start' }}><ContinueCard item={item} onOpen={() => openVideo(item.video_id)} onRemove={() => handleRemoveContinuar(item.id)} /></div>)}
+                {continuarAssistindo.filter((item) => item.videos).map((item) => <div key={item.id} style={{ width: 160 }}><ContinueCard item={item} onOpen={() => openVideo(item.video_id)} onRemove={() => handleRemoveContinuar(item.id)} /></div>)}
               </div>
             </section>}
             
@@ -1042,7 +1045,7 @@ function PlayerPage() {
     if (access === false) setLocation('/assinatura');
   }, [access, setLocation]);
 
-  const video = videos.find((v) => v.id === (params.id || new URLSearchParams(window.location.search).get('id') || ''));
+  const video = findVideo(videos, params.id || new URLSearchParams(window.location.search).get('id') || '');
   const [saved, setSaved] = useState(() => JSON.parse(localStorage.getItem('cinevito-favorites') || '[]').includes(video?.id));
   const [episodioInfo, setEpisodioInfo] = useState<{ episodio: Episodio; serieId: string; proximo?: Episodio } | null>(null);
   const [episodiosDaTemporada, setEpisodiosDaTemporada] = useState<Episodio[]>([]);
@@ -1051,27 +1054,26 @@ function PlayerPage() {
     if (!video || access !== true) return;
     let cancelled = false;
     
+    // GATILHO INDEPENDENTE: Salva a View
+    registrarVisualizacao(video.id).catch(() => {});
+    
+    // HISTÓRICO GARANTIDO: Salva a visita se for um filme (não ao vivo) sem depender de checar episódios
+    if (user && !video.ao_vivo) {
+      salvarProgresso({ video_id: video.id }).catch(() => {});
+    }
+
     (async () => {
       try {
-        registrarVisualizacao(video.id).catch(() => {});
         const info = await fetchEpisodioInfo(video.id);
         if (cancelled) return;
-
+        
         if (info) {
           setEpisodioInfo(info);
           const lista = await fetchEpisodios(info.episodio.temporada_id);
           if (!cancelled) setEpisodiosDaTemporada(lista);
-          // O Salvar progresso aqui está protegido para não falhar
-          if (user) {
-            await salvarProgresso({ video_id: video.id });
-          }
         } else {
           setEpisodioInfo(null);
           setEpisodiosDaTemporada([]);
-          // Salva o histórico do filme diretamente
-          if (user && !video.ao_vivo) {
-            await salvarProgresso({ video_id: video.id });
-          }
         }
       } catch (err) {
         console.error('Erro no player:', err);
