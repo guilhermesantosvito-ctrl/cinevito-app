@@ -45,6 +45,18 @@ function normalizeCatalogLabel(value: string | null | undefined) {
     .trim();
 }
 
+function videoBelongsToShelf(video: Video, shelf: string) {
+  if (shelf === 'Início') return true;
+  const category = normalizeCatalogLabel(video.categoria);
+  const target = normalizeCatalogLabel(shelf);
+  const aliases: Record<string, string[]> = {
+    'filmes classicos': ['filmes classicos', 'classicos', 'classico'],
+    documentarios: ['documentarios', 'documentario'],
+    'curtas metragens': ['curtas metragens', 'curtas', 'curta'],
+  };
+  return (aliases[target] || [target]).some((label) => category === label || category.includes(label));
+}
+
 function initials(user: SessionUser | null) {
   const name = user?.user_metadata?.nome || user?.user_metadata?.name || user?.email || '?';
   return name.split(/[ @]/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || '?';
@@ -192,7 +204,6 @@ function getEmbedInfo(url?: string | null): { type: 'file' | 'embed' | 'none'; s
 }
 
 type PlataformaInstalacao = 'ios' | 'android' | 'desktop' | 'tv';
-
 function detectarPlataformaInstalacao(): PlataformaInstalacao {
   const ua = navigator.userAgent.toLowerCase();
   const ehTV = /smarttv|smart-tv|googletv|appletv|hbbtv|netcast|viera|aquos|bravia|tizen|web0s|webos|crkey|roku|firetv|aft\b/i.test(ua);
@@ -247,7 +258,6 @@ function useInstallPrompt(user: SessionUser | null) {
 }
 
 type InstallStep = { icon: typeof Share2; title: string; description: string };
-
 function stepsForPlatform(platform: PlataformaInstalacao): InstallStep[] {
   if (platform === 'ios') {
     return [
@@ -267,7 +277,6 @@ function ehChromeAndroid(): boolean {
   if (!/android/.test(ua)) return false;
   return /chrome\//.test(ua) && !/edg\//.test(ua) && !/opr\//.test(ua) && !/samsungbrowser\//.test(ua) && !/firefox\//.test(ua) && !/; wv\)/.test(ua);
 }
-
 function abrirNoChrome() {
   const semProtocolo = window.location.href.replace(/^https?:\/\//, '');
   window.location.href = `intent://${semProtocolo}#Intent;scheme=https;package=com.android.chrome;end`;
@@ -280,31 +289,20 @@ function InstallInstructionsModal({ platform, onClose }: { platform: PlataformaI
     <div role="dialog" aria-modal="true" aria-label="Como instalar o CineVito" onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(6,9,14,.72)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 0 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: '#0f141c', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, padding: '22px 20px 26px', boxShadow: '0 -8px 40px rgba(0,0,0,.5)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Clapperboard size={20} />
-            <strong style={{ fontSize: '1.05rem' }}>Como instalar o CineVito</strong>
-          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Clapperboard size={20} /><strong style={{ fontSize: '1.05rem' }}>Como instalar o CineVito</strong></div>
           <button onClick={onClose} className="icon-button focus-tv" aria-label="Fechar instruções"><X size={18} /></button>
         </div>
         <p className="muted" style={{ fontSize: '.83rem', marginTop: 6, marginBottom: mostrarBotaoChrome ? 12 : 20 }}>
           {platform === 'ios' ? 'Leva só alguns segundos.' : 'Seu navegador não suporta instalação direta, mas você pode salvar na tela inicial com estes passos rápidos:'}
         </p>
         {mostrarBotaoChrome && (
-          <div className="notice notice-cyan" style={{ marginBottom: 20 }}>
-            <Info size={16} />
-            <span>Você não está no Chrome. <button onClick={abrirNoChrome} style={{ background: 'none', border: 'none', textDecoration: 'underline', color: '#00c8ff', cursor: 'pointer', padding: 0, font: 'inherit' }}>Toque aqui pra abrir no Chrome</button>.</span>
-          </div>
+          <div className="notice notice-cyan" style={{ marginBottom: 20 }}><Info size={16} /><span>Você não está no Chrome. <button onClick={abrirNoChrome} style={{ background: 'none', border: 'none', textDecoration: 'underline', color: '#00c8ff', cursor: 'pointer', padding: 0, font: 'inherit' }}>Toque aqui pra abrir no Chrome</button>.</span></div>
         )}
         <div style={{ display: 'grid', gap: 16 }}>
           {steps.map((step, index) => (
             <div key={step.title} style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-              <div style={{ width: 38, height: 38, borderRadius: 12, background: 'linear-gradient(145deg, #ff8228, #2ec4b6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#0b0e14' }}>
-                <step.icon size={19} />
-              </div>
-              <div>
-                <strong style={{ fontSize: '.92rem', display: 'block' }}>{index + 1}. {step.title}</strong>
-                <span className="muted" style={{ fontSize: '.82rem', lineHeight: 1.5 }}>{step.description}</span>
-              </div>
+              <div style={{ width: 38, height: 38, borderRadius: 12, background: 'linear-gradient(145deg, #ff8228, #2ec4b6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#0b0e14' }}><step.icon size={19} /></div>
+              <div><strong style={{ fontSize: '.92rem', display: 'block' }}>{index + 1}. {step.title}</strong><span className="muted" style={{ fontSize: '.82rem', lineHeight: 1.5 }}>{step.description}</span></div>
             </div>
           ))}
         </div>
@@ -321,17 +319,9 @@ function InstallBanner({ user }: { user: SessionUser | null }) {
   return (
     <>
       <div style={{ width: '100%', background: '#0d121a', borderBottom: '1px solid rgba(0,200,255,.18)', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'nowrap', overflow: 'hidden' }}>
-        <div style={{ width: 26, height: 26, borderRadius: 8, background: 'linear-gradient(145deg, #ff8228, #2ec4b6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <Download size={14} color="#0b0e14" />
-        </div>
+        <div style={{ width: 26, height: 26, borderRadius: 8, background: 'linear-gradient(145deg, #ff8228, #2ec4b6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Download size={14} color="#0b0e14" /></div>
         <span style={{ flex: 1, minWidth: 0, fontSize: '.82rem', fontWeight: 500, color: '#dbe2ea', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Instale o CineVito na sua tela inicial</span>
-        <button
-          className="secondary-button focus-tv"
-          style={{ padding: '6px 14px', fontSize: '.78rem', flexShrink: 0 }}
-          onClick={canInstallDirectly ? install : () => setShowInstructions(true)}
-        >
-          {canInstallDirectly ? 'Instalar agora' : 'Como instalar'}
-        </button>
+        <button className="secondary-button focus-tv" style={{ padding: '6px 14px', fontSize: '.78rem', flexShrink: 0 }} onClick={canInstallDirectly ? install : () => setShowInstructions(true)}>{canInstallDirectly ? 'Instalar agora' : 'Como instalar'}</button>
         <button onClick={dismiss} aria-label="Fechar aviso de instalação" className="icon-button focus-tv" style={{ flexShrink: 0 }}><X size={16} /></button>
       </div>
       {showInstructions && <InstallInstructionsModal platform={platform} onClose={() => setShowInstructions(false)} />}
@@ -359,22 +349,15 @@ function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user || !hasRuntimeConfig) { setIsAdmin(false); return; }
     let cancelled = false;
-    fetchProfile()
-      .then((profile) => { if (!cancelled) setIsAdmin(Boolean((profile as { is_admin?: boolean } | null)?.is_admin)); })
-      .catch(() => { if (!cancelled) setIsAdmin(false); });
+    fetchProfile().then((profile) => { if (!cancelled) setIsAdmin(Boolean((profile as { is_admin?: boolean } | null)?.is_admin)); }).catch(() => { if (!cancelled) setIsAdmin(false); });
     return () => { cancelled = true; };
   }, [user]);
   useEffect(() => {
-    if (!user && location !== '/' && location !== '/index.html') {
-      setLocation('/');
-    }
+    if (!user && location !== '/' && location !== '/index.html') setLocation('/');
   }, [user, location]);
   const isHome = location === '/' || location === '/index.html';
   const active = (href: string) => location === href || location === `${href}.html` || (href === '/catalogo' && location.startsWith('/player'));
-  async function logout() {
-    clearSession();
-    setLocation('/');
-  }
+  async function logout() { clearSession(); setLocation('/'); }
   if (isHome) return <>{children}</>;
   return (
     <div className="app-frame">
@@ -403,9 +386,7 @@ function AppShell({ children }: { children: ReactNode }) {
 function AuthPage() {
   const [, setLocation] = useLocation();
   const user = useAuth();
-  useEffect(() => {
-    if (user) setLocation('/catalogo');
-  }, [user]);
+  useEffect(() => { if (user) setLocation('/catalogo'); }, [user]);
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -414,61 +395,35 @@ function AuthPage() {
   const [form, setForm] = useState({ nome: '', email: '', password: '', nascimento: '', codigo: '', lembrar: false });
   useEffect(() => {
     const ref = new URLSearchParams(window.location.search).get('ref');
-    if (ref) {
-      setMode('signup');
-      setForm((current) => ({ ...current, codigo: ref.toUpperCase() }));
-    }
+    if (ref) { setMode('signup'); setForm((current) => ({ ...current, codigo: ref.toUpperCase() })); }
   }, []);
-  function update(field: keyof typeof form, value: string | boolean) {
-    setForm((current) => ({ ...current, [field]: value }));
-    setError('');
-  }
+  function update(field: keyof typeof form, value: string | boolean) { setForm((current) => ({ ...current, [field]: value })); setError(''); }
   async function submit(event: FormEvent) {
     event.preventDefault();
-    setError('');
-    setNotice('');
-    if (!form.email || !form.password || (mode === 'signup' && !form.nome)) {
-      setError('Preencha os campos obrigatórios para continuar.');
-      return;
-    }
+    setError(''); setNotice('');
+    if (!form.email || !form.password || (mode === 'signup' && !form.nome)) { setError('Preencha os campos obrigatórios para continuar.'); return; }
     setBusy(true);
     try {
       if (mode === 'login') {
         if (hasRuntimeConfig) await signIn(form.email, form.password);
-        else {
-          localStorage.setItem('cinevito-demo-user', form.email);
-          window.dispatchEvent(new Event('cinevito-auth-change'));
-        }
+        else { localStorage.setItem('cinevito-demo-user', form.email); window.dispatchEvent(new Event('cinevito-auth-change')); }
         setLocation('/catalogo');
       } else {
         if (hasRuntimeConfig) {
           const result = await signUp(form.nome, form.email, form.password, form.nascimento, form.codigo);
-          if (!result.access_token) {
-            setNotice('Conta criada. Verifique seu e-mail para confirmar o acesso.');
-            setMode('login');
-          } else setLocation('/catalogo');
-        } else {
-          localStorage.setItem('cinevito-demo-user', form.email);
-          window.dispatchEvent(new Event('cinevito-auth-change'));
-          setLocation('/catalogo');
-        }
+          if (!result.access_token) { setNotice('Conta criada. Verifique seu e-mail para confirmar o acesso.'); setMode('login'); } else setLocation('/catalogo');
+        } else { localStorage.setItem('cinevito-demo-user', form.email); window.dispatchEvent(new Event('cinevito-auth-change')); setLocation('/catalogo'); }
       }
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'Não foi possível concluir. Tente novamente.');
-    } finally {
-      setBusy(false);
-    }
+    } finally { setBusy(false); }
   }
   return (
     <div className="home-shell">
       <div className="auth-layout reveal">
         <section className="auth-aside">
           <Brand />
-          <div className="auth-aside-copy">
-            <div className="eyebrow">Cinema brasileiro, do seu jeito</div>
-            <h1>Seu próximo<br /><span>filme.</span></h1>
-            <p>Um catálogo para assistir no celular, no computador ou na sala. Sem pressa, com curadoria e controle sobre a sua sessão.</p>
-          </div>
+          <div className="auth-aside-copy"><div className="eyebrow">Cinema brasileiro, do seu jeito</div><h1>Seu próximo<br /><span>filme.</span></h1><p>Um catálogo para assistir no celular, no computador ou na sala. Sem pressa, com curadoria e controle sobre a sua sessão.</p></div>
           <div className="auth-aside-meta"><i /> PWA para todas as telas</div>
         </section>
         <section className="auth-panel">
@@ -584,6 +539,9 @@ function ContinueCard({ item, onOpen, onRemove }: { item: ContinuarAssistindoIte
   </article>;
 }
 
+// ============================================================================
+// TV AO VIVO - ATUALIZADA COM O ISOLAMENTO DE CANAIS E LAYOUT CUSTOMIZADO
+// ============================================================================
 function LiveTVPage() {
   const [, setLocation] = useLocation();
   const user = useAuth();
@@ -644,8 +602,8 @@ function LiveTVPage() {
     
     <div className="catalog-toolbar"><div className="search-wrap"><Search size={16} /><input className="input focus-tv" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar canal..." aria-label="Buscar canal" /></div></div>
     
-    {categories.length > 1 && <div className="chip-row no-scrollbar" aria-label="Filtrar por categoria" style={{ display: 'flex', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 8 }}>
-      {categories.map((item) => <button key={item} className={`chip focus-tv ${genre === item ? 'active' : ''}`} style={{ flexShrink: 0 }} onClick={() => setGenre(item)}>{item}</button>)}
+    {categories.length > 1 && <div className="chip-row horizontal-scroll" aria-label="Filtrar por categoria">
+      {categories.map((item) => <button key={item} className={`chip focus-tv ${genre === item ? 'active' : ''}`} onClick={() => setGenre(item)}>{item}</button>)}
     </div>}
     
     {loading && <div className="video-grid" style={{ marginTop: 22 }}>{Array.from({ length: 5 }).map((_, index) => <div className="skeleton" style={{ aspectRatio: '2/3' }} key={index} />)}</div>}
@@ -665,8 +623,8 @@ function LiveTVPage() {
             return (
               <section className="shelf" key={item.id} style={{ marginBottom: 36 }}>
                 <div className="shelf-heading"><h2 className="section-title">{item.titulo || 'Canais em Destaque'}</h2><div className="section-rule" /></div>
-                <div className="video-grid horizontal-scroll" style={{ display: 'flex', overflowX: 'auto', gap: 16, paddingBottom: 16, scrollSnapType: 'x mandatory' }}>
-                  {rowVideos.map(video => <div key={video.id} style={{ width: 160, flexShrink: 0, scrollSnapAlign: 'start' }}><Poster video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} subtitle="Transmissão ao vivo" /></div>)}
+                <div className="video-grid horizontal-scroll">
+                  {rowVideos.map(video => <div key={video.id} style={{ width: 160 }}><Poster video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} subtitle="Transmissão ao vivo" /></div>)}
                 </div>
               </section>
             );
@@ -674,8 +632,8 @@ function LiveTVPage() {
           {Object.entries(autoCategories).sort((a, b) => a[0].localeCompare(b[0])).map(([catName, vids]) => (
             <section className="shelf" key={catName} style={{ marginBottom: 36 }}>
               <div className="shelf-heading"><h2 className="section-title">{catName}</h2><div className="section-rule" /></div>
-              <div className="video-grid horizontal-scroll" style={{ display: 'flex', overflowX: 'auto', gap: 16, paddingBottom: 16, scrollSnapType: 'x mandatory' }}>
-                {vids.map(video => <div key={video.id} style={{ width: 160, flexShrink: 0, scrollSnapAlign: 'start' }}><Poster video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} subtitle="Transmissão ao vivo" /></div>)}
+              <div className="video-grid horizontal-scroll">
+                {vids.map(video => <div key={video.id} style={{ width: 160 }}><Poster video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} subtitle="Transmissão ao vivo" /></div>)}
               </div>
             </section>
           ))}
@@ -686,6 +644,9 @@ function LiveTVPage() {
   </div>;
 }
 
+// ============================================================================
+// CATÁLOGO PRINCIPAL (Padrão Nível Premium)
+// ============================================================================
 function CatalogPage() {
   const [, setLocation] = useLocation();
   const user = useAuth();
@@ -764,8 +725,8 @@ function CatalogPage() {
     if (!secaoVideos.length) return null;
     return <section className="shelf" key={key} style={{ marginTop: 22 }}>
       <div className="shelf-heading"><h2 className="section-title">{item.titulo || 'Carrossel'}</h2><div className="section-rule" /></div>
-      <div className="video-grid horizontal-scroll" style={{ display: 'flex', overflowX: 'auto', gap: 16, paddingBottom: 16, scrollSnapType: 'x mandatory' }}>
-        {secaoVideos.map((video) => <div key={video.id} style={{ width: 160, flexShrink: 0, scrollSnapAlign: 'start' }}><Poster video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} /></div>)}
+      <div className="video-grid horizontal-scroll">
+        {secaoVideos.map((video) => <div key={video.id} style={{ width: 160 }}><Poster video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} /></div>)}
       </div>
     </section>;
   }
@@ -775,8 +736,8 @@ function CatalogPage() {
     if (!secaoVideos.length) return null;
     return <section className="shelf" key={key} style={{ marginTop: 22 }}>
       <div className="shelf-heading"><h2 className="section-title">{item.titulo || 'Top 10'}</h2><div className="section-rule" /></div>
-      <div className="video-grid horizontal-scroll" style={{ display: 'flex', overflowX: 'auto', gap: 16, paddingBottom: 16, scrollSnapType: 'x mandatory', paddingLeft: 16 }}>
-        {secaoVideos.map((video, index) => <div key={video.id} style={{ width: 160, flexShrink: 0, scrollSnapAlign: 'start' }}><RankedPoster video={video} rank={index + 1} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} /></div>)}
+      <div className="video-grid horizontal-scroll" style={{ paddingLeft: 16 }}>
+        {secaoVideos.map((video, index) => <div key={video.id} style={{ width: 160 }}><RankedPoster video={video} rank={index + 1} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} /></div>)}
       </div>
     </section>;
   }
@@ -788,8 +749,8 @@ function CatalogPage() {
     if (!secaoVideos.length) return null;
     return <section className="shelf" key={key} style={{ marginTop: 22 }}>
       <div className="shelf-heading"><h2 className="section-title">{item.titulo || `Coleção ${item.config?.nome}`}</h2><div className="section-rule" /></div>
-      <div className="video-grid horizontal-scroll" style={{ display: 'flex', overflowX: 'auto', gap: 16, paddingBottom: 16, scrollSnapType: 'x mandatory' }}>
-        {secaoVideos.map((video) => <div key={video.id} style={{ width: 160, flexShrink: 0, scrollSnapAlign: 'start' }}><Poster video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} /></div>)}
+      <div className="video-grid horizontal-scroll">
+        {secaoVideos.map((video) => <div key={video.id} style={{ width: 160 }}><Poster video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} /></div>)}
       </div>
     </section>;
   }
@@ -801,8 +762,8 @@ function CatalogPage() {
     if (!secaoVideos.length) return null;
     return <section className="shelf" key={key} style={{ marginTop: 22 }}>
       <div className="shelf-heading"><h2 className="section-title">{item.titulo || item.config?.valor}</h2><div className="section-rule" /></div>
-      <div className="video-grid horizontal-scroll" style={{ display: 'flex', overflowX: 'auto', gap: 16, paddingBottom: 16, scrollSnapType: 'x mandatory' }}>
-        {secaoVideos.map((video) => <div key={video.id} style={{ width: 160, flexShrink: 0, scrollSnapAlign: 'start' }}><Poster video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} /></div>)}
+      <div className="video-grid horizontal-scroll">
+        {secaoVideos.map((video) => <div key={video.id} style={{ width: 160 }}><Poster video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} /></div>)}
       </div>
     </section>;
   }
@@ -812,8 +773,8 @@ function CatalogPage() {
     if (!found || !found.videos.length) return null;
     return <section className="shelf" key={key} style={{ marginTop: 22 }}>
       <div className="shelf-heading"><h2 className="section-title">{found.colecao.titulo}</h2><div className="section-rule" /></div>
-      <div className="video-grid horizontal-scroll" style={{ display: 'flex', overflowX: 'auto', gap: 16, paddingBottom: 16, scrollSnapType: 'x mandatory' }}>
-        {found.videos.map((video) => <div key={video.id} style={{ width: 160, flexShrink: 0, scrollSnapAlign: 'start' }}><Poster key={video.id} video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} /></div>)}
+      <div className="video-grid horizontal-scroll">
+        {found.videos.map((video) => <div key={video.id} style={{ width: 160 }}><Poster key={video.id} video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} /></div>)}
       </div>
     </section>;
   }
@@ -868,9 +829,9 @@ function CatalogPage() {
               <div className="section-rule" />
               {vids.length > 6 && <button className="quiet-button focus-tv" onClick={() => setGenre(gName)}>Ver todos</button>}
             </div>
-            <div className="video-grid horizontal-scroll" style={{ display: 'flex', overflowX: 'auto', gap: 16, paddingBottom: 16, scrollSnapType: 'x mandatory' }}>
+            <div className="video-grid horizontal-scroll">
               {vids.slice(0, 15).map(video => (
-                <div key={video.id} style={{ width: 160, flexShrink: 0, scrollSnapAlign: 'start' }}>
+                <div key={video.id} style={{ width: 160 }}>
                   <Poster video={video} favorite={favorites.includes(video.id)} onFavorite={() => toggleFavorite(video.id)} onOpen={() => openVideo(video.id)} />
                 </div>
               ))}
@@ -910,9 +871,9 @@ function CatalogPage() {
               <div className="section-rule" />
               {sList.length > 6 && <button className="quiet-button focus-tv" onClick={() => setGenre(gName)}>Ver todas</button>}
             </div>
-            <div className="video-grid horizontal-scroll" style={{ display: 'flex', overflowX: 'auto', gap: 16, paddingBottom: 16, scrollSnapType: 'x mandatory' }}>
+            <div className="video-grid horizontal-scroll">
               {sList.slice(0, 15).map(serie => (
-                <div key={serie.id} style={{ width: 160, flexShrink: 0, scrollSnapAlign: 'start' }}>
+                <div key={serie.id} style={{ width: 160 }}>
                   <SerieCard serie={serie} onOpen={() => setLocation(`/serie/${serie.id}`)} />
                 </div>
               ))}
@@ -932,13 +893,15 @@ function CatalogPage() {
     
     <div className="catalog-toolbar"><div className="search-wrap"><Search size={16} /><input className="input focus-tv" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar no catálogo" aria-label="Buscar no catálogo" data-testid="input-search-catalog" /></div><Link href="/colecao" className="secondary-button focus-tv" data-testid="link-open-collection"><Heart size={15} />Minha coleção</Link></div>
     
-    <div className="chip-row no-scrollbar" role="tablist" style={{ display: 'flex', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 8 }}>
-      {MAIN_TABS.map((item) => <button key={item} className={`chip focus-tv ${shelf === item ? 'active' : ''}`} style={{ flexShrink: 0 }} onClick={() => { setShelf(item); setGenre('Por Gênero'); setQuery(''); }} role="tab" aria-selected={shelf === item}>{item}</button>)}
+    {/* MENU SUPERIOR PREMIUM: Início, Filmes, Séries */}
+    <div className="chip-row horizontal-scroll" role="tablist">
+      {MAIN_TABS.map((item) => <button key={item} className={`chip focus-tv ${shelf === item ? 'active' : ''}`} onClick={() => { setShelf(item); setGenre('Por Gênero'); setQuery(''); }} role="tab" aria-selected={shelf === item}>{item}</button>)}
     </div>
     
+    {/* BARRA DE GÊNEROS */}
     {!query && shelf !== 'Início' && (
-      <div className="chip-row no-scrollbar" aria-label="Filtrar por gênero" style={{ display: 'flex', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 8 }}>
-        {genreChips.map((item) => <button key={item} className={`chip focus-tv ${genre === item ? 'active' : ''}`} style={{ flexShrink: 0 }} onClick={() => setGenre(item)}>{item}</button>)}
+      <div className="chip-row horizontal-scroll" aria-label="Filtrar por gênero">
+        {genreChips.map((item) => <button key={item} className={`chip focus-tv ${genre === item ? 'active' : ''}`} onClick={() => setGenre(item)}>{item}</button>)}
       </div>
     )}
     
@@ -954,18 +917,19 @@ function CatalogPage() {
         ) : shelf === 'Séries' ? (
           renderSeries()
         ) : (
+          /* ABA INÍCIO (Layout CMS e Continuar Assistindo) */
           <>
             {continuarAssistindo.length > 0 && <section className="shelf" style={{ marginTop: 22 }}>
               <div className="shelf-heading"><h2 className="section-title">Continuar assistindo</h2><div className="section-rule" /></div>
-              <div className="video-grid horizontal-scroll" style={{ display: 'flex', overflowX: 'auto', gap: 16, paddingBottom: 16, scrollSnapType: 'x mandatory' }}>
-                {continuarAssistindo.filter((item) => item.videos).map((item) => <div key={item.id} style={{ width: 160, flexShrink: 0, scrollSnapAlign: 'start' }}><ContinueCard item={item} onOpen={() => openVideo(item.video_id)} onRemove={() => handleRemoveContinuar(item.id)} /></div>)}
+              <div className="video-grid horizontal-scroll">
+                {continuarAssistindo.filter((item) => item.videos).map((item) => <div key={item.id} style={{ width: 160 }}><ContinueCard item={item} onOpen={() => openVideo(item.video_id)} onRemove={() => handleRemoveContinuar(item.id)} /></div>)}
               </div>
             </section>}
             
             {layout.length > 0 ? (
               layout.map((item) => {
                 if (item.tipo === ('ao_vivo_fileira' as any)) return null;
-                if (item.tipo === 'series') return <div key={item.id}>{renderSeries()}</div>;
+                if (item.tipo === 'series') return <div key={item.id}>{renderSeries()}</div>; 
                 if (item.tipo === 'colecao' && item.colecao_id) return renderColecaoSection(item.colecao_id, item.id);
                 if (item.tipo === 'catalogo_geral') return <div key={item.id}>{renderFilmes()}</div>;
                 if (item.tipo === 'hero') return renderHeroSection(item, item.id);
@@ -976,6 +940,7 @@ function CatalogPage() {
                 return null;
               })
             ) : (
+              // Se o admin não criou layout nenhum
               <>
                 {colecoes.map((c) => renderColecaoSection(c.colecao.id, c.colecao.id))}
               </>
@@ -1045,8 +1010,7 @@ function VideoPlayer({ embed, title }: { embed: { type: string, src: string }, t
         {/* ESCUDO TOPO: Bloqueia links de direcionamento e título */}
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '60px', zIndex: 10 }} title="Cabeçalho protegido" />
         
-        {/* ESCUDO INFERIOR: Posicionado milimetricamente para cobrir Share, Embed e Logo do Archive.
-            Deixa livre o botão de Fullscreen (que fica nos últimos 40px à direita). */}
+        {/* ESCUDO INFERIOR: Posicionado para cobrir Share, Embed e Logo. Deixa livre o botão de Fullscreen (últimos 42px) */}
         <div style={{ position: 'absolute', bottom: 0, right: '42px', width: '145px', height: '50px', zIndex: 10 }} title="Controles protegidos" />
         
         <iframe src={embed.src} title={title} allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowFullScreen style={{ width: '100%', height: '100%', border: 0 }} data-testid="video-player" />
@@ -1076,7 +1040,7 @@ function PlayerPage() {
     if (access === false) setLocation('/assinatura');
   }, [access, setLocation]);
 
-  const video = findVideo(videos, params.id || new URLSearchParams(window.location.search).get('id') || '');
+  const video = findVideo(videos, params.id || newSearchParams(window.location.search).get('id') || '');
   const [saved, setSaved] = useState(() => JSON.parse(localStorage.getItem('cinevito-favorites') || '[]').includes(video?.id));
   const [episodioInfo, setEpisodioInfo] = useState<{ episodio: Episodio; serieId: string; proximo?: Episodio } | null>(null);
   const [episodiosDaTemporada, setEpisodiosDaTemporada] = useState<Episodio[]>([]);
@@ -1150,7 +1114,7 @@ function SeriePage() {
   return <div className="content-wrap page-main">
     <button className="quiet-button focus-tv" onClick={() => setLocation('/catalogo')}><ArrowLeft size={16} />Voltar ao catálogo</button>
     <PageHeader eyebrow="Série" title={data.serie.titulo} description={data.serie.descricao || undefined} />
-    {data.temporadas.length > 0 && <div className="chip-row no-scrollbar" role="tablist" style={{ display: 'flex', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 8 }}>{data.temporadas.map((item, index) => <button key={item.temporada.id} className={'chip focus-tv ' + (activeTemporada === index ? 'active' : '')} style={{ flexShrink: 0 }} onClick={() => setActiveTemporada(index)} role="tab" aria-selected={activeTemporada === index}>{item.temporada.titulo || `Temporada ${item.temporada.numero}`}</button>)}</div>}
+    {data.temporadas.length > 0 && <div className="chip-row horizontal-scroll" role="tablist">{data.temporadas.map((item, index) => <button key={item.temporada.id} className={'chip focus-tv ' + (activeTemporada === index ? 'active' : '')} onClick={() => setActiveTemporada(index)} role="tab" aria-selected={activeTemporada === index}>{item.temporada.titulo || `Temporada ${item.temporada.numero}`}</button>)}</div>}
     {atual && <div className="admin-list" style={{ marginTop: 18 }}>{atual.episodios.length ? atual.episodios.map((ep) => <div className="result-row" key={ep.id} role="button" tabIndex={0} onClick={() => openEpisodio(ep.video_id)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && openEpisodio(ep.video_id)} style={{ cursor: 'pointer' }}><span><strong>Ep. {ep.numero}</strong> — {ep.titulo || ep.videos?.titulo}</span><Play size={16} color="#00c8ff" /></div>) : <p className="muted">Nenhum episódio cadastrado nesta temporada ainda.</p>}</div>}
     {!data.temporadas.length && <p className="muted" style={{ marginTop: 18 }}>Nenhuma temporada cadastrada ainda.</p>}
   </div>;
@@ -1308,7 +1272,7 @@ function SubscriptionPage() {
     return () => { cancelled = true; if (brickRef.current) { try { brickRef.current.unmount(); } catch { } brickRef.current = null; } };
   }, [selectedPlan?.id, user?.id]);
 
-  return <div className="content-wrap page-main"><PageHeader eyebrow="Escolha o seu acesso" title="Assine o CineVito" description="Assista ao catálogo completo em seus dispositivos." /><div className="two-col"><section className="panel panel-pad"><h2 className="panel-title">Planos disponíveis</h2>{loading ? <div className="plan-list">{[1, 2].map((n) => <div className="skeleton" style={{ height: 94 }} key={n} />)}</div> : plans.length ? <><div className="chip-row no-scrollbar" role="tablist" style={{ display: 'flex', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 8 }}>{categories.map((item) => <button key={item} className={'chip focus-tv ' + (category === item ? 'active' : '')} style={{ flexShrink: 0 }} onClick={() => { setCategory(item); setSelected(''); }} role="tab" aria-selected={category === item}>{item}</button>)}</div><div className="plan-list">{visiblePlans.map((plan) => <div className={'plan-card ' + (selected === plan.id ? 'selected' : '')} key={plan.id} onClick={() => setSelected(plan.id)}><div><h3>{plan.nome}</h3><p>{plan.descricao || ((plan.dispositivos || 1) + ' dispositivo(s) · ' + duration(plan))}</p></div><div style={{ display: 'grid', justifyItems: 'end', gap: 8 }}><strong className="plan-price">{typeof plan.preco === 'number' ? 'R$ ' + plan.preco.toFixed(2).replace('.', ',') : 'Consultar'}</strong><button className="primary-button focus-tv" onClick={(event) => { event.stopPropagation(); setSelected(plan.id); }} data-testid={'button-select-plan-' + plan.id}>{selected === plan.id ? 'Selecionado' : 'Escolher'}</button></div></div>)}</div></> : <div className="empty-state"><Settings size={24} /><h3>Planos em configuração</h3><p>Quando os planos estiverem publicados, eles aparecerão aqui.</p></div>}</section><aside className="panel panel-pad"><div className="eyebrow">Pagamento seguro</div><h2 className="panel-title" style={{ marginTop: 9 }}>Checkout protegido</h2><p className="muted" style={{ fontSize: '.82rem', lineHeight: 1.65 }}>Pagamento seguro direto pelo CineVito.</p>
+  return <div className="content-wrap page-main"><PageHeader eyebrow="Escolha o seu acesso" title="Assine o CineVito" description="Assista ao catálogo completo em seus dispositivos." /><div className="two-col"><section className="panel panel-pad"><h2 className="panel-title">Planos disponíveis</h2>{loading ? <div className="plan-list">{[1, 2].map((n) => <div className="skeleton" style={{ height: 94 }} key={n} />)}</div> : plans.length ? <><div className="chip-row horizontal-scroll" role="tablist">{categories.map((item) => <button key={item} className={'chip focus-tv ' + (category === item ? 'active' : '')} onClick={() => { setCategory(item); setSelected(''); }} role="tab" aria-selected={category === item}>{item}</button>)}</div><div className="plan-list">{visiblePlans.map((plan) => <div className={'plan-card ' + (selected === plan.id ? 'selected' : '')} key={plan.id} onClick={() => setSelected(plan.id)}><div><h3>{plan.nome}</h3><p>{plan.descricao || ((plan.dispositivos || 1) + ' dispositivo(s) · ' + duration(plan))}</p></div><div style={{ display: 'grid', justifyItems: 'end', gap: 8 }}><strong className="plan-price">{typeof plan.preco === 'number' ? 'R$ ' + plan.preco.toFixed(2).replace('.', ',') : 'Consultar'}</strong><button className="primary-button focus-tv" onClick={(event) => { event.stopPropagation(); setSelected(plan.id); }} data-testid={'button-select-plan-' + plan.id}>{selected === plan.id ? 'Selecionado' : 'Escolher'}</button></div></div>)}</div></> : <div className="empty-state"><Settings size={24} /><h3>Planos em configuração</h3><p>Quando os planos estiverem publicados, eles aparecerão aqui.</p></div>}</section><aside className="panel panel-pad"><div className="eyebrow">Pagamento seguro</div><h2 className="panel-title" style={{ marginTop: 9 }}>Checkout protegido</h2><p className="muted" style={{ fontSize: '.82rem', lineHeight: 1.65 }}>Pagamento seguro direto pelo CineVito.</p>
     {!user && <div className="notice notice-orange" style={{ marginTop: 16 }}><Info size={16} color="#ff8228" /><span>Entre na sua conta para continuar.</span><Link href="/" className="quiet-button focus-tv">Entrar</Link></div>}
     {user && !selectedPlan && <div className="notice notice-orange" style={{ marginTop: 16 }}><Info size={16} color="#ff8228" /><span>Selecione um plano para continuar.</span></div>}
     {user && selectedPlan && checkoutStatus !== 'approved' && <>
