@@ -525,7 +525,7 @@ function useVideos() {
 function ContinueCard({ item, onOpen, onRemove }: { item: ContinuarAssistindoItem; onOpen: () => void; onRemove: () => void }) {
   const video = item.videos;
   if (!video) return null;
-  const subtitle = item.series ? `${item.series.titulo}${item.numero_episodio ? ` · Ep. ${item.numero_episodio}` : ''}` : undefined;
+  const subtitle = video.genero || video.categoria || 'Continuar assistindo';
   const style = video.url_capa ? undefined : ({ '--poster': 'linear-gradient(145deg, #0d596c, #172532 50%, #e58d49)' } as CSSProperties);
   return <article className="video-card reveal" style={{ position: 'relative' }}>
     <button onClick={(e) => { e.stopPropagation(); onRemove(); }} style={{ position: 'absolute', top: 6, right: 6, zIndex: 10, background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%', padding: 4, cursor: 'pointer', color: '#fff' }} title="Remover do histórico" aria-label="Remover" className="focus-tv" tabIndex={0}>
@@ -533,10 +533,10 @@ function ContinueCard({ item, onOpen, onRemove }: { item: ContinuarAssistindoIte
     </button>
     <div className="poster focus-tv" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen()} style={style}>
       <div className="poster-art" style={video.url_capa ? { backgroundImage: `url(${video.url_capa})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}>
-        <span className="poster-meta">CONTINUAR</span><strong className="poster-word">{item.series?.titulo || video.titulo}</strong>
+        <span className="poster-meta">CONTINUAR</span><strong className="poster-word">{video.titulo}</strong>
       </div>
     </div>
-    <div className="video-info"><div><h3 className="video-title">{item.series?.titulo || video.titulo}</h3><p className="video-subtitle">{subtitle || 'Continuar assistindo'}</p></div><Play size={14} color="#00c8ff" /></div>
+    <div className="video-info"><div><h3 className="video-title">{video.titulo}</h3><p className="video-subtitle">{subtitle}</p></div><Play size={14} color="#00c8ff" /></div>
   </article>;
 }
 
@@ -923,7 +923,7 @@ function CatalogPage() {
             {continuarAssistindo.length > 0 && <section className="shelf" style={{ marginTop: 22 }}>
               <div className="shelf-heading"><h2 className="section-title">Continuar assistindo</h2><div className="section-rule" /></div>
               <div className="video-grid horizontal-scroll">
-                {continuarAssistindo.filter((item) => item.videos).map((item) => <div key={item.id} style={{ width: 160 }}><ContinueCard item={item} onOpen={() => openVideo(item.video_id)} onRemove={() => handleRemoveContinuar(item.id)} /></div>)}
+                {continuarAssistindo.filter((item) => item.videos).map((item) => <div key={item.id} style={{ width: 160, flexShrink: 0, scrollSnapAlign: 'start' }}><ContinueCard item={item} onOpen={() => openVideo(item.video_id)} onRemove={() => handleRemoveContinuar(item.id)} /></div>)}
               </div>
             </section>}
             
@@ -1014,9 +1014,10 @@ function VideoPlayer({ embed, title }: { embed: { type: string, src: string }, t
         {/* ESCUDO TOPO: Bloqueia links de direcionamento e título */}
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '60px', zIndex: 10 }} title="Cabeçalho protegido" />
         
-        {/* ESCUDO INFERIOR: Posicionado exatamente para cobrir Share, Embed e Logo. 
-            Deixa os últimos 135px (Engrenagem, Mini-player e Fullscreen) totalmente livres! */}
-        <div style={{ position: 'absolute', bottom: 0, right: '135px', width: '140px', height: '50px', zIndex: 10 }} title="Controles protegidos" />
+        {/* ESCUDO INFERIOR (PERFEITAMENTE CALIBRADO): 
+            Bloqueia Chromecast, PiP, Share, Embed e Logo. 
+            Deixa os últimos 135px (Engrenagem, Mini-player nativo e Fullscreen) totalmente livres! */}
+        <div style={{ position: 'absolute', bottom: 0, right: '135px', width: '250px', height: '50px', zIndex: 10 }} title="Controles protegidos" />
         
         <iframe src={embed.src} title={title} allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowFullScreen style={{ width: '100%', height: '100%', border: 0 }} data-testid="video-player" />
       </div>
@@ -1030,10 +1031,6 @@ function VideoPlayer({ embed, title }: { embed: { type: string, src: string }, t
   return <div className="player-idle"><Play size={38} /><strong>Pronto para assistir</strong><span>Este título ainda não tem um link de vídeo cadastrado.</span></div>;
 }
 
-function findVideo(videos: Video[], id: string) {
-  return videos.find((video) => video.id === id);
-}
-
 function PlayerPage() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
@@ -1045,7 +1042,7 @@ function PlayerPage() {
     if (access === false) setLocation('/assinatura');
   }, [access, setLocation]);
 
-  const video = findVideo(videos, params.id || new URLSearchParams(window.location.search).get('id') || '');
+  const video = videos.find((v) => v.id === (params.id || new URLSearchParams(window.location.search).get('id') || ''));
   const [saved, setSaved] = useState(() => JSON.parse(localStorage.getItem('cinevito-favorites') || '[]').includes(video?.id));
   const [episodioInfo, setEpisodioInfo] = useState<{ episodio: Episodio; serieId: string; proximo?: Episodio } | null>(null);
   const [episodiosDaTemporada, setEpisodiosDaTemporada] = useState<Episodio[]>([]);
@@ -1054,29 +1051,31 @@ function PlayerPage() {
     if (!video || access !== true) return;
     let cancelled = false;
     
-    // GATILHO INDEPENDENTE: Salva a View e o Histórico de filmes na mesma hora
-    registrarVisualizacao(video.id).catch(() => {});
-    if (user && !video.ao_vivo) {
-      salvarProgresso({ video_id: video.id }).catch(() => {});
-    }
-
     (async () => {
       try {
+        registrarVisualizacao(video.id).catch(() => {});
         const info = await fetchEpisodioInfo(video.id);
         if (cancelled) return;
+
         if (info) {
           setEpisodioInfo(info);
           const lista = await fetchEpisodios(info.episodio.temporada_id);
           if (!cancelled) setEpisodiosDaTemporada(lista);
-          // Se for série, atualiza o histórico para incluir os dados extras da temporada
+          // O Salvar progresso aqui está protegido para não falhar
           if (user) {
-            salvarProgresso({ video_id: video.id, serie_id: info.serieId, temporada_id: info.episodio.temporada_id, numero_episodio: info.episodio.numero }).catch(() => {});
+            await salvarProgresso({ video_id: video.id });
           }
         } else {
           setEpisodioInfo(null);
           setEpisodiosDaTemporada([]);
+          // Salva o histórico do filme diretamente
+          if (user && !video.ao_vivo) {
+            await salvarProgresso({ video_id: video.id });
+          }
         }
-      } catch { }
+      } catch (err) {
+        console.error('Erro no player:', err);
+      }
     })();
     return () => { cancelled = true; };
   }, [video?.id, access, user?.id]);
@@ -1094,11 +1093,12 @@ function PlayerPage() {
   if (loading || access === null || access === false) return <div className="content-wrap page-main"><div className="skeleton" style={{ aspectRatio: '16/9' }} /></div>;
   if (!video) return <div className="content-wrap page-main"><div className="empty-state"><CircleAlert size={26} /><h3>Vídeo não encontrado</h3><p>Esse título não está mais disponível no catálogo.</p><Link href="/catalogo" className="primary-button focus-tv" tabIndex={0}>Voltar ao catálogo</Link></div></div>;
   
-  // SOLUÇÃO DO TAMANHO DA TELA AO VIVO E FILMES
+  // SOLUÇÃO DA TELA DO PLAYER (TAMANHO DE CINEMA)
   return <div className="content-wrap page-main">
     <button className="quiet-button focus-tv" onClick={() => setLocation('/catalogo')} data-testid="button-back-catalog" tabIndex={0}><ArrowLeft size={16} />Voltar ao catálogo</button>
     <div className="player-stage" style={{ marginTop: 17 }}>
-      <div className="player-box" style={{ aspectRatio: '16/9', width: '100%', background: '#000', borderRadius: '12px', overflow: 'hidden' }}>
+      {/* O Player agora respeita o tamanho da tela e o formato 16:9 sempre! */}
+      <div className="player-box" style={{ aspectRatio: '16/9', width: '100%', maxHeight: '75vh', margin: '0 auto', background: '#000', borderRadius: '12px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <VideoPlayer embed={embed} title={video.titulo} />
       </div>
       <div className="player-details">
