@@ -762,6 +762,7 @@ function CatalogPage() {
   function renderCategoriaSection(item: LayoutItem, key: string) {
     const valorAlvo = normalizeCatalogLabel(item.config?.valor);
     if (!valorAlvo) return null;
+    // Puxa tudo (Filmes e Séries) que bater com a categoria que o admin escolheu no CMS!
     const secaoVideos = videos.filter((video) => !episodioVideoIds.has(video.id) && (normalizeCatalogLabel(video.categoria).includes(valorAlvo) || normalizeCatalogLabel(video.genero).includes(valorAlvo)));
     const secaoSeries = series.filter((serie) => normalizeCatalogLabel(serie.categoria_id).includes(valorAlvo) || normalizeCatalogLabel(serie.genero).includes(valorAlvo));
     
@@ -1019,11 +1020,9 @@ function VideoPlayer({ embed, title }: { embed: { type: string, src: string }, t
         {/* ESCUDO TOPO: Bloqueia links de direcionamento e título */}
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '60px', zIndex: 10 }} title="Cabeçalho protegido" />
         
-        {/* ESCUDO INFERIOR (O MAIS PRECISO): 
-            Ele NÃO trava o player inteiro. Ele é um bloco fixo alinhado à direita 
-            que cobre APENAS do Chromecast até a Logo. 
-            Ele termina antes dos últimos 135px da tela, deixando as 3 engrenagens/modos livres. */}
-        <div style={{ position: 'absolute', bottom: 0, right: '135px', width: '140px', height: '50px', zIndex: 10 }} title="Controles protegidos" />
+        {/* ESCUDO INFERIOR: Posicionado fixo à direita para cobrir Chromecast, PiP, Share, Embed e Logo. 
+            Deixa os últimos 135px (Engrenagem, Mini-player nativo e Fullscreen) totalmente livres! */}
+        <div style={{ position: 'absolute', bottom: 0, right: '135px', width: '250px', height: '50px', zIndex: 10 }} title="Controles protegidos" />
         
         <iframe src={embed.src} title={title} allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowFullScreen style={{ width: '100%', height: '100%', border: 0 }} data-testid="video-player" />
       </div>
@@ -1057,10 +1056,9 @@ function PlayerPage() {
     if (!video || access !== true) return;
     let cancelled = false;
     
-    // GATILHO INDEPENDENTE 1: Salva a View no banco
     registrarVisualizacao(video.id).catch(() => {});
     
-    // GATILHO INDEPENDENTE 2: Salva o Histórico de Filmes
+    // GATILHO INDEPENDENTE: Salva o histórico imediatamente se não for Ao Vivo
     if (user && !video.ao_vivo) {
       salvarProgresso({ video_id: video.id }).catch(() => {});
     }
@@ -1074,7 +1072,7 @@ function PlayerPage() {
           setEpisodioInfo(info);
           const lista = await fetchEpisodios(info.episodio.temporada_id);
           if (!cancelled) setEpisodiosDaTemporada(lista);
-          // GATILHO 3: Se for série, regrava o histórico incluindo o número do episódio
+          // Atualiza histórico com a info de série/episódio
           if (user) {
             salvarProgresso({ video_id: video.id, serie_id: info.serieId, temporada_id: info.episodio.temporada_id, numero_episodio: info.episodio.numero }).catch(() => {});
           }
@@ -1097,15 +1095,26 @@ function PlayerPage() {
     setSaved(!saved);
   }
 
+  // --- LÓGICA DE VOLTAR INTELIGENTE (Histórico do Navegador) ---
+  function handleBack() {
+    if (window.history.length > 2) {
+      window.history.back();
+    } else {
+      setLocation('/catalogo');
+    }
+  }
+
   const embed = getEmbedInfo(video?.url_video);
 
   if (loading || access === null || access === false) return <div className="content-wrap page-main"><div className="skeleton" style={{ aspectRatio: '16/9' }} /></div>;
   if (!video) return <div className="content-wrap page-main"><div className="empty-state"><CircleAlert size={26} /><h3>Vídeo não encontrado</h3><p>Esse título não está mais disponível no catálogo.</p><Link href="/catalogo" className="primary-button focus-tv" tabIndex={0}>Voltar ao catálogo</Link></div></div>;
   
   // SOLUÇÃO DA TELA DO PLAYER (TAMANHO DE CINEMA)
-  // O maxHeight: '75vh' evita que o vídeo ocupe toda a altura do monitor e esmague a descrição
   return <div className="content-wrap page-main">
-    <button className="quiet-button focus-tv" onClick={() => setLocation('/catalogo')} data-testid="button-back-catalog" tabIndex={0}><ArrowLeft size={16} />Voltar ao catálogo</button>
+    {/* Botão de voltar inteligente */}
+    <button className="quiet-button focus-tv" onClick={handleBack} data-testid="button-back-catalog" tabIndex={0}>
+      <ArrowLeft size={16} />Voltar
+    </button>
     <div className="player-stage" style={{ marginTop: 17 }}>
       <div className="player-box" style={{ aspectRatio: '16/9', width: '100%', maxHeight: '75vh', margin: '0 auto', background: '#000', borderRadius: '12px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <VideoPlayer embed={embed} title={video.titulo} />
@@ -1145,12 +1154,23 @@ function SeriePage() {
     fetchSerieCompleta(params.id).then((result) => { if (!cancelled) setData(result); }).catch(() => { if (!cancelled) setData({ serie: null, temporadas: [] }); });
     return () => { cancelled = true; };
   }, [params.id]);
+  
   function openEpisodio(videoId: string) { setLocation(access ? `/player/${videoId}` : '/assinatura'); }
+  
+  // LÓGICA DE VOLTAR INTELIGENTE PARA SÉRIES
+  function handleBack() {
+    if (window.history.length > 2) {
+      window.history.back();
+    } else {
+      setLocation('/catalogo');
+    }
+  }
+
   if (!data) return <div className="content-wrap page-main"><div className="skeleton" style={{ height: 200 }} /></div>;
   if (!data.serie) return <div className="content-wrap page-main"><div className="empty-state"><CircleAlert size={26} /><h3>Série não encontrada</h3><Link href="/catalogo" className="primary-button focus-tv" style={{ marginTop: 12 }} tabIndex={0}>Voltar ao catálogo</Link></div></div>;
   const atual = data.temporadas[activeTemporada];
   return <div className="content-wrap page-main">
-    <button className="quiet-button focus-tv" onClick={() => setLocation('/catalogo')} tabIndex={0}><ArrowLeft size={16} />Voltar ao catálogo</button>
+    <button className="quiet-button focus-tv" onClick={handleBack} tabIndex={0}><ArrowLeft size={16} />Voltar</button>
     <PageHeader eyebrow="Série" title={data.serie.titulo} description={data.serie.descricao || undefined} />
     {data.temporadas.length > 0 && <div className="chip-row horizontal-scroll" role="tablist">{data.temporadas.map((item, index) => <button key={item.temporada.id} className={'chip focus-tv ' + (activeTemporada === index ? 'active' : '')} onClick={() => setActiveTemporada(index)} role="tab" aria-selected={activeTemporada === index} tabIndex={0}>{item.temporada.titulo || `Temporada ${item.temporada.numero}`}</button>)}</div>}
     {atual && <div className="admin-list" style={{ marginTop: 18 }}>{atual.episodios.length ? atual.episodios.map((ep) => <div className="result-row" key={ep.id} role="button" tabIndex={0} onClick={() => openEpisodio(ep.video_id)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && openEpisodio(ep.video_id)} style={{ cursor: 'pointer' }}><span><strong>Ep. {ep.numero}</strong> — {ep.titulo || ep.videos?.titulo}</span><Play size={16} color="#00c8ff" /></div>) : <p className="muted">Nenhum episódio cadastrado nesta temporada ainda.</p>}</div>}
