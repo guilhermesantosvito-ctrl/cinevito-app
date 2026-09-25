@@ -83,19 +83,15 @@ const SUPABASE_URL = String(import.meta.env.VITE_SUPABASE_URL || '').replace(/\/
 const SUPABASE_ANON_KEY = String(import.meta.env.VITE_SUPABASE_ANON_KEY || '');
 const SESSION_KEY = 'cinevito-auth-session';
 const SUPABASE_SESSION_KEY = 'sb-cefyzitdkvtynhwsxdvv-auth-token';
-const BACKGROUND_KEY = 'cinevito-background-since';
-const BACKGROUND_LIMIT_MS = 3 * 60 * 1000;
 const ADMIN_FLAG_KEY = 'cinevito-is-admin';
 const DEVICE_ID_KEY = 'cinevito-device-id';
+
 export function isAdminCached(): boolean {
   return localStorage.getItem(ADMIN_FLAG_KEY) === 'true';
 }
 export const MASTER_ADMIN_EMAIL = 'guilhermesantosvito@gmail.com';
 export const hasRuntimeConfig = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
-function isExpiredSession() {
-  const since = Number(localStorage.getItem(BACKGROUND_KEY) || 0);
-  return since > 0 && Date.now() - since >= BACKGROUND_LIMIT_MS;
-}
+
 function storedSession(): { access_token: string; refresh_token?: string; expires_in?: number; expires_at?: number; token_type?: string; user: SessionUser } | null {
   try {
     const value = localStorage.getItem(SESSION_KEY);
@@ -105,7 +101,6 @@ function storedSession(): { access_token: string; refresh_token?: string; expire
   }
 }
 export function getStoredUser(): SessionUser | null {
-  if (isExpiredSession() && !isAdminCached()) { clearSession(); return null; }
   const sessionUser = storedSession()?.user;
   if (sessionUser) return sessionUser;
   const demoEmail = localStorage.getItem('cinevito-demo-user');
@@ -117,48 +112,11 @@ export function getAccessToken(): string | null {
 function saveSession(session: { access_token: string; refresh_token?: string; expires_in?: number; expires_at?: number; token_type?: string; user: SessionUser }) {
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
   localStorage.setItem(SUPABASE_SESSION_KEY, JSON.stringify({ ...session, expires_at: session.expires_at || (session.expires_in ? Math.floor(Date.now() / 1000) + session.expires_in : undefined) }));
-  localStorage.removeItem(BACKGROUND_KEY);
-  // O bug do admin estava aqui! O sistema apagava a flag de admin toda vez que salvava a sessão. Resolvido.
   window.dispatchEvent(new Event('cinevito-auth-change'));
-}
-function irParaEntrada() {
-  if (typeof window === 'undefined') return;
-  if (window.location.pathname !== '/' && window.location.pathname !== '/index.html') {
-    window.location.href = '/';
-  }
-}
-function checkBackgroundLogout() {
-  if (isAdminCached()) { window.dispatchEvent(new Event('cinevito-auth-change')); return; }
-  if (isExpiredSession()) {
-    clearSession();
-    irParaEntrada();
-    return;
-  }
-  window.dispatchEvent(new Event('cinevito-auth-change'));
-}
-if (typeof document !== 'undefined') {
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) localStorage.setItem(BACKGROUND_KEY, String(Date.now()));
-    else checkBackgroundLogout();
-  });
-  window.addEventListener('pageshow', checkBackgroundLogout);
-  window.addEventListener('focus', checkBackgroundLogout);
-  const registrarAtividade = () => localStorage.setItem(BACKGROUND_KEY, String(Date.now()));
-  ['click', 'keydown', 'touchstart', 'scroll'].forEach((evento) => {
-    window.addEventListener(evento, registrarAtividade, { passive: true });
-  });
-  window.setInterval(() => {
-    if (isAdminCached()) return;
-    if (isExpiredSession() && getStoredUser()) {
-      clearSession();
-      irParaEntrada();
-    }
-  }, 15000);
 }
 export function clearSession() {
   localStorage.removeItem(SESSION_KEY);
   localStorage.removeItem(SUPABASE_SESSION_KEY);
-  localStorage.removeItem(BACKGROUND_KEY);
   localStorage.removeItem(ADMIN_FLAG_KEY);
   localStorage.removeItem('cinevito-demo-user');
   window.dispatchEvent(new Event('cinevito-auth-change'));
