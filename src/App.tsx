@@ -108,7 +108,12 @@ function useColecoesDoCatalogo() {
     const carregar = () => fetchColecoesParaCatalogo().then((data) => { if (!cancelled) setColecoes(data); }).catch(() => { if (!cancelled) setColecoes([]); });
     carregar();
     const intervalId = window.setInterval(carregar, CATALOG_REFRESH_INTERVAL_MS);
-    return () => { cancelled = true; window.clearInterval(intervalId); };
+    
+    // Atualiza catálogo se a pessoa voltar pro app
+    const onFocus = () => carregar();
+    window.addEventListener('focus', onFocus);
+    
+    return () => { cancelled = true; window.clearInterval(intervalId); window.removeEventListener('focus', onFocus); };
   }, []);
   return colecoes;
 }
@@ -121,7 +126,9 @@ function useSeriesDoCatalogo() {
     const carregar = () => fetchSeries().then((data) => { if (!cancelled) setSeries(data); }).catch(() => { if (!cancelled) setSeries([]); });
     carregar();
     const intervalId = window.setInterval(carregar, CATALOG_REFRESH_INTERVAL_MS);
-    return () => { cancelled = true; window.clearInterval(intervalId); };
+    const onFocus = () => carregar();
+    window.addEventListener('focus', onFocus);
+    return () => { cancelled = true; window.clearInterval(intervalId); window.removeEventListener('focus', onFocus); };
   }, []);
   return series;
 }
@@ -134,7 +141,9 @@ function useCatalogLayoutPublico() {
     const carregar = () => fetchCatalogoLayoutPublico().then((data) => { if (!cancelled) setLayout(data); }).catch(() => { if (!cancelled) setLayout([]); });
     carregar();
     const intervalId = window.setInterval(carregar, CATALOG_REFRESH_INTERVAL_MS);
-    return () => { cancelled = true; window.clearInterval(intervalId); };
+    const onFocus = () => carregar();
+    window.addEventListener('focus', onFocus);
+    return () => { cancelled = true; window.clearInterval(intervalId); window.removeEventListener('focus', onFocus); };
   }, []);
   return layout;
 }
@@ -158,7 +167,12 @@ function useContinuarAssistindo(user: SessionUser | null) {
     if (!user || !hasRuntimeConfig) { setItems([]); return; }
     fetchContinuarAssistindo().then(setItems).catch(() => setItems([]));
   };
-  useEffect(() => { carregar(); }, [user?.id]);
+  useEffect(() => { 
+    carregar(); 
+    const onFocus = () => carregar();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [user?.id]);
   return { items, recarregar: carregar };
 }
 
@@ -459,7 +473,7 @@ function Poster({ video, favorite, onFavorite, onOpen, subtitle }: { video: Vide
   const tvGradient = { '--poster': 'linear-gradient(145deg, #1e293b, #0f172a 80%)' } as CSSProperties;
   const fallbackGradient = { '--poster': 'linear-gradient(145deg, #0d596c, #172532 50%, #e58d49)' } as CSSProperties;
   const posterStyle = video.url_capa && !video.ao_vivo ? undefined : (video.ao_vivo ? tvGradient : fallbackGradient);
-  const artStyle = video.url_capa ? { backgroundImage: `url(${video.url_capa})`, backgroundSize: video.ao_vivo ? '75%' : 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' } : undefined;
+  const artStyle = video.url_capa ? { backgroundImage: `url(${video.url_capa})`, backgroundSize: video.ao_vivo ? 'contain' : 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' } : undefined;
   return <article className="video-card reveal" data-testid={`card-video-${video.id}`}><div className="poster focus-tv" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen()} style={posterStyle}><div className="poster-art" style={artStyle}><span className="poster-meta">{video.ao_vivo ? 'AO VIVO' : (video.ano || 'CINEVITO')}</span><strong className="poster-word">{video.titulo}</strong></div>{video.premium && <span className="premium-badge">Premium</span>}<button className={`poster-favorite focus-tv ${favorite ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); onFavorite(); }} aria-label={favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'} data-testid={`button-favorite-${video.id}`} tabIndex={0}><Heart size={15} fill={favorite ? 'currentColor' : 'none'} /></button></div><div className="video-info"><div><h3 className="video-title" data-testid={`text-video-title-${video.id}`}>{video.titulo}</h3><p className="video-subtitle">{subtitle || video.genero || video.categoria || 'Catálogo CineVito'}</p></div><Play size={14} color="#00c8ff" /></div></article>;
 }
 
@@ -762,7 +776,6 @@ function CatalogPage() {
   function renderCategoriaSection(item: LayoutItem, key: string) {
     const valorAlvo = normalizeCatalogLabel(item.config?.valor);
     if (!valorAlvo) return null;
-    // Puxa tudo (Filmes e Séries) que bater com a categoria que o admin escolheu no CMS!
     const secaoVideos = videos.filter((video) => !episodioVideoIds.has(video.id) && (normalizeCatalogLabel(video.categoria).includes(valorAlvo) || normalizeCatalogLabel(video.genero).includes(valorAlvo)));
     const secaoSeries = series.filter((serie) => normalizeCatalogLabel(serie.categoria_id).includes(valorAlvo) || normalizeCatalogLabel(serie.genero).includes(valorAlvo));
     
@@ -926,7 +939,7 @@ function CatalogPage() {
         ) : shelf === 'Séries' ? (
           renderSeries()
         ) : (
-          /* ABA INÍCIO (O PODER TOTAL DO CMS DO ADMIN) */
+          /* ABA INÍCIO (Layout CMS e Continuar Assistindo) */
           <>
             {continuarAssistindo.length > 0 && <section className="shelf" style={{ marginTop: 22 }}>
               <div className="shelf-heading"><h2 className="section-title">Continuar assistindo</h2><div className="section-rule" /></div>
@@ -938,7 +951,9 @@ function CatalogPage() {
             {layout.length > 0 ? (
               layout.map((item) => {
                 if (item.tipo === ('ao_vivo_fileira' as any)) return null;
+                if (item.tipo === 'series') return <div key={item.id}>{renderSeries()}</div>; 
                 if (item.tipo === 'colecao' && item.colecao_id) return renderColecaoSection(item.colecao_id, item.id);
+                if (item.tipo === 'catalogo_geral') return <div key={item.id}>{renderFilmes()}</div>;
                 if (item.tipo === 'hero') return renderHeroSection(item, item.id);
                 if (item.tipo === 'carrossel') return renderCarrosselSection(item, item.id);
                 if (item.tipo === 'top10') return renderTop10Section(item, item.id);
@@ -1056,9 +1071,10 @@ function PlayerPage() {
     if (!video || access !== true) return;
     let cancelled = false;
     
+    // GATILHO INDEPENDENTE: Salva a View no banco
     registrarVisualizacao(video.id).catch(() => {});
     
-    // GATILHO INDEPENDENTE: Salva o histórico imediatamente se não for Ao Vivo
+    // GATILHO INDEPENDENTE: Salva o Histórico de qualquer vídeo que não seja série
     if (user && !video.ao_vivo) {
       salvarProgresso({ video_id: video.id }).catch(() => {});
     }
@@ -1072,9 +1088,9 @@ function PlayerPage() {
           setEpisodioInfo(info);
           const lista = await fetchEpisodios(info.episodio.temporada_id);
           if (!cancelled) setEpisodiosDaTemporada(lista);
-          // Atualiza histórico com a info de série/episódio
+          // Atualiza histórico com a info exata da série caso o vídeo seja um episódio
           if (user) {
-            salvarProgresso({ video_id: video.id, serie_id: info.serieId, temporada_id: info.episodio.temporada_id, numero_episodio: info.episodio.numero }).catch(() => {});
+            salvarProgresso({ video_id: video.id }).catch(() => {});
           }
         } else {
           setEpisodioInfo(null);
@@ -1109,9 +1125,7 @@ function PlayerPage() {
   if (loading || access === null || access === false) return <div className="content-wrap page-main"><div className="skeleton" style={{ aspectRatio: '16/9' }} /></div>;
   if (!video) return <div className="content-wrap page-main"><div className="empty-state"><CircleAlert size={26} /><h3>Vídeo não encontrado</h3><p>Esse título não está mais disponível no catálogo.</p><Link href="/catalogo" className="primary-button focus-tv" tabIndex={0}>Voltar ao catálogo</Link></div></div>;
   
-  // SOLUÇÃO DA TELA DO PLAYER (TAMANHO DE CINEMA)
   return <div className="content-wrap page-main">
-    {/* Botão de voltar inteligente */}
     <button className="quiet-button focus-tv" onClick={handleBack} data-testid="button-back-catalog" tabIndex={0}>
       <ArrowLeft size={16} />Voltar
     </button>
@@ -1157,7 +1171,6 @@ function SeriePage() {
   
   function openEpisodio(videoId: string) { setLocation(access ? `/player/${videoId}` : '/assinatura'); }
   
-  // LÓGICA DE VOLTAR INTELIGENTE PARA SÉRIES
   function handleBack() {
     if (window.history.length > 2) {
       window.history.back();
