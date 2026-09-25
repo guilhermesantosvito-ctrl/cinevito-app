@@ -473,7 +473,7 @@ function Poster({ video, favorite, onFavorite, onOpen, subtitle }: { video: Vide
   const tvGradient = { '--poster': 'linear-gradient(145deg, #1e293b, #0f172a 80%)' } as CSSProperties;
   const fallbackGradient = { '--poster': 'linear-gradient(145deg, #0d596c, #172532 50%, #e58d49)' } as CSSProperties;
   
-  // CORREÇÃO DA CAPA INVISÍVEL NO AO VIVO: Se tem url_capa, usa sempre a url_capa! Só usa gradient se estiver vazio.
+  // SOLUÇÃO DAS CAPAS DO AO VIVO: Mostra a imagem sempre que existir
   const posterStyle = video.url_capa ? undefined : (video.ao_vivo ? tvGradient : fallbackGradient);
   const artStyle = video.url_capa ? { backgroundImage: `url(${video.url_capa})`, backgroundSize: video.ao_vivo ? 'contain' : 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' } : undefined;
   
@@ -942,7 +942,7 @@ function CatalogPage() {
         ) : shelf === 'Séries' ? (
           renderSeries()
         ) : (
-          /* ABA INÍCIO (Layout CMS e Continuar Assistindo) */
+          /* ABA INÍCIO (O PODER TOTAL DO CMS DO ADMIN) */
           <>
             {continuarAssistindo.length > 0 && <section className="shelf" style={{ marginTop: 22 }}>
               <div className="shelf-heading"><h2 className="section-title">Continuar assistindo</h2><div className="section-rule" /></div>
@@ -954,9 +954,7 @@ function CatalogPage() {
             {layout.length > 0 ? (
               layout.map((item) => {
                 if (item.tipo === ('ao_vivo_fileira' as any)) return null;
-                if (item.tipo === 'series') return <div key={item.id}>{renderSeries()}</div>; 
                 if (item.tipo === 'colecao' && item.colecao_id) return renderColecaoSection(item.colecao_id, item.id);
-                if (item.tipo === 'catalogo_geral') return <div key={item.id}>{renderFilmes()}</div>;
                 if (item.tipo === 'hero') return renderHeroSection(item, item.id);
                 if (item.tipo === 'carrossel') return renderCarrosselSection(item, item.id);
                 if (item.tipo === 'top10') return renderTop10Section(item, item.id);
@@ -978,7 +976,7 @@ function CatalogPage() {
 }
 
 // ============================================================================
-// COMPONENTE DO PLAYER (Com escudos de proteção responsivos)
+// COMPONENTE DO PLAYER (Com motor IPT / M3U8 para .txt)
 // ============================================================================
 function VideoPlayer({ embed, title }: { embed: { type: string, src: string }, title?: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -1005,7 +1003,9 @@ function VideoPlayer({ embed, title }: { embed: { type: string, src: string }, t
     if (!video || embed.type !== 'file' || !embed.src) return;
 
     let hls: any = null;
-    const isM3U8 = embed.src.toLowerCase().includes('.m3u8');
+    
+    // CORREÇÃO CRÍTICA: Agora qualquer link que tenha /m3u8/, termine com .txt ou .m3u8 vai ligar o motor HLS.js
+    const isM3U8 = embed.src.toLowerCase().includes('.m3u8') || embed.src.toLowerCase().includes('/m3u8/') || embed.src.toLowerCase().includes('.txt');
 
     if (!isM3U8) { video.src = embed.src; video.play().catch(() => {}); return; }
 
@@ -1074,10 +1074,10 @@ function PlayerPage() {
     if (!video || access !== true) return;
     let cancelled = false;
     
-    // GATILHO INDEPENDENTE: Salva a View no banco
+    // GATILHO INDEPENDENTE 1: Salva a View no banco
     registrarVisualizacao(video.id).catch(() => {});
     
-    // GATILHO INDEPENDENTE: Salva o Histórico apenas com video_id e usuario_id
+    // GATILHO INDEPENDENTE 2: Salva o Histórico de Filmes
     if (user && !video.ao_vivo) {
       salvarProgresso({ video_id: video.id }).catch(() => {});
     }
@@ -1091,6 +1091,10 @@ function PlayerPage() {
           setEpisodioInfo(info);
           const lista = await fetchEpisodios(info.episodio.temporada_id);
           if (!cancelled) setEpisodiosDaTemporada(lista);
+          // GATILHO 3: Se for série, regrava o histórico incluindo o número do episódio
+          if (user) {
+            salvarProgresso({ video_id: video.id, serie_id: info.serieId, temporada_id: info.episodio.temporada_id, numero_episodio: info.episodio.numero }).catch(() => {});
+          }
         } else {
           setEpisodioInfo(null);
           setEpisodiosDaTemporada([]);
