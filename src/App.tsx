@@ -367,17 +367,16 @@ function AppShell({ children }: { children: ReactNode }) {
         <div className="content-wrap topbar-inner">
           <Brand />
           <nav className="topbar-nav" aria-label="Navegação principal">
-            {navigation.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className="nav-link focus-tv" aria-current={active(href) ? 'page' : undefined} data-testid={`link-nav-${label.toLowerCase().replaceAll(' ', '-')}`} tabIndex={0}><Icon size={16} />{label}</Link>)}
+            {navigation.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className="nav-link focus-tv" aria-current={active(href) ? 'page' : undefined} data-testid={`link-nav-${label.toLowerCase().replace(/ /g, '-')}`} tabIndex={0}><Icon size={16} />{label}</Link>)}
           </nav>
           <div className="topbar-actions">
-            {isAdmin && <Link href="/admin" className="nav-link focus-tv" data-testid="link-admin" tabIndex={0}><Settings size={16} />Painel</Link>}
-            {user ? <><Link href="/perfil" className="avatar focus-tv" aria-label="Abrir perfil" data-testid="link-profile-avatar" tabIndex={0}>{initials(user)}</Link><button className="icon-button focus-tv" onClick={logout} title="Sair" aria-label="Sair" data-testid="button-logout" tabIndex={0}><LogOut size={17} /></button></> : <Link href="/" className="secondary-button focus-tv" data-testid="link-login" tabIndex={0}><LogIn size={15} />Entrar</Link>}
+            {isAdmin && <Link href="/admin" className="nav-link focus-tv" data-testid="link-admin" tabIndex={0}><Settings size={16} />Painel</Link>}{user ? <><Link href="/perfil" className="avatar focus-tv" aria-label="Abrir perfil" data-testid="link-profile-avatar" tabIndex={0}>{initials(user)}</Link><button className="icon-button focus-tv" onClick={logout} title="Sair" aria-label="Sair" data-testid="button-logout" tabIndex={0}><LogOut size={17} /></button></> : <Link href="/" className="secondary-button focus-tv" data-testid="link-login" tabIndex={0}><LogIn size={15} />Entrar</Link>}
           </div>
         </div>
       </header>
       <main>{children}</main>
       <nav className="mobile-nav" aria-label="Navegação mobile">
-        {navigation.slice(0, 3).map(({ href, label, icon: Icon }) => <Link key={href} href={href} className="mobile-nav-link focus-tv" aria-current={active(href) ? 'page' : undefined} data-testid={`link-mobile-${label.toLowerCase().replaceAll(' ', '-')}`} tabIndex={0}><Icon size={17} /><span>{label}</span></Link>)}
+        {navigation.slice(0, 3).map(({ href, label, icon: Icon }) => <Link key={href} href={href} className="mobile-nav-link focus-tv" aria-current={active(href) ? 'page' : undefined} data-testid={`link-mobile-${label.toLowerCase().replace(/ /g, '-')}`} tabIndex={0}><Icon size={17} /><span>{label}</span></Link>)}
         <Link href={user ? '/perfil' : '/'} className="mobile-nav-link focus-tv" aria-current={location === '/perfil' ? 'page' : undefined} data-testid="link-mobile-profile" tabIndex={0}><UserRound size={17} /><span>{user ? 'Perfil' : 'Entrar'}</span></Link>
       </nav>
     </div>
@@ -650,7 +649,7 @@ function LiveTVPage() {
 }
 
 // ============================================================================
-// CATÁLOGO PRINCIPAL (O Poder Total de CMS)
+// CATÁLOGO PRINCIPAL (Padrão Nível Premium)
 // ============================================================================
 function CatalogPage() {
   const [, setLocation] = useLocation();
@@ -763,7 +762,6 @@ function CatalogPage() {
   function renderCategoriaSection(item: LayoutItem, key: string) {
     const valorAlvo = normalizeCatalogLabel(item.config?.valor);
     if (!valorAlvo) return null;
-    // Puxa tudo (Filmes e Séries) que bater com a categoria que o admin escolheu no CMS!
     const secaoVideos = videos.filter((video) => !episodioVideoIds.has(video.id) && (normalizeCatalogLabel(video.categoria).includes(valorAlvo) || normalizeCatalogLabel(video.genero).includes(valorAlvo)));
     const secaoSeries = series.filter((serie) => normalizeCatalogLabel(serie.categoria_id).includes(valorAlvo) || normalizeCatalogLabel(serie.genero).includes(valorAlvo));
     
@@ -1062,7 +1060,7 @@ function PlayerPage() {
     // GATILHO INDEPENDENTE 1: Salva a View no banco
     registrarVisualizacao(video.id).catch(() => {});
     
-    // GATILHO INDEPENDENTE 2: Salva o Histórico de Filmes (sem depender da verificação de série)
+    // GATILHO INDEPENDENTE 2: Salva o Histórico de Filmes
     if (user && !video.ao_vivo) {
       salvarProgresso({ video_id: video.id }).catch(() => {});
     }
