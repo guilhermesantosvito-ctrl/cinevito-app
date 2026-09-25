@@ -108,11 +108,8 @@ function useColecoesDoCatalogo() {
     const carregar = () => fetchColecoesParaCatalogo().then((data) => { if (!cancelled) setColecoes(data); }).catch(() => { if (!cancelled) setColecoes([]); });
     carregar();
     const intervalId = window.setInterval(carregar, CATALOG_REFRESH_INTERVAL_MS);
-    
-    // Atualiza catálogo se a pessoa voltar pro app
     const onFocus = () => carregar();
     window.addEventListener('focus', onFocus);
-    
     return () => { cancelled = true; window.clearInterval(intervalId); window.removeEventListener('focus', onFocus); };
   }, []);
   return colecoes;
@@ -212,7 +209,10 @@ function getEmbedInfo(url?: string | null): { type: 'file' | 'embed' | 'none'; s
   if (archive) return { type: 'embed', src: `https://archive.org/embed/${archive[1]}` };
   if (trimmed.includes('archive.org/embed/')) return { type: 'embed', src: trimmed };
   
-  if (/\.(mp4|webm|ogv|m3u8)(\?|$)/i.test(trimmed)) return { type: 'file', src: trimmed };
+  // REGRA ATUALIZADA: Pega .m3u8, .mp4, links IPTV com /m3u8/ no meio, ou arquivos mestre de IPTV terminados em .txt
+  if (/\.(mp4|webm|ogv|m3u8)(\?|$)/i.test(trimmed) || trimmed.includes('/m3u8/') || trimmed.includes('.txt')) {
+    return { type: 'file', src: trimmed };
+  }
   
   return { type: 'embed', src: trimmed };
 }
@@ -472,8 +472,11 @@ function PageHeader({ eyebrow, title, description, action }: { eyebrow: string; 
 function Poster({ video, favorite, onFavorite, onOpen, subtitle }: { video: Video; favorite: boolean; onFavorite: () => void; onOpen: () => void; subtitle?: string }) {
   const tvGradient = { '--poster': 'linear-gradient(145deg, #1e293b, #0f172a 80%)' } as CSSProperties;
   const fallbackGradient = { '--poster': 'linear-gradient(145deg, #0d596c, #172532 50%, #e58d49)' } as CSSProperties;
-  const posterStyle = video.url_capa && !video.ao_vivo ? undefined : (video.ao_vivo ? tvGradient : fallbackGradient);
+  
+  // CORREÇÃO DA CAPA INVISÍVEL NO AO VIVO: Se tem url_capa, usa sempre a url_capa! Só usa gradient se estiver vazio.
+  const posterStyle = video.url_capa ? undefined : (video.ao_vivo ? tvGradient : fallbackGradient);
   const artStyle = video.url_capa ? { backgroundImage: `url(${video.url_capa})`, backgroundSize: video.ao_vivo ? 'contain' : 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' } : undefined;
+  
   return <article className="video-card reveal" data-testid={`card-video-${video.id}`}><div className="poster focus-tv" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen()} style={posterStyle}><div className="poster-art" style={artStyle}><span className="poster-meta">{video.ao_vivo ? 'AO VIVO' : (video.ano || 'CINEVITO')}</span><strong className="poster-word">{video.titulo}</strong></div>{video.premium && <span className="premium-badge">Premium</span>}<button className={`poster-favorite focus-tv ${favorite ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); onFavorite(); }} aria-label={favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'} data-testid={`button-favorite-${video.id}`} tabIndex={0}><Heart size={15} fill={favorite ? 'currentColor' : 'none'} /></button></div><div className="video-info"><div><h3 className="video-title" data-testid={`text-video-title-${video.id}`}>{video.titulo}</h3><p className="video-subtitle">{subtitle || video.genero || video.categoria || 'Catálogo CineVito'}</p></div><Play size={14} color="#00c8ff" /></div></article>;
 }
 
@@ -1074,7 +1077,7 @@ function PlayerPage() {
     // GATILHO INDEPENDENTE: Salva a View no banco
     registrarVisualizacao(video.id).catch(() => {});
     
-    // GATILHO INDEPENDENTE: Salva o Histórico de qualquer vídeo que não seja série
+    // GATILHO INDEPENDENTE: Salva o Histórico apenas com video_id e usuario_id
     if (user && !video.ao_vivo) {
       salvarProgresso({ video_id: video.id }).catch(() => {});
     }
@@ -1088,10 +1091,6 @@ function PlayerPage() {
           setEpisodioInfo(info);
           const lista = await fetchEpisodios(info.episodio.temporada_id);
           if (!cancelled) setEpisodiosDaTemporada(lista);
-          // Atualiza histórico com a info exata da série caso o vídeo seja um episódio
-          if (user) {
-            salvarProgresso({ video_id: video.id }).catch(() => {});
-          }
         } else {
           setEpisodioInfo(null);
           setEpisodiosDaTemporada([]);
