@@ -275,9 +275,9 @@ type InstallStep = { icon: typeof Share2; title: string; description: string };
 function stepsForPlatform(platform: PlataformaInstalacao): InstallStep[] {
   if (platform === 'ios') {
     return [
-      { icon: Share2, title: 'Toque em Compartilhar', description: 'Na barra do Safari, toque no ícone de partilhar.' },
-      { icon: Plus, title: 'Toque em "Adicionar ao Ecrã Principal"', description: 'Desliza a lista de opções e toca nela.' },
-      { icon: Smartphone, title: 'Toque em "Adicionar"', description: 'Confirma para adicionar a app.' },
+      { icon: Share2, title: 'Toque em Partilhar', description: 'Na barra do Safari, toque no ícone de partilhar.' },
+      { icon: Plus, title: 'Toque em "Adicionar ao Ecrã Principal"', description: 'Deslize a lista de opções e toque nela.' },
+      { icon: Smartphone, title: 'Toque em "Adicionar"', description: 'Confirme para adicionar a app.' },
     ];
   }
   return [
@@ -307,10 +307,10 @@ function InstallInstructionsModal({ platform, onClose }: { platform: PlataformaI
           <button onClick={onClose} className="icon-button focus-tv" aria-label="Fechar instruções"><X size={18} /></button>
         </div>
         <p className="muted" style={{ fontSize: '.83rem', marginTop: 6, marginBottom: mostrarBotaoChrome ? 12 : 20 }}>
-          {platform === 'ios' ? 'Leva só alguns segundos.' : 'O teu navegador não suporta instalação direta, mas podes guardar no ecrã inicial com estes passos rápidos:'}
+          {platform === 'ios' ? 'Leva só alguns segundos.' : 'O seu navegador não suporta instalação direta, mas pode guardar no ecrã inicial com estes passos rápidos:'}
         </p>
         {mostrarBotaoChrome && (
-          <div className="notice notice-cyan" style={{ marginBottom: 20 }}><Info size={16} /><span>Não estás no Chrome. <button onClick={abrirNoChrome} style={{ background: 'none', border: 'none', textDecoration: 'underline', color: '#00c8ff', cursor: 'pointer', padding: 0, font: 'inherit' }}>Toca aqui para abrir no Chrome</button>.</span></div>
+          <div className="notice notice-cyan" style={{ marginBottom: 20 }}><Info size={16} /><span>Não está no Chrome. <button onClick={abrirNoChrome} style={{ background: 'none', border: 'none', textDecoration: 'underline', color: '#00c8ff', cursor: 'pointer', padding: 0, font: 'inherit' }}>Toque aqui para abrir no Chrome</button>.</span></div>
         )}
         <div style={{ display: 'grid', gap: 16 }}>
           {steps.map((step, index) => (
@@ -472,7 +472,7 @@ function PageHeader({ eyebrow, title, description, action }: { eyebrow: string; 
 function Poster({ video, favorite, onFavorite, onOpen, subtitle }: { video: Video; favorite: boolean; onFavorite: () => void; onOpen: () => void; subtitle?: string }) {
   const tvGradient = { '--poster': 'linear-gradient(145deg, #1e293b, #0f172a 80%)' } as CSSProperties;
   const fallbackGradient = { '--poster': 'linear-gradient(145deg, #0d596c, #172532 50%, #e58d49)' } as CSSProperties;
-  const posterStyle = video.url_capa && !video.ao_vivo ? undefined : (video.ao_vivo ? tvGradient : fallbackGradient);
+  const posterStyle = video.url_capa ? undefined : (video.ao_vivo ? tvGradient : fallbackGradient);
   const artStyle = video.url_capa ? { backgroundImage: `url(${video.url_capa})`, backgroundSize: video.ao_vivo ? 'contain' : 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' } : undefined;
   return <article className="video-card reveal" data-testid={`card-video-${video.id}`}><div className="poster focus-tv" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen()} style={posterStyle}><div className="poster-art" style={artStyle}><span className="poster-meta">{video.ao_vivo ? 'AO VIVO' : (video.ano || 'CINEVITO')}</span><strong className="poster-word">{video.titulo}</strong></div>{video.premium && <span className="premium-badge">Premium</span>}<button className={`poster-favorite focus-tv ${favorite ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); onFavorite(); }} aria-label={favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'} data-testid={`button-favorite-${video.id}`} tabIndex={0}><Heart size={15} fill={favorite ? 'currentColor' : 'none'} /></button></div><div className="video-info"><div><h3 className="video-title" data-testid={`text-video-title-${video.id}`}>{video.titulo}</h3><p className="video-subtitle">{subtitle || video.genero || video.categoria || 'Catálogo CineVito'}</p></div><Play size={14} color="#00c8ff" /></div></article>;
 }
@@ -663,7 +663,7 @@ function LiveTVPage() {
 }
 
 // ============================================================================
-// CATÁLOGO PRINCIPAL (Padrão Nível Premium com Memória de Sessão)
+// CATÁLOGO PRINCIPAL
 // ============================================================================
 function CatalogPage() {
   const [, setLocation] = useLocation();
@@ -676,7 +676,6 @@ function CatalogPage() {
   const episodioVideoIds = useEpisodioVideoIds();
   const { items: continuarAssistindo, recarregar: recarregarContinuar } = useContinuarAssistindo(user);
   
-  // Memória de sessão para lembrar de onde o utilizador veio
   const [shelf, setShelf] = useState(() => sessionStorage.getItem('cinevito-catalog-shelf') || 'Início');
   const [genre, setGenre] = useState(() => sessionStorage.getItem('cinevito-catalog-genre') || 'Por Gênero');
   const [query, setQuery] = useState(() => sessionStorage.getItem('cinevito-catalog-query') || '');
@@ -823,7 +822,7 @@ function CatalogPage() {
           </section>
         )}
         {filteredVideos.length === 0 && filteredSeries.length === 0 && (
-          <div className="empty-state"><Search size={25} /><h3>Nenhum resultado encontrado</h3><button className="quiet-button focus-tv" onClick={() => setQuery('')} tabIndex={0}>Limpar pesquisa</button></div>
+          <div className="empty-state"><Search size={25} /><h3>Nenhum resultado encontrado</h3><button className="quiet-button focus-tv" onClick={() => setQuery('')} tabIndex={0}>Limpar procura</button></div>
         )}
       </>
     );
@@ -921,7 +920,7 @@ function CatalogPage() {
     
     <div className="catalog-toolbar"><div className="search-wrap"><Search size={16} /><input className="input focus-tv" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Procurar no catálogo" aria-label="Buscar no catálogo" data-testid="input-search-catalog" tabIndex={0} /></div><Link href="/colecao" className="secondary-button focus-tv" data-testid="link-open-collection" tabIndex={0}><Heart size={15} />A minha coleção</Link></div>
     
-    {/* MENU SUPERIOR PREMIUM: Início, Filmes, Séries */}
+    {/* MENU SUPERIOR PREMIUM */}
     <div className="chip-row horizontal-scroll" role="tablist">
       {MAIN_TABS.map((item) => <button key={item} className={`chip focus-tv ${shelf === item ? 'active' : ''}`} onClick={() => { setShelf(item); setGenre('Por Gênero'); setQuery(''); }} role="tab" aria-selected={shelf === item} tabIndex={0}>{item}</button>)}
     </div>
@@ -981,7 +980,7 @@ function CatalogPage() {
 }
 
 // ============================================================================
-// COMPONENTE DO PLAYER (Com escudos e tratamento de erro de servidor pirata)
+// COMPONENTE DO PLAYER (Proteções Responsivas e Alerta de Bloqueio)
 // ============================================================================
 function VideoPlayer({ embed, title }: { embed: { type: string, src: string }, title?: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -1009,6 +1008,9 @@ function VideoPlayer({ embed, title }: { embed: { type: string, src: string }, t
     if (!video || embed.type !== 'file' || !embed.src) return;
 
     let hls: any = null;
+    setHlsError('');
+    
+    // REGRA DE DETEÇÃO HLS
     const isM3U8 = embed.src.toLowerCase().includes('.m3u8') || embed.src.toLowerCase().includes('/m3u8/') || embed.src.toLowerCase().includes('.txt');
 
     if (!isM3U8) { video.src = embed.src; video.play().catch(() => {}); return; }
@@ -1027,7 +1029,7 @@ function VideoPlayer({ embed, title }: { embed: { type: string, src: string }, t
         hls.on(Hls.Events.ERROR, (event: any, data: any) => {
           if (data.fatal) {
             if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-              setHlsError('Bloqueado pelo servidor. Tenta usar o link de Iframe/Embed deste filme no painel.');
+              setHlsError('Erro ao carregar o vídeo. Por favor, contacte o suporte.');
               hls.destroy();
             } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
               hls.recoverMediaError();
@@ -1044,8 +1046,13 @@ function VideoPlayer({ embed, title }: { embed: { type: string, src: string }, t
   if (embed.type === 'embed') {
     return (
       <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+        {/* ESCUDO TOPO: Bloqueia links de direcionamento e título */}
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '60px', zIndex: 10 }} title="Cabeçalho protegido" />
+        
+        {/* ESCUDO INFERIOR: Cobre do Chromecast à Logo. 
+            Deixa os últimos 135px (Engrenagem, Mini-player nativo e Fullscreen) totalmente livres! */}
         <div style={{ position: 'absolute', bottom: 0, right: '135px', width: '250px', height: '50px', zIndex: 10 }} title="Controlos protegidos" />
+        
         <iframe src={embed.src} title={title} allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowFullScreen style={{ width: '100%', height: '100%', border: 0 }} data-testid="video-player" />
       </div>
     );
@@ -1056,15 +1063,15 @@ function VideoPlayer({ embed, title }: { embed: { type: string, src: string }, t
       return (
         <div className="player-idle" style={{ color: '#ff8275' }}>
           <CircleAlert size={38} />
-          <strong>Erro de Conexão</strong>
-          <span style={{ maxWidth: 400, textAlign: 'center' }}>{hlsError}</span>
+          <strong style={{ marginTop: 8 }}>Erro de Ligação</strong>
+          <span style={{ maxWidth: 400, textAlign: 'center', marginTop: 4 }}>{hlsError}</span>
         </div>
       );
     }
     return <video ref={videoRef} controls autoPlay muted playsInline poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-testid="video-player" style={{ width: '100%', height: '100%', backgroundColor: '#000' }} />;
   }
 
-  return <div className="player-idle"><Play size={38} /><strong>Pronto para assistir</strong><span>Este título ainda não tem um link de vídeo cadastrado.</span></div>;
+  return <div className="player-idle"><Play size={38} /><strong>Pronto para assistir</strong><span>Este título ainda não tem um link de vídeo registado.</span></div>;
 }
 
 function PlayerPage() {
@@ -1078,7 +1085,7 @@ function PlayerPage() {
     if (access === false) setLocation('/assinatura');
   }, [access, setLocation]);
 
-  const video = videos.find((v) => v.id === (params.id || new URLSearchParams(window.location.search).get('id') || ''));
+  const video = findVideo(videos, params.id || new URLSearchParams(window.location.search).get('id') || '');
   const [saved, setSaved] = useState(() => JSON.parse(localStorage.getItem('cinevito-favorites') || '[]').includes(video?.id));
   const [episodioInfo, setEpisodioInfo] = useState<{ episodio: Episodio; serieId: string; proximo?: Episodio } | null>(null);
   const [episodiosDaTemporada, setEpisodiosDaTemporada] = useState<Episodio[]>([]);
@@ -1087,9 +1094,10 @@ function PlayerPage() {
     if (!video || access !== true) return;
     let cancelled = false;
     
+    // GATILHO INDEPENDENTE: Salva a View
     registrarVisualizacao(video.id).catch(() => {});
     
-    // GATILHO INDEPENDENTE: Histórico para filmes
+    // GATILHO INDEPENDENTE: Histórico
     if (user && !video.ao_vivo) {
       salvarProgresso({ video_id: video.id }).catch(() => {});
     }
@@ -1103,7 +1111,6 @@ function PlayerPage() {
           setEpisodioInfo(info);
           const lista = await fetchEpisodios(info.episodio.temporada_id);
           if (!cancelled) setEpisodiosDaTemporada(lista);
-          // Atualiza histórico com a info de série
           if (user) {
             salvarProgresso({ video_id: video.id, serie_id: info.serieId, temporada_id: info.episodio.temporada_id, numero_episodio: info.episodio.numero }).catch(() => {});
           }
@@ -1126,7 +1133,6 @@ function PlayerPage() {
     setSaved(!saved);
   }
 
-  // --- LÓGICA DE VOLTAR INTELIGENTE ---
   function handleBack() {
     if (window.history.length > 2) {
       window.history.back();
@@ -1206,8 +1212,8 @@ function SeriePage() {
     <button className="quiet-button focus-tv" onClick={handleBack} tabIndex={0}><ArrowLeft size={16} />Voltar</button>
     <PageHeader eyebrow="Série" title={data.serie.titulo} description={data.serie.descricao || undefined} />
     {data.temporadas.length > 0 && <div className="chip-row horizontal-scroll" role="tablist">{data.temporadas.map((item, index) => <button key={item.temporada.id} className={'chip focus-tv ' + (activeTemporada === index ? 'active' : '')} onClick={() => setActiveTemporada(index)} role="tab" aria-selected={activeTemporada === index} tabIndex={0}>{item.temporada.titulo || `Temporada ${item.temporada.numero}`}</button>)}</div>}
-    {atual && <div className="admin-list" style={{ marginTop: 18 }}>{atual.episodios.length ? atual.episodios.map((ep) => <div className="result-row" key={ep.id} role="button" tabIndex={0} onClick={() => openEpisodio(ep.video_id)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && openEpisodio(ep.video_id)} style={{ cursor: 'pointer' }}><span><strong>Ep. {ep.numero}</strong> — {ep.titulo || ep.videos?.titulo}</span><Play size={16} color="#00c8ff" /></div>) : <p className="muted">Nenhum episódio cadastrado nesta temporada ainda.</p>}</div>}
-    {!data.temporadas.length && <p className="muted" style={{ marginTop: 18 }}>Nenhuma temporada cadastrada ainda.</p>}
+    {atual && <div className="admin-list" style={{ marginTop: 18 }}>{atual.episodios.length ? atual.episodios.map((ep) => <div className="result-row" key={ep.id} role="button" tabIndex={0} onClick={() => openEpisodio(ep.video_id)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && openEpisodio(ep.video_id)} style={{ cursor: 'pointer' }}><span><strong>Ep. {ep.numero}</strong> — {ep.titulo || ep.videos?.titulo}</span><Play size={16} color="#00c8ff" /></div>) : <p className="muted">Nenhum episódio registado nesta temporada ainda.</p>}</div>}
+    {!data.temporadas.length && <p className="muted" style={{ marginTop: 18 }}>Nenhuma temporada registada ainda.</p>}
   </div>;
 }
 
