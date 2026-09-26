@@ -184,6 +184,17 @@ function getEmbedInfo(url?: string | null): { type: 'file' | 'embed' | 'none'; s
   if (!url) return { type: 'none', src: '' };
   const trimmed = url.trim();
 
+  // === O ATALHO MÁGICO (ENGENHARIA REVERSA DE IPTV/BRSTREAM) ===
+  // Interceta links que contenham brstream.cc e um ID e converte-os no Iframe Oficial
+  if (trimmed.includes('brstream') && trimmed.includes('id=')) {
+    const idMatch = trimmed.match(/id=(\d+)/);
+    if (idMatch) {
+      // O padrão para Iframe oficial geralmente é /v/ID ou /e/ID
+      return { type: 'embed', src: `https://watch.brstream.cc/v/${idMatch[1]}` };
+    }
+  }
+
+  // Restantes conversores automáticos
   if (trimmed.includes('mixdrop') || trimmed.includes('miixdrop')) {
     const mixMatch = trimmed.match(/(?:mixdrop|miixdrop)\.(?:top|to|club|co|sx|bz)\/(?:f|e|e6)\/([a-zA-Z0-9_-]+)/);
     if (mixMatch) return { type: 'embed', src: `https://mixdrop.top/e/${mixMatch[1]}` };
@@ -209,7 +220,6 @@ function getEmbedInfo(url?: string | null): { type: 'file' | 'embed' | 'none'; s
   if (archive) return { type: 'embed', src: `https://archive.org/embed/${archive[1]}` };
   if (trimmed.includes('archive.org/embed/')) return { type: 'embed', src: trimmed };
   
-  // REGRA ATUALIZADA: Pega .m3u8, .mp4, links IPTV com /m3u8/ no meio, ou ficheiros mestre de IPTV terminados em .txt
   if (/\.(mp4|webm|ogv|m3u8)(\?|$)/i.test(trimmed) || trimmed.includes('/m3u8/') || trimmed.includes('.txt')) {
     return { type: 'file', src: trimmed };
   }
@@ -663,7 +673,7 @@ function LiveTVPage() {
 }
 
 // ============================================================================
-// CATÁLOGO PRINCIPAL
+// CATÁLOGO PRINCIPAL (Padrão Nível Premium)
 // ============================================================================
 function CatalogPage() {
   const [, setLocation] = useLocation();
@@ -1094,7 +1104,7 @@ function PlayerPage() {
     if (!video || access !== true) return;
     let cancelled = false;
     
-    // GATILHO INDEPENDENTE: Salva a View
+    // GATILHO INDEPENDENTE: Salva a View no banco
     registrarVisualizacao(video.id).catch(() => {});
     
     // GATILHO INDEPENDENTE: Histórico
