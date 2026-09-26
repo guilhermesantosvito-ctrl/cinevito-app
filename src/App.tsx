@@ -184,17 +184,9 @@ function getEmbedInfo(url?: string | null): { type: 'file' | 'embed' | 'none'; s
   if (!url) return { type: 'none', src: '' };
   const trimmed = url.trim();
 
-  // === O ATALHO MÁGICO (ENGENHARIA REVERSA DE IPTV/BRSTREAM) ===
-  // Interceta links que contenham brstream.cc e um ID e converte-os no Iframe Oficial
-  if (trimmed.includes('brstream') && trimmed.includes('id=')) {
-    const idMatch = trimmed.match(/id=(\d+)/);
-    if (idMatch) {
-      // O padrão para Iframe oficial geralmente é /v/ID ou /e/ID
-      return { type: 'embed', src: `https://watch.brstream.cc/v/${idMatch[1]}` };
-    }
-  }
+  // REMOVIDO: O atalho para o brstream.cc foi removido porque eles bloqueiam Iframes via X-Frame-Options.
+  // A tentativa de usar Iframe forçava a "tela preta silenciosa". O fallback agora cairá no `hls.js` que capturará o erro.
 
-  // Restantes conversores automáticos
   if (trimmed.includes('mixdrop') || trimmed.includes('miixdrop')) {
     const mixMatch = trimmed.match(/(?:mixdrop|miixdrop)\.(?:top|to|club|co|sx|bz)\/(?:f|e|e6)\/([a-zA-Z0-9_-]+)/);
     if (mixMatch) return { type: 'embed', src: `https://mixdrop.top/e/${mixMatch[1]}` };
@@ -673,7 +665,7 @@ function LiveTVPage() {
 }
 
 // ============================================================================
-// CATÁLOGO PRINCIPAL (Padrão Nível Premium)
+// CATÁLOGO PRINCIPAL
 // ============================================================================
 function CatalogPage() {
   const [, setLocation] = useLocation();
@@ -990,7 +982,7 @@ function CatalogPage() {
 }
 
 // ============================================================================
-// COMPONENTE DO PLAYER (Proteções Responsivas e Alerta de Bloqueio)
+// COMPONENTE DO PLAYER (Captura de Erro CORS Limpa)
 // ============================================================================
 function VideoPlayer({ embed, title }: { embed: { type: string, src: string }, title?: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -1020,7 +1012,6 @@ function VideoPlayer({ embed, title }: { embed: { type: string, src: string }, t
     let hls: any = null;
     setHlsError('');
     
-    // REGRA DE DETEÇÃO HLS
     const isM3U8 = embed.src.toLowerCase().includes('.m3u8') || embed.src.toLowerCase().includes('/m3u8/') || embed.src.toLowerCase().includes('.txt');
 
     if (!isM3U8) { video.src = embed.src; video.play().catch(() => {}); return; }
@@ -1071,14 +1062,13 @@ function VideoPlayer({ embed, title }: { embed: { type: string, src: string }, t
   if (embed.type === 'file') {
     if (hlsError) {
       return (
-        <div className="player-idle" style={{ color: '#ff8275' }}>
-          <CircleAlert size={38} />
-          <strong style={{ marginTop: 8 }}>Erro de Ligação</strong>
-          <span style={{ maxWidth: 400, textAlign: 'center', marginTop: 4 }}>{hlsError}</span>
+        <div className="player-idle" style={{ color: '#ff8275', textAlign: 'center', padding: '0 20px' }}>
+          <CircleAlert size={48} style={{ marginBottom: 12 }} />
+          <strong>{hlsError}</strong>
         </div>
       );
     }
-    return <video ref={videoRef} controls autoPlay muted playsInline poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-testid="video-player" style={{ width: '100%', height: '100%', backgroundColor: '#000' }} />;
+    return <video ref={videoRef} controls autoPlay muted playsInline poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-testid="video-player" style={{ width: '100%', height: '100%', backgroundColor: '#000' }} onError={() => setHlsError('Erro ao carregar o vídeo. Por favor, contacte o suporte.')} />;
   }
 
   return <div className="player-idle"><Play size={38} /><strong>Pronto para assistir</strong><span>Este título ainda não tem um link de vídeo registado.</span></div>;
@@ -1104,10 +1094,8 @@ function PlayerPage() {
     if (!video || access !== true) return;
     let cancelled = false;
     
-    // GATILHO INDEPENDENTE: Salva a View no banco
     registrarVisualizacao(video.id).catch(() => {});
     
-    // GATILHO INDEPENDENTE: Histórico
     if (user && !video.ao_vivo) {
       salvarProgresso({ video_id: video.id }).catch(() => {});
     }
