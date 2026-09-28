@@ -86,7 +86,6 @@ function useAuth() {
   return user;
 }
 
-// LOGICA ATUALIZADA DO MODO LIVRE
 function useCatalogAccess(user: SessionUser | null) {
   const [access, setAccess] = useState<boolean | null>(null);
   
@@ -94,13 +93,11 @@ function useCatalogAccess(user: SessionUser | null) {
     let cancelled = false;
     
     const checkAccess = () => {
-      // 1. Verifica se o "Modo Livre" está ativado globalmente pelo Administrador
       if (localStorage.getItem('cinevito_modo_livre') === 'true') {
         if (!cancelled) setAccess(true);
         return;
       }
       
-      // 2. Se não estiver no modo livre, verifica a conta do utilizador
       if (!user) { 
         if (!cancelled) setAccess(false); 
         return; 
@@ -113,7 +110,6 @@ function useCatalogAccess(user: SessionUser | null) {
     
     checkAccess();
     
-    // Recalcula o acesso caso o admin ative/desative o botão
     const handler = () => checkAccess();
     window.addEventListener('cinevito-auth-change', handler);
     
@@ -1432,14 +1428,15 @@ function FaqPage() {
 function AdminPage() {
   const user = useAuth(); const [profile, setProfile] = useState<{ is_admin?: boolean; admin_master?: boolean } | null>(null); const [tab, setTab] = useState('videos'); const [loading, setLoading] = useState(Boolean(user && hasRuntimeConfig)); const [message, setMessage] = useState('');
   
-  // ESTADO DO MODO LIVRE GLOBAL (Fora do formulário de planos)
+  // ESTADO DO MODO LIVRE GLOBAL
   const [modoLivre, setModoLivre] = useState(() => localStorage.getItem('cinevito_modo_livre') === 'true');
+  const [adminPlanCat, setAdminPlanCat] = useState('');
 
   function toggleModoLivre(ativo: boolean) {
     setModoLivre(ativo);
     localStorage.setItem('cinevito_modo_livre', String(ativo));
     window.dispatchEvent(new Event('cinevito-auth-change'));
-    setMessage(ativo ? 'Modo Livre Ativado! Catálogo agora é gratuito para todos.' : 'Planos reativados! Exigência de assinatura ligada.');
+    setMessage(ativo ? 'Modo Livre Ativado! Catálogo gratuito para todos.' : 'Planos reativados! Exigência de assinatura ligada.');
   }
 
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -1801,21 +1798,6 @@ function AdminPage() {
       </div>
       {message && <div className="notice notice-orange" role="status">{message}</div>}
 
-      {/* MODO LIVRE GLOBAL - SEPARADO DA ABA DOS PLANOS PARA NÃO MODIFICAR O LAYOUT */}
-      {profile.admin_master && (
-        <div className="status-card" style={{ marginBottom: 24, padding: 16, border: '1px solid rgba(0, 200, 255, 0.3)', borderRadius: 8, background: 'rgba(0, 200, 255, 0.05)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-            <div>
-              <h3 style={{ color: '#00c8ff', margin: 0 }}>Modo Catálogo Livre (Acesso Geral)</h3>
-              <p className="muted" style={{ fontSize: '.85rem', marginTop: 4, marginBottom: 0 }}>Pausa a exigência de assinatura e liberta os vídeos gratuitamente para todos.</p>
-            </div>
-            <button className={modoLivre ? "primary-button focus-tv" : "secondary-button focus-tv"} onClick={() => toggleModoLivre(!modoLivre)} tabIndex={0}>
-              {modoLivre ? 'Desativar (Exigir Plano)' : 'Ativar (Tudo Grátis)'}
-            </button>
-          </div>
-        </div>
-      )}
-
       {tab === 'videos' && (
         <section className="panel panel-pad">
           <div className="eyebrow">Catálogo manual</div><h2 className="panel-title" style={{ marginTop: 8 }}>{editingVideoId ? 'Editar vídeo' : 'Adicionar vídeo'}</h2>
@@ -1985,20 +1967,68 @@ function AdminPage() {
         </section>
       )}
 
-      {tab === 'planos' && (
-        <section className="panel panel-pad">
-          <div className="eyebrow">Financeiro</div><h2 className="panel-title" style={{ marginTop: 8 }}>Planos de Assinatura</h2>
-          <div className="field"><label>Nome do Plano</label><input className="input focus-tv" value={planoForm.nome} onChange={(e) => setPlanoForm({ ...planoForm, nome: e.target.value })} placeholder="Ex.: Plano Família" tabIndex={0} /></div>
-          <div className="field"><label>Categoria (agrupa botões)</label><input className="input focus-tv" value={planoForm.categoria} onChange={(e) => setPlanoForm({ ...planoForm, categoria: e.target.value })} placeholder="Ex.: Mensal" tabIndex={0} /></div>
-          <div className="field"><label>Descrição curta</label><input className="input focus-tv" value={planoForm.descricao} onChange={(e) => setPlanoForm({ ...planoForm, descricao: e.target.value })} placeholder="Ex.: 4 telas em simultâneo" tabIndex={0} /></div>
-          <div className="field"><label>Preço (R$)</label><input type="number" step="0.01" className="input focus-tv" value={planoForm.preco} onChange={(e) => setPlanoForm({ ...planoForm, preco: e.target.value })} placeholder="Ex.: 29.90" tabIndex={0} /></div>
-          <div className="field"><label>Dispositivos</label><input type="number" className="input focus-tv" value={planoForm.dispositivos} onChange={(e) => setPlanoForm({ ...planoForm, dispositivos: e.target.value })} tabIndex={0} /></div>
-          <div className="field"><label>Duração do Acesso</label><div style={{ display: 'flex', gap: 8 }}><input type="number" className="input focus-tv" value={planoForm.duracaoQtd} onChange={(e) => setPlanoForm({ ...planoForm, duracaoQtd: e.target.value })} style={{ width: 80 }} tabIndex={0} /><select className="input focus-tv" value={planoForm.duracaoUnidade} onChange={(e) => setPlanoForm({ ...planoForm, duracaoUnidade: e.target.value as 'dias' | 'meses' })} tabIndex={0}><option value="dias">Dias</option><option value="meses">Meses</option></select></div></div>
-          <button className="primary-button focus-tv" onClick={savePlano} disabled={savingPlano} tabIndex={0}>{savingPlano ? 'A guardar...' : editingPlanoId ? 'Guardar Plano' : 'Criar Plano'}</button>
-          {editingPlanoId && <button className="quiet-button focus-tv" style={{ marginLeft: 10 }} onClick={resetPlanoForm} tabIndex={0}>Cancelar</button>}
-          <div className="admin-list" style={{ marginTop: 24 }}>{plans.map((p) => <div className="result-row" key={p.id}><span><strong>{p.nome}</strong> — R$ {p.preco} <span className="muted">({p.ativo ? 'Ativo' : 'Inativo'})</span></span><span style={{ display: 'flex', gap: 8 }}><button className="quiet-button focus-tv" onClick={() => togglePlan(p)} tabIndex={0}>{p.ativo ? 'Ocultar' : 'Mostrar'}</button><button className="quiet-button focus-tv" onClick={() => editPlano(p)} tabIndex={0}>Editar</button><button className="quiet-button focus-tv" onClick={() => deletePlanoHandler(p.id)} style={{ color: '#ff8275' }} tabIndex={0}>Apagar</button></span></div>)}</div>
-        </section>
-      )}
+      {tab === 'planos' && (() => {
+        // Separa as categorias de planos de forma automática
+        const adminPlanCategories = Array.from(new Set(plans.map((p) => p.categoria || 'Plano')));
+        const activeCat = adminPlanCat || adminPlanCategories[0] || '';
+
+        return (
+          <section className="panel panel-pad">
+            <div className="eyebrow">Financeiro</div><h2 className="panel-title" style={{ marginTop: 8 }}>Planos de Assinatura</h2>
+            
+            {/* BOTÃO MODO LIVRE AQUI (Sem interferir no formulário dos planos) */}
+            {profile.admin_master && (
+              <div className="status-card" style={{ marginBottom: 24, padding: 16, border: '1px solid rgba(0, 200, 255, 0.3)', borderRadius: 8, background: 'rgba(0, 200, 255, 0.05)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                  <div>
+                    <h3 style={{ color: '#00c8ff', margin: 0 }}>Modo Catálogo Livre (Acesso Geral)</h3>
+                    <p className="muted" style={{ fontSize: '.85rem', marginTop: 4, marginBottom: 0 }}>Pausa a exigência de assinatura e liberta os vídeos gratuitamente para todos.</p>
+                  </div>
+                  <button className={modoLivre ? "primary-button focus-tv" : "secondary-button focus-tv"} onClick={() => toggleModoLivre(!modoLivre)} tabIndex={0}>
+                    {modoLivre ? 'Desativar (Exigir Plano)' : 'Ativar (Tudo Grátis)'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* FORMULÁRIO DE CRIAR/EDITAR PLANOS FICA EXATAMENTE COMO ESTAVA */}
+            <h3 style={{ marginBottom: 12 }}>{editingPlanoId ? 'Editar Plano' : 'Criar Novo Plano'}</h3>
+            <div className="field"><label>Nome do Plano</label><input className="input focus-tv" value={planoForm.nome} onChange={(e) => setPlanoForm({ ...planoForm, nome: e.target.value })} placeholder="Ex.: Plano Família" tabIndex={0} /></div>
+            <div className="field"><label>Categoria (agrupa botões)</label><input className="input focus-tv" value={planoForm.categoria} onChange={(e) => setPlanoForm({ ...planoForm, categoria: e.target.value })} placeholder="Ex.: Mensal" tabIndex={0} /></div>
+            <div className="field"><label>Descrição curta</label><input className="input focus-tv" value={planoForm.descricao} onChange={(e) => setPlanoForm({ ...planoForm, descricao: e.target.value })} placeholder="Ex.: 4 telas em simultâneo" tabIndex={0} /></div>
+            <div className="field"><label>Preço (R$)</label><input type="number" step="0.01" className="input focus-tv" value={planoForm.preco} onChange={(e) => setPlanoForm({ ...planoForm, preco: e.target.value })} placeholder="Ex.: 29.90" tabIndex={0} /></div>
+            <div className="field"><label>Dispositivos</label><input type="number" className="input focus-tv" value={planoForm.dispositivos} onChange={(e) => setPlanoForm({ ...planoForm, dispositivos: e.target.value })} tabIndex={0} /></div>
+            <div className="field"><label>Duração do Acesso</label><div style={{ display: 'flex', gap: 8 }}><input type="number" className="input focus-tv" value={planoForm.duracaoQtd} onChange={(e) => setPlanoForm({ ...planoForm, duracaoQtd: e.target.value })} style={{ width: 80 }} tabIndex={0} /><select className="input focus-tv" value={planoForm.duracaoUnidade} onChange={(e) => setPlanoForm({ ...planoForm, duracaoUnidade: e.target.value as 'dias' | 'meses' })} tabIndex={0}><option value="dias">Dias</option><option value="meses">Meses</option></select></div></div>
+            <button className="primary-button focus-tv" onClick={savePlano} disabled={savingPlano} tabIndex={0}>{savingPlano ? 'A guardar...' : editingPlanoId ? 'Guardar Plano' : 'Criar Plano'}</button>
+            {editingPlanoId && <button className="quiet-button focus-tv" style={{ marginLeft: 10 }} onClick={resetPlanoForm} tabIndex={0}>Cancelar</button>}
+            
+            {/* LISTA DE PLANOS DO ADMIN AGORA SEPARADA POR ABAS IGUAL AO DO CLIENTE */}
+            <div style={{ marginTop: 32 }}>
+              <h3 style={{ marginBottom: 16 }}>Planos Publicados</h3>
+              {adminPlanCategories.length > 0 && (
+                <div className="chip-row horizontal-scroll" role="tablist" style={{ marginBottom: 16 }}>
+                  {adminPlanCategories.map((item) => (
+                    <button key={item} className={'chip focus-tv ' + (activeCat === item ? 'active' : '')} onClick={() => setAdminPlanCat(item)} role="tab" aria-selected={activeCat === item} tabIndex={0}>{item}</button>
+                  ))}
+                </div>
+              )}
+              <div className="admin-list">
+                {plans.filter(p => (p.categoria || 'Plano') === activeCat).map((p) => (
+                  <div className="result-row" key={p.id}>
+                    <span><strong>{p.nome}</strong> — R$ {p.preco} <span className="muted">({p.ativo ? 'Ativo' : 'Inativo'})</span></span>
+                    <span style={{ display: 'flex', gap: 8 }}>
+                      <button className="quiet-button focus-tv" onClick={() => togglePlan(p)} tabIndex={0}>{p.ativo ? 'Ocultar' : 'Mostrar'}</button>
+                      <button className="quiet-button focus-tv" onClick={() => { editPlano(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }} tabIndex={0}>Editar</button>
+                      <button className="quiet-button focus-tv" onClick={() => deletePlanoHandler(p.id)} style={{ color: '#ff8275' }} tabIndex={0}>Apagar</button>
+                    </span>
+                  </div>
+                ))}
+                {plans.filter(p => (p.categoria || 'Plano') === activeCat).length === 0 && <p className="muted">Nenhum plano nesta categoria.</p>}
+              </div>
+            </div>
+          </section>
+        );
+      })()}
 
       {tab === 'equipe' && (
         <section className="panel panel-pad">
