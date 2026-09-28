@@ -14,7 +14,7 @@ import {
   adminAddEpisodio, adminAddToEquipe, adminAddVideoToColecao, adminCreateCategoria, adminCreateColecao, adminCreateCupom, adminCreateGenero, adminCreateLayoutSection, adminCreatePlano, adminCreateSerie, adminCreateTemporada, adminCreateVideo,
   adminDeleteColecao, adminDeleteCupom, adminDeleteLayoutSection, adminDeletePlano, adminDeleteSerie, adminDeleteTemporada, adminDeleteVideo, adminPromoverMaster, adminRebaixarMaster, adminRemoveEpisodio, adminRemoveVideoFromColecao, adminRemoverDaEquipe, adminReorderColecaoVideos, adminReorderLayout, adminToggleCupom, adminToggleLayoutVisible, adminUpdateLayoutSection, adminUpdatePlano, adminUpdateVideo,
   checkCatalogAccess, clearSession, fetchAdminClients, fetchAdminCupons, fetchAdminPlans, fetchAdminVideos, fetchCategorias, fetchCatalogoLayout, fetchCatalogoLayoutPublico, fetchColecaoVideos, fetchColecoes, fetchColecoesParaCatalogo, fetchContinuarAssistindo, fetchEpisodioInfo, fetchEpisodioVideoIds, fetchEpisodios, fetchEquipe, fetchGenerosList, fetchMySubscription, fetchPlans, fetchProfile, fetchSerieCompleta, fetchSeries, fetchTemporadas, fetchVideos, getAccessToken, getStoredUser, grantAccess, hasRuntimeConfig,
-  processPayment, requestPasswordReset, revokeAccess, salvarProgresso, signIn, signUp, submitSuggestion, updatePlanActive, registrarVisualizacao, removeContinuarAssistindo, type Categoria, type Cliente, type Colecao, type ContinuarAssistindoItem, type Cupom, type Episodio, type Equipe, type Genero, type LayoutItem, type LayoutSectionConfig, type MinhaAssinatura, type Plan, type SessionUser, type Serie, type Temporada, type Video,
+  processPayment, requestPasswordReset, revokeAccess, salvarProgresso, signIn, signUp, submitSuggestion, updatePlanActive, registrarVisualizacao, removeContinuarAssistindo, getModoLivre, setModoLivreDB, type Categoria, type Cliente, type Colecao, type ContinuarAssistindoItem, type Cupom, type Episodio, type Equipe, type Genero, type LayoutItem, type LayoutSectionConfig, type MinhaAssinatura, type Plan, type SessionUser, type Serie, type Temporada, type Video,
 } from '@/lib/cinevito-client';
 
 import { UserUploadPage } from './pages/user-upload';
@@ -86,16 +86,24 @@ function useAuth() {
   return user;
 }
 
+// LÓGICA ATUALIZADA DO MODO LIVRE (Verifica na base de dados)
 function useCatalogAccess(user: SessionUser | null) {
   const [access, setAccess] = useState<boolean | null>(null);
   
   useEffect(() => {
     let cancelled = false;
     
-    const checkAccess = () => {
-      if (localStorage.getItem('cinevito_modo_livre') === 'true') {
-        if (!cancelled) setAccess(true);
-        return;
+    const checkAccess = async () => {
+      if (hasRuntimeConfig) {
+        try {
+          const isLivre = await getModoLivre();
+          if (isLivre) {
+            if (!cancelled) setAccess(true);
+            return;
+          }
+        } catch (e) {
+          // Continua para a verificação normal se falhar
+        }
       }
       
       if (!user) { 
@@ -436,7 +444,7 @@ function AuthPage() {
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError(''); setNotice('');
-    if (!form.email || !form.password || (mode === 'signup' && !form.nome)) { setError('Preencha os campos obrigatórios para continuar.'); return; }
+    if (!form.email || !form.password || (mode === 'signup' && !form.nome)) { setError('Preencha os campos obrigatórios para continue.'); return; }
     setBusy(true);
     try {
       if (mode === 'login') {
@@ -1428,15 +1436,25 @@ function FaqPage() {
 function AdminPage() {
   const user = useAuth(); const [profile, setProfile] = useState<{ is_admin?: boolean; admin_master?: boolean } | null>(null); const [tab, setTab] = useState('videos'); const [loading, setLoading] = useState(Boolean(user && hasRuntimeConfig)); const [message, setMessage] = useState('');
   
-  // ESTADO DO MODO LIVRE GLOBAL
-  const [modoLivre, setModoLivre] = useState(() => localStorage.getItem('cinevito_modo_livre') === 'true');
+  // MODO LIVRE: BUSCA O ESTADO INICIAL DA BASE DE DADOS
+  const [modoLivre, setModoLivre] = useState(false);
   const [adminPlanCat, setAdminPlanCat] = useState('');
 
-  function toggleModoLivre(ativo: boolean) {
-    setModoLivre(ativo);
-    localStorage.setItem('cinevito_modo_livre', String(ativo));
-    window.dispatchEvent(new Event('cinevito-auth-change'));
-    setMessage(ativo ? 'Modo Livre Ativado! Catálogo gratuito para todos.' : 'Planos reativados! Exigência de assinatura ligada.');
+  useEffect(() => {
+    if (profile?.admin_master) {
+      getModoLivre().then(setModoLivre).catch(() => {});
+    }
+  }, [profile?.admin_master]);
+
+  async function toggleModoLivreAction(ativo: boolean) {
+    try {
+      await setModoLivreDB(ativo);
+      setModoLivre(ativo);
+      window.dispatchEvent(new Event('cinevito-auth-change'));
+      setMessage(ativo ? 'Modo Livre Ativado! Catálogo gratuito para todos.' : 'Planos reativados! Exigência de assinatura ligada.');
+    } catch (err) {
+      setMessage('Erro ao tentar atualizar o Modo Livre.');
+    }
   }
 
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -1798,6 +1816,21 @@ function AdminPage() {
       </div>
       {message && <div className="notice notice-orange" role="status">{message}</div>}
 
+      {/* MODO LIVRE GLOBAL - SEPARADO DA ABA DOS PLANOS PARA NÃO MODIFICAR O LAYOUT */}
+      {profile.admin_master && (
+        <div className="status-card" style={{ marginBottom: 24, padding: 16, border: '1px solid rgba(0, 200, 255, 0.3)', borderRadius: 8, background: 'rgba(0, 200, 255, 0.05)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+            <div>
+              <h3 style={{ color: '#00c8ff', margin: 0 }}>Modo Catálogo Livre (Acesso Geral)</h3>
+              <p className="muted" style={{ fontSize: '.85rem', marginTop: 4, marginBottom: 0 }}>Pausa a exigência de assinatura e liberta os vídeos gratuitamente para todos.</p>
+            </div>
+            <button className={modoLivre ? "primary-button focus-tv" : "secondary-button focus-tv"} onClick={() => toggleModoLivreAction(!modoLivre)} tabIndex={0}>
+              {modoLivre ? 'Desativar (Exigir Plano)' : 'Ativar (Tudo Grátis)'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {tab === 'videos' && (
         <section className="panel panel-pad">
           <div className="eyebrow">Catálogo manual</div><h2 className="panel-title" style={{ marginTop: 8 }}>{editingVideoId ? 'Editar vídeo' : 'Adicionar vídeo'}</h2>
@@ -1984,7 +2017,7 @@ function AdminPage() {
                     <h3 style={{ color: '#00c8ff', margin: 0 }}>Modo Catálogo Livre (Acesso Geral)</h3>
                     <p className="muted" style={{ fontSize: '.85rem', marginTop: 4, marginBottom: 0 }}>Pausa a exigência de assinatura e liberta os vídeos gratuitamente para todos.</p>
                   </div>
-                  <button className={modoLivre ? "primary-button focus-tv" : "secondary-button focus-tv"} onClick={() => toggleModoLivre(!modoLivre)} tabIndex={0}>
+                  <button className={modoLivre ? "primary-button focus-tv" : "secondary-button focus-tv"} onClick={() => toggleModoLivreAction(!modoLivre)} tabIndex={0}>
                     {modoLivre ? 'Desativar (Exigir Plano)' : 'Ativar (Tudo Grátis)'}
                   </button>
                 </div>
