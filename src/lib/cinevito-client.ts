@@ -646,3 +646,25 @@ export async function registrarVisualizacao(videoId: string) {
     console.error('Erro no contador:', error);
   }
 }
+
+// === NOVAS FUNÇÕES: MODO LIVRE ===
+export async function getModoLivre(): Promise<boolean> {
+  try {
+    const rows = await request<Array<{ valor: string }>>('/rest/v1/configuracoes?select=valor&chave=eq.modo_livre&limit=1');
+    return rows[0]?.valor === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export async function setModoLivreDB(ativo: boolean): Promise<void> {
+  try {
+    await request('/rest/v1/configuracoes?chave=eq.modo_livre', {
+      method: 'PATCH',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ valor: String(ativo) })
+    });
+  } catch (error) {
+    throw new Error('Não foi possível atualizar o Modo Livre no Supabase.');
+  }
+}
