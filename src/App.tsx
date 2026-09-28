@@ -14,7 +14,7 @@ import {
   adminAddEpisodio, adminAddToEquipe, adminAddVideoToColecao, adminCreateCategoria, adminCreateColecao, adminCreateCupom, adminCreateGenero, adminCreateLayoutSection, adminCreatePlano, adminCreateSerie, adminCreateTemporada, adminCreateVideo,
   adminDeleteColecao, adminDeleteCupom, adminDeleteLayoutSection, adminDeletePlano, adminDeleteSerie, adminDeleteTemporada, adminDeleteVideo, adminPromoverMaster, adminRebaixarMaster, adminRemoveEpisodio, adminRemoveVideoFromColecao, adminRemoverDaEquipe, adminReorderColecaoVideos, adminReorderLayout, adminToggleCupom, adminToggleLayoutVisible, adminUpdateLayoutSection, adminUpdatePlano, adminUpdateVideo,
   checkCatalogAccess, clearSession, fetchAdminClients, fetchAdminCupons, fetchAdminPlans, fetchAdminVideos, fetchCategorias, fetchCatalogoLayout, fetchCatalogoLayoutPublico, fetchColecaoVideos, fetchColecoes, fetchColecoesParaCatalogo, fetchContinuarAssistindo, fetchEpisodioInfo, fetchEpisodioVideoIds, fetchEpisodios, fetchEquipe, fetchGenerosList, fetchMySubscription, fetchPlans, fetchProfile, fetchSerieCompleta, fetchSeries, fetchTemporadas, fetchVideos, getAccessToken, getStoredUser, grantAccess, hasRuntimeConfig,
-  processPayment, requestPasswordReset, revokeAccess, salvarProgresso, signIn, signUp, submitSuggestion, updatePlanActive, registrarVisualizacao, removeContinuarAssistindo, type Categoria, type Cliente, type Colecao, type ContinuarAssistindoItem, type Cupom, type Episodio, type Equipe, type Genero, type LayoutItem, type LayoutSectionConfig, type MinhaAssinatura, type Plan, type SessionUser, type Serie, type Temporada, type Video,
+  processPayment, requestPasswordReset, revokeAccess, salvarProgresso, signIn, signUp, submitSuggestion, updatePlanActive, registrarVisualizacao, removeContinuarAssistindo, getModoLivre, setModoLivreDB, type Categoria, type Cliente, type Colecao, type ContinuarAssistindoItem, type Cupom, type Episodio, type Equipe, type Genero, type LayoutItem, type LayoutSectionConfig, type MinhaAssinatura, type Plan, type SessionUser, type Serie, type Temporada, type Video,
 } from '@/lib/cinevito-client';
 
 import { UserUploadPage } from './pages/user-upload';
@@ -93,14 +93,19 @@ function useCatalogAccess(user: SessionUser | null) {
   useEffect(() => {
     let cancelled = false;
     
-    const checkAccess = () => {
-      // 1. Verifica se o "Modo Livre" está ativado globalmente pelo Administrador
-      if (localStorage.getItem('cinevito_modo_livre') === 'true') {
-        if (!cancelled) setAccess(true);
-        return;
+    const checkAccess = async () => {
+      if (hasRuntimeConfig) {
+        try {
+          const isLivre = await getModoLivre();
+          if (isLivre) {
+            if (!cancelled) setAccess(true);
+            return;
+          }
+        } catch (e) {
+          // Continua para a verificação normal se falhar
+        }
       }
       
-      // 2. Se não estiver no modo livre, verifica a conta do utilizador
       if (!user) { 
         if (!cancelled) setAccess(false); 
         return; 
@@ -113,7 +118,6 @@ function useCatalogAccess(user: SessionUser | null) {
     
     checkAccess();
     
-    // Recalcula o acesso caso o admin ative/desative o botão
     const handler = () => checkAccess();
     window.addEventListener('cinevito-auth-change', handler);
     
@@ -209,9 +213,6 @@ function extractVideoUrl(input: string): string {
 function getEmbedInfo(url?: string | null): { type: 'file' | 'embed' | 'none'; src: string } {
   if (!url) return { type: 'none', src: '' };
   const trimmed = url.trim();
-
-  // REMOVIDO: O atalho para o brstream.cc foi removido porque eles bloqueiam Iframes via X-Frame-Options.
-  // A tentativa de usar Iframe forçava a "tela preta silenciosa". O fallback agora cairá no `hls.js` que capturará o erro.
 
   if (trimmed.includes('mixdrop') || trimmed.includes('miixdrop')) {
     const mixMatch = trimmed.match(/(?:mixdrop|miixdrop)\.(?:top|to|club|co|sx|bz)\/(?:f|e|e6)\/([a-zA-Z0-9_-]+)/);
@@ -1435,7 +1436,7 @@ function FaqPage() {
 function AdminPage() {
   const user = useAuth(); const [profile, setProfile] = useState<{ is_admin?: boolean; admin_master?: boolean } | null>(null); const [tab, setTab] = useState('videos'); const [loading, setLoading] = useState(Boolean(user && hasRuntimeConfig)); const [message, setMessage] = useState('');
   
-  // MODO LIVRE: BUSCA O ESTADO INICIAL DA BASE DE DADOS
+  // MODO LIVRE: BUSCA O ESTADO INICIAL DA BASE DE DADOS E APAGA REPETIÇÕES
   const [modoLivre, setModoLivre] = useState(false);
   const [adminPlanCat, setAdminPlanCat] = useState('');
 
@@ -1993,7 +1994,6 @@ function AdminPage() {
           <section className="panel panel-pad">
             <div className="eyebrow">Financeiro</div><h2 className="panel-title" style={{ marginTop: 8 }}>Planos de Assinatura</h2>
             
-            {/* BOTÃO MODO LIVRE AQUI (Sem interferir no formulário dos planos) */}
             {profile.admin_master && (
               <div className="status-card" style={{ marginBottom: 24, padding: 16, border: '1px solid rgba(0, 200, 255, 0.3)', borderRadius: 8, background: 'rgba(0, 200, 255, 0.05)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
@@ -2008,7 +2008,6 @@ function AdminPage() {
               </div>
             )}
 
-            {/* FORMULÁRIO DE CRIAR/EDITAR PLANOS FICA EXATAMENTE COMO ESTAVA */}
             <h3 style={{ marginBottom: 12 }}>{editingPlanoId ? 'Editar Plano' : 'Criar Novo Plano'}</h3>
             <div className="field"><label>Nome do Plano</label><input className="input focus-tv" value={planoForm.nome} onChange={(e) => setPlanoForm({ ...planoForm, nome: e.target.value })} placeholder="Ex.: Plano Família" tabIndex={0} /></div>
             <div className="field"><label>Categoria (agrupa botões)</label><input className="input focus-tv" value={planoForm.categoria} onChange={(e) => setPlanoForm({ ...planoForm, categoria: e.target.value })} placeholder="Ex.: Mensal" tabIndex={0} /></div>
@@ -2019,7 +2018,6 @@ function AdminPage() {
             <button className="primary-button focus-tv" onClick={savePlano} disabled={savingPlano} tabIndex={0}>{savingPlano ? 'A guardar...' : editingPlanoId ? 'Guardar Plano' : 'Criar Plano'}</button>
             {editingPlanoId && <button className="quiet-button focus-tv" style={{ marginLeft: 10 }} onClick={resetPlanoForm} tabIndex={0}>Cancelar</button>}
             
-            {/* LISTA DE PLANOS DO ADMIN AGORA SEPARADA POR ABAS IGUAL AO DO CLIENTE */}
             <div style={{ marginTop: 32 }}>
               <h3 style={{ marginBottom: 16 }}>Planos Publicados</h3>
               {adminPlanCategories.length > 0 && (
