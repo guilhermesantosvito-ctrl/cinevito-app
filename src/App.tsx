@@ -14,7 +14,7 @@ import {
   adminAddEpisodio, adminAddToEquipe, adminAddVideoToColecao, adminCreateCategoria, adminCreateColecao, adminCreateCupom, adminCreateGenero, adminCreateLayoutSection, adminCreatePlano, adminCreateSerie, adminCreateTemporada, adminCreateVideo,
   adminDeleteColecao, adminDeleteCupom, adminDeleteLayoutSection, adminDeletePlano, adminDeleteSerie, adminDeleteTemporada, adminDeleteVideo, adminPromoverMaster, adminRebaixarMaster, adminRemoveEpisodio, adminRemoveVideoFromColecao, adminRemoverDaEquipe, adminReorderColecaoVideos, adminReorderLayout, adminToggleCupom, adminToggleLayoutVisible, adminUpdateLayoutSection, adminUpdatePlano, adminUpdateVideo,
   checkCatalogAccess, clearSession, fetchAdminClients, fetchAdminCupons, fetchAdminPlans, fetchAdminVideos, fetchCategorias, fetchCatalogoLayout, fetchCatalogoLayoutPublico, fetchColecaoVideos, fetchColecoes, fetchColecoesParaCatalogo, fetchContinuarAssistindo, fetchEpisodioInfo, fetchEpisodioVideoIds, fetchEpisodios, fetchEquipe, fetchGenerosList, fetchMySubscription, fetchPlans, fetchProfile, fetchSerieCompleta, fetchSeries, fetchTemporadas, fetchVideos, getAccessToken, getStoredUser, grantAccess, hasRuntimeConfig,
-  processPayment, requestPasswordReset, revokeAccess, salvarProgresso, signIn, signUp, submitSuggestion, updatePlanActive, registrarVisualizacao, removeContinuarAssistindo, getModoLivre, setModoLivreDB, type Categoria, type Cliente, type Colecao, type ContinuarAssistindoItem, type Cupom, type Episodio, type Equipe, type Genero, type LayoutItem, type LayoutSectionConfig, type MinhaAssinatura, type Plan, type SessionUser, type Serie, type Temporada, type Video,
+  processPayment, requestPasswordReset, revokeAccess, salvarProgresso, signIn, signUp, submitSuggestion, updatePlanActive, registrarVisualizacao, removeContinuarAssistindo, type Categoria, type Cliente, type Colecao, type ContinuarAssistindoItem, type Cupom, type Episodio, type Equipe, type Genero, type LayoutItem, type LayoutSectionConfig, type MinhaAssinatura, type Plan, type SessionUser, type Serie, type Temporada, type Video,
 } from '@/lib/cinevito-client';
 
 import { UserUploadPage } from './pages/user-upload';
@@ -86,26 +86,21 @@ function useAuth() {
   return user;
 }
 
-// LÓGICA ATUALIZADA DO MODO LIVRE (Verifica na base de dados)
+// LOGICA ATUALIZADA DO MODO LIVRE
 function useCatalogAccess(user: SessionUser | null) {
   const [access, setAccess] = useState<boolean | null>(null);
   
   useEffect(() => {
     let cancelled = false;
     
-    const checkAccess = async () => {
-      if (hasRuntimeConfig) {
-        try {
-          const isLivre = await getModoLivre();
-          if (isLivre) {
-            if (!cancelled) setAccess(true);
-            return;
-          }
-        } catch (e) {
-          // Continua para a verificação normal se falhar
-        }
+    const checkAccess = () => {
+      // 1. Verifica se o "Modo Livre" está ativado globalmente pelo Administrador
+      if (localStorage.getItem('cinevito_modo_livre') === 'true') {
+        if (!cancelled) setAccess(true);
+        return;
       }
       
+      // 2. Se não estiver no modo livre, verifica a conta do utilizador
       if (!user) { 
         if (!cancelled) setAccess(false); 
         return; 
@@ -118,6 +113,7 @@ function useCatalogAccess(user: SessionUser | null) {
     
     checkAccess();
     
+    // Recalcula o acesso caso o admin ative/desative o botão
     const handler = () => checkAccess();
     window.addEventListener('cinevito-auth-change', handler);
     
@@ -213,6 +209,9 @@ function extractVideoUrl(input: string): string {
 function getEmbedInfo(url?: string | null): { type: 'file' | 'embed' | 'none'; src: string } {
   if (!url) return { type: 'none', src: '' };
   const trimmed = url.trim();
+
+  // REMOVIDO: O atalho para o brstream.cc foi removido porque eles bloqueiam Iframes via X-Frame-Options.
+  // A tentativa de usar Iframe forçava a "tela preta silenciosa". O fallback agora cairá no `hls.js` que capturará o erro.
 
   if (trimmed.includes('mixdrop') || trimmed.includes('miixdrop')) {
     const mixMatch = trimmed.match(/(?:mixdrop|miixdrop)\.(?:top|to|club|co|sx|bz)\/(?:f|e|e6)\/([a-zA-Z0-9_-]+)/);
@@ -444,7 +443,7 @@ function AuthPage() {
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError(''); setNotice('');
-    if (!form.email || !form.password || (mode === 'signup' && !form.nome)) { setError('Preencha os campos obrigatórios para continue.'); return; }
+    if (!form.email || !form.password || (mode === 'signup' && !form.nome)) { setError('Preencha os campos obrigatórios para continuar.'); return; }
     setBusy(true);
     try {
       if (mode === 'login') {
@@ -1815,21 +1814,6 @@ function AdminPage() {
         ))}
       </div>
       {message && <div className="notice notice-orange" role="status">{message}</div>}
-
-      {/* MODO LIVRE GLOBAL - SEPARADO DA ABA DOS PLANOS PARA NÃO MODIFICAR O LAYOUT */}
-      {profile.admin_master && (
-        <div className="status-card" style={{ marginBottom: 24, padding: 16, border: '1px solid rgba(0, 200, 255, 0.3)', borderRadius: 8, background: 'rgba(0, 200, 255, 0.05)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-            <div>
-              <h3 style={{ color: '#00c8ff', margin: 0 }}>Modo Catálogo Livre (Acesso Geral)</h3>
-              <p className="muted" style={{ fontSize: '.85rem', marginTop: 4, marginBottom: 0 }}>Pausa a exigência de assinatura e liberta os vídeos gratuitamente para todos.</p>
-            </div>
-            <button className={modoLivre ? "primary-button focus-tv" : "secondary-button focus-tv"} onClick={() => toggleModoLivreAction(!modoLivre)} tabIndex={0}>
-              {modoLivre ? 'Desativar (Exigir Plano)' : 'Ativar (Tudo Grátis)'}
-            </button>
-          </div>
-        </div>
-      )}
 
       {tab === 'videos' && (
         <section className="panel panel-pad">
