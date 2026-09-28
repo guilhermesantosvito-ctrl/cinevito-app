@@ -184,9 +184,6 @@ function getEmbedInfo(url?: string | null): { type: 'file' | 'embed' | 'none'; s
   if (!url) return { type: 'none', src: '' };
   const trimmed = url.trim();
 
-  // REMOVIDO: O atalho para o brstream.cc foi removido porque eles bloqueiam Iframes via X-Frame-Options.
-  // A tentativa de usar Iframe forçava a "tela preta silenciosa". O fallback agora cairá no `hls.js` que capturará o erro.
-
   if (trimmed.includes('mixdrop') || trimmed.includes('miixdrop')) {
     const mixMatch = trimmed.match(/(?:mixdrop|miixdrop)\.(?:top|to|club|co|sx|bz)\/(?:f|e|e6)\/([a-zA-Z0-9_-]+)/);
     if (mixMatch) return { type: 'embed', src: `https://mixdrop.top/e/${mixMatch[1]}` };
@@ -502,9 +499,9 @@ function HeroBanner({ videos, onOpen }: { videos: Video[]; onOpen: (id: string) 
   if (!videos.length) return null;
   const video = videos[index % videos.length];
   return <section className="shelf" style={{ marginTop: 22 }}>
-    <div role="button" tabIndex={0} onClick={() => onOpen(video.id)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen(video.id)} className="focus-tv" style={{ aspectRatio: '16/7', borderRadius: 14, overflow: 'hidden', position: 'relative', cursor: 'pointer', background: video.url_capa ? undefined : 'linear-gradient(145deg, #0d596c, #172532 50%, #e58d49)' }}>
-      {video.url_capa && <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${video.url_capa})`, backgroundSize: video.ao_vivo ? 'contain' : 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', opacity: video.ao_vivo ? 0.8 : 1 }} />}
-      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(0deg, rgba(0,0,0,.8), rgba(0,0,0,.05) 65%)' }} />
+    <div role="button" tabIndex={0} onClick={() => onOpen(video.id)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen(video.id)} className="focus-tv" style={{ aspectRatio: '16/7', borderRadius: 14, overflow: 'hidden', position: 'relative', cursor: 'pointer', background: '#090d12' }}>
+      {video.url_capa && <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${video.url_capa})`, backgroundSize: 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }} />}
+      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(0deg, rgba(0,0,0,.85), rgba(0,0,0,.1) 65%)' }} />
       <div style={{ position: 'absolute', left: 20, bottom: 20, right: 20 }}>
         <div className="eyebrow" style={{ color: '#00c8ff' }}>Em destaque</div>
         <h2 style={{ fontSize: '1.6rem', margin: '6px 0' }}>{video.titulo}</h2>
