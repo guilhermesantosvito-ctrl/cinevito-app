@@ -88,15 +88,41 @@ function useAuth() {
 
 function useCatalogAccess(user: SessionUser | null) {
   const [access, setAccess] = useState<boolean | null>(null);
+  
   useEffect(() => {
-    if (!user) { setAccess(false); return; }
     let cancelled = false;
-    setAccess(null);
-    checkCatalogAccess()
-      .then((value) => { if (!cancelled) setAccess(value); })
-      .catch(() => { if (!cancelled) setAccess(false); });
-    return () => { cancelled = true; };
+    
+    const checkAccess = () => {
+      // 1. Verifica se o "Modo Livre" está ativado globalmente pelo Administrador
+      if (localStorage.getItem('cinevito_modo_livre') === 'true') {
+        if (!cancelled) setAccess(true);
+        return;
+      }
+      
+      // 2. Se não estiver no modo livre, verifica a conta do utilizador
+      if (!user) { 
+        if (!cancelled) setAccess(false); 
+        return; 
+      }
+      
+      if (!cancelled) setAccess(null);
+      checkCatalogAccess()
+        .then((value) => { if (!cancelled) setAccess(value); })
+        .catch(() => { if (!cancelled) setAccess(false); });
+    };
+    
+    checkAccess();
+    
+    // Recalcula o acesso caso o admin ative/desative o botão
+    const handler = () => checkAccess();
+    window.addEventListener('cinevito-auth-change', handler);
+    
+    return () => { 
+      cancelled = true; 
+      window.removeEventListener('cinevito-auth-change', handler);
+    };
   }, [user?.id]);
+  
   return access;
 }
 
@@ -1405,6 +1431,17 @@ function FaqPage() {
 
 function AdminPage() {
   const user = useAuth(); const [profile, setProfile] = useState<{ is_admin?: boolean; admin_master?: boolean } | null>(null); const [tab, setTab] = useState('videos'); const [loading, setLoading] = useState(Boolean(user && hasRuntimeConfig)); const [message, setMessage] = useState('');
+  
+  // ESTADO GLOBAL DO MODO LIVRE (Passo 1: Salvo localmente para já)
+  const [modoLivre, setModoLivre] = useState(() => localStorage.getItem('cinevito_modo_livre') === 'true');
+
+  function toggleModoLivre(ativo: boolean) {
+    setModoLivre(ativo);
+    localStorage.setItem('cinevito_modo_livre', String(ativo));
+    window.dispatchEvent(new Event('cinevito-auth-change')); // Força a interface a atualizar instantaneamente
+    setMessage(ativo ? 'Modo Livre Ativado! Catálogo gratuito para todos.' : 'Planos reativados! Exigência de assinatura ligada.');
+  }
+
   const [plans, setPlans] = useState<Plan[]>([]);
   const [planoForm, setPlanoForm] = useState({ nome: '', categoria: '', descricao: '', preco: '', dispositivos: '1', duracaoQtd: '1', duracaoUnidade: 'meses' as 'dias' | 'meses' });
   const [editingPlanoId, setEditingPlanoId] = useState<string | null>(null);
@@ -1936,6 +1973,20 @@ function AdminPage() {
       {tab === 'planos' && (
         <section className="panel panel-pad">
           <div className="eyebrow">Financeiro</div><h2 className="panel-title" style={{ marginTop: 8 }}>Planos de Assinatura</h2>
+          
+          {/* BOTÃO MODO LIVRE CRIADO AQUI */}
+          <div className="status-card" style={{ marginBottom: 24, padding: 16, border: '1px solid rgba(0, 200, 255, 0.3)', borderRadius: 8, background: 'rgba(0, 200, 255, 0.05)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+              <div>
+                <h3 style={{ color: '#00c8ff', margin: 0 }}>Modo Catálogo Livre</h3>
+                <p className="muted" style={{ fontSize: '.85rem', marginTop: 4, marginBottom: 0 }}>Pausa a exigência de assinatura e liberta o catálogo para todos de graça.</p>
+              </div>
+              <button className={modoLivre ? "primary-button focus-tv" : "secondary-button focus-tv"} onClick={() => toggleModoLivre(!modoLivre)} tabIndex={0}>
+                {modoLivre ? 'Desativar (Exigir Plano)' : 'Ativar (Tudo Grátis)'}
+              </button>
+            </div>
+          </div>
+
           <div className="field"><label>Nome do Plano</label><input className="input focus-tv" value={planoForm.nome} onChange={(e) => setPlanoForm({ ...planoForm, nome: e.target.value })} placeholder="Ex.: Plano Família" tabIndex={0} /></div>
           <div className="field"><label>Categoria (agrupa botões)</label><input className="input focus-tv" value={planoForm.categoria} onChange={(e) => setPlanoForm({ ...planoForm, categoria: e.target.value })} placeholder="Ex.: Mensal" tabIndex={0} /></div>
           <div className="field"><label>Descrição curta</label><input className="input focus-tv" value={planoForm.descricao} onChange={(e) => setPlanoForm({ ...planoForm, descricao: e.target.value })} placeholder="Ex.: 4 telas em simultâneo" tabIndex={0} /></div>
