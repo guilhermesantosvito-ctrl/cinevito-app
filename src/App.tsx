@@ -521,24 +521,44 @@ function SerieCard({ serie, onOpen }: { serie: Serie; onOpen: () => void }) {
 
 function HeroBanner({ videos, onOpen }: { videos: Video[]; onOpen: (id: string) => void }) {
   const [index, setIndex] = useState(0);
+  
+  // Deteta se é telemóvel para ajustar o rácio e a posição do banner
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   useEffect(() => {
     if (videos.length < 2) return;
     const id = window.setInterval(() => setIndex((current) => (current + 1) % videos.length), 6000);
     return () => window.clearInterval(id);
   }, [videos.length]);
+
   if (!videos.length) return null;
   const video = videos[index % videos.length];
+
   return <section className="shelf" style={{ marginTop: 22 }}>
-    <div role="button" tabIndex={0} onClick={() => onOpen(video.id)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen(video.id)} className="focus-tv" style={{ aspectRatio: '16/7', borderRadius: 14, overflow: 'hidden', position: 'relative', cursor: 'pointer', background: '#090d12' }}>
-      {video.url_capa && <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${video.url_capa})`, backgroundSize: 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }} />}
-      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(0deg, rgba(0,0,0,.85), rgba(0,0,0,.1) 65%)' }} />
-      <div style={{ position: 'absolute', left: 20, bottom: 20, right: 20 }}>
-        <div className="eyebrow" style={{ color: '#00c8ff' }}>Em destaque</div>
-        <h2 style={{ fontSize: '1.6rem', margin: '6px 0' }}>{video.titulo}</h2>
-        <p className="muted" style={{ maxWidth: 520, fontSize: '.86rem' }}>{video.descricao}</p>
-        <button className="primary-button focus-tv" style={{ marginTop: 8 }} onClick={(e) => { e.stopPropagation(); onOpen(video.id); }} tabIndex={0}><Play size={15} />Assistir agora</button>
+    <div role="button" tabIndex={0} onClick={() => onOpen(video.id)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen(video.id)} className="focus-tv" style={{ aspectRatio: isMobile ? '3/4' : '16/7', borderRadius: 14, overflow: 'hidden', position: 'relative', cursor: 'pointer', background: '#090d12' }}>
+      {/* 1. Fundo desfocado para dar um efeito premium e preencher ecrãs largos ou altos */}
+      {video.url_capa && <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${video.url_capa})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(20px)', opacity: 0.4, transform: 'scale(1.1)' }} />}
+      
+      {/* 2. Imagem nítida em destaque (no telemóvel fica mais acima, no PC ao centro) */}
+      {video.url_capa && <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${video.url_capa})`, backgroundSize: 'contain', backgroundPosition: isMobile ? 'top' : 'center', backgroundRepeat: 'no-repeat', marginTop: isMobile ? '20px' : '0', maxHeight: isMobile ? '65%' : '100%' }} />}
+      
+      {/* 3. Gradiente escuro para dar destaque perfeito ao texto */}
+      <div style={{ position: 'absolute', inset: 0, background: isMobile ? 'linear-gradient(0deg, #090d12 15%, rgba(9,13,18,0.7) 45%, rgba(9,13,18,0) 100%)' : 'linear-gradient(0deg, rgba(9,13,18,0.95) 0%, rgba(9,13,18,0.4) 60%, rgba(9,13,18,0) 100%)' }} />
+      
+      <div style={{ position: 'absolute', left: isMobile ? 16 : 30, bottom: isMobile ? 20 : 30, right: isMobile ? 16 : 30, zIndex: 2 }}>
+        <div className="eyebrow" style={{ color: '#00c8ff', marginBottom: isMobile ? 6 : 8, textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>Em destaque</div>
+        <h2 style={{ fontSize: isMobile ? '1.5rem' : '2.2rem', margin: '0 0 8px 0', textShadow: '0 2px 4px rgba(0,0,0,0.8)', fontWeight: 800, lineHeight: 1.1 }}>{video.titulo}</h2>
+        <p className="muted" style={{ maxWidth: 520, fontSize: isMobile ? '.85rem' : '.95rem', textShadow: '0 1px 3px rgba(0,0,0,0.8)', color: '#dbe2ea', display: '-webkit-box', WebkitLineClamp: isMobile ? 2 : 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', margin: 0 }}>{video.descricao}</p>
+        <button className="primary-button focus-tv" style={{ marginTop: 16, padding: isMobile ? '8px 16px' : '10px 20px', fontSize: isMobile ? '.9rem' : '1rem' }} onClick={(e) => { e.stopPropagation(); onOpen(video.id); }} tabIndex={0}><Play size={16} />Assistir agora</button>
       </div>
-      {videos.length > 1 && <div style={{ position: 'absolute', right: 16, top: 16, display: 'flex', gap: 6 }}>{videos.map((_, i) => <span key={i} style={{ width: 7, height: 7, borderRadius: '50%', background: i === index ? '#fff' : 'rgba(255,255,255,.35)' }} />)}</div>}
+      
+      {videos.length > 1 && <div style={{ position: 'absolute', right: 16, top: 16, display: 'flex', gap: 6, zIndex: 2 }}>{videos.map((_, i) => <span key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: i === index ? '#fff' : 'rgba(255,255,255,.35)', transition: 'background 0.3s' }} />)}</div>}
     </div>
   </section>;
 }
@@ -1815,6 +1835,21 @@ function AdminPage() {
         ))}
       </div>
       {message && <div className="notice notice-orange" role="status">{message}</div>}
+
+      {/* MODO LIVRE GLOBAL - SEPARADO DA ABA DOS PLANOS PARA NÃO MODIFICAR O LAYOUT */}
+      {profile.admin_master && (
+        <div className="status-card" style={{ marginBottom: 24, padding: 16, border: '1px solid rgba(0, 200, 255, 0.3)', borderRadius: 8, background: 'rgba(0, 200, 255, 0.05)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+            <div>
+              <h3 style={{ color: '#00c8ff', margin: 0 }}>Modo Catálogo Livre (Acesso Geral)</h3>
+              <p className="muted" style={{ fontSize: '.85rem', marginTop: 4, marginBottom: 0 }}>Pausa a exigência de assinatura e liberta os vídeos gratuitamente para todos.</p>
+            </div>
+            <button className={modoLivre ? "primary-button focus-tv" : "secondary-button focus-tv"} onClick={() => toggleModoLivreAction(!modoLivre)} tabIndex={0}>
+              {modoLivre ? 'Desativar (Exigir Plano)' : 'Ativar (Tudo Grátis)'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {tab === 'videos' && (
         <section className="panel panel-pad">
